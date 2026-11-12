@@ -7,7 +7,7 @@ use super::*;
 
 /// Two terminal states with tasks in them and one task still moving, so the
 /// tally has to name both terminals and the in-progress remainder.
-const SUMMARY_PLAN: &str = r#"# Rhei: Ticket Fix
+pub(super) const SUMMARY_PLAN: &str = r#"# Rhei: Ticket Fix
 
 ## Tasks
 
@@ -52,20 +52,20 @@ const UNMEASURED_TOKENS: &str = r#"{
   }
 }"#;
 
-struct Invocation<'a> {
-    id: &'a str,
-    task_id: &'a str,
-    state: &'a str,
-    visit: u64,
-    model: &'a str,
-    started_at: &'a str,
-    ended_at: &'a str,
-    measured: bool,
+pub(super) struct Invocation<'a> {
+    pub(super) id: &'a str,
+    pub(super) task_id: &'a str,
+    pub(super) state: &'a str,
+    pub(super) visit: u64,
+    pub(super) model: &'a str,
+    pub(super) started_at: &'a str,
+    pub(super) ended_at: &'a str,
+    pub(super) measured: bool,
 }
 
 /// Write one `rhei.accounting.invocation.v1` record, the durable material the
 /// summary is rendered from. §FS-rhei-summary.1
-fn write_invocation(root: &Path, invocation: &Invocation<'_>) {
+pub(super) fn write_invocation(root: &Path, invocation: &Invocation<'_>) {
     let dir = root.join("runtime/accounting/invocations");
     fs::create_dir_all(&dir).expect("accounting directory should be created");
     let (extraction_status, tokens) = if invocation.measured {
@@ -168,9 +168,9 @@ fn summary_leads_with_the_workflow_the_invocations_and_the_task_tally() {
 
 #[test]
 fn summary_numbers_the_steps_by_started_at_with_visits_and_measured_tokens() {
-    // §FS-rhei-summary.2.2: one numbered entry per record in `started_at`
-    // order; `(visit N)` only where a task has more than one record, and token
-    // counts only where the record measured them.
+    // §FS-rhei-summary.2.2: entries in `started_at` order, one per record here
+    // because no two are attempts at one visit; `(visit N)` only where a task
+    // has more than one record, and token counts only where it measured them.
     let (dir, plan_path, machine_path) = setup_single_file("summary-steps", SUMMARY_PLAN);
     write_three_invocations(&dir);
 

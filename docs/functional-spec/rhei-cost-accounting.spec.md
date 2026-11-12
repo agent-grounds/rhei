@@ -1150,8 +1150,9 @@ text the malformed-artifact warnings use ([§FS-rhei-cost-accounting.11](rhei-co
 prints no such tail — `--json` carries the roots either way ([§FS-rhei-cost-accounting.8.4](rhei-cost-accounting.spec.md#84-compatibility)).
 
 `rhei summary` reads the same artifacts for the other question — not what the
-run cost but what it did, one numbered line per invocation, as Markdown short
-enough to paste into a pull request ([§FS-rhei-summary](rhei-summary.spec.md#fs-rhei-summary-rhei-summary)).
+run cost but what it did, one numbered line per step, with the consecutive
+attempts at one visit folded into one line ([§FS-rhei-summary.2.2.1](rhei-summary.spec.md#221-consecutive-attempts-at-one-visit-fold)), as
+Markdown short enough to paste into a pull request ([§FS-rhei-summary](rhei-summary.spec.md#fs-rhei-summary-rhei-summary)).
 
 ### 8.1. Published Accounting Schemas
 

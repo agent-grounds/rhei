@@ -335,6 +335,7 @@ mod strict_inputs_exit_tests;
 mod strict_inputs_support;
 mod strict_inputs_tests;
 mod suite_isolation_tests;
+mod summary_fold_tests;
 mod summary_repricing_lock_tests;
 mod summary_repricing_support;
 mod summary_repricing_tests;

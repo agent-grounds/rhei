@@ -850,7 +850,7 @@ transitions:
         let err = rhei_core::parser::ParseError {
             message: "unexpected token".to_string(),
             line: Some(2),
-            file: None,
+            ..Default::default()
         };
 
         let rendered = render_parse_diagnostic(Path::new("broken.md"), input, &err);

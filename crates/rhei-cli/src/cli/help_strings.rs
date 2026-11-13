@@ -44,6 +44,27 @@ fn plan_authoring_help() -> String {
     )
 }
 
+/// Help for task metadata under a task heading above `## Tasks`: put the heading
+/// under the section — add it above the heading's line when the plan has none,
+/// or move the task under the one that follows. §FS-rhei-errors.1.7
+fn task_heading_above_tasks_help(
+    heading_line: Option<usize>,
+    tasks_section_follows: bool,
+) -> String {
+    let at = heading_line
+        .map_or_else(|| "the task heading".to_string(), |line| format!("line {line}"));
+    let edit = if tasks_section_follows {
+        format!("move the task at {at} under `## Tasks`")
+    } else {
+        format!("add a `## Tasks` line above {at}")
+    };
+    // A discarded rendering holds nothing to validate. §FS-rhei-errors.4.1
+    match rendering_retry_help() {
+        Some(retry) => format!("{edit} {retry}"),
+        None => format!("{edit}, then re-run: {}", help_command("validate")),
+    }
+}
+
 /// Help for a rhei whose id cannot be derived from the path naming it.
 ///
 /// The plan is not the problem here — it parsed — so the reader must be sent to

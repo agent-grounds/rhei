@@ -52,7 +52,6 @@ fn read_json(path: &Path, what: &str) -> serde_json::Value {
 /// it `finished` with `exit_code: 3` — never `failed`.
 // §FS-rhei-run-headless.2 §FS-rhei-evidence.9.1
 #[test]
-#[ignore = "red until #677: idle stop recorded as failed; implement removes this"]
 fn until_idle_stop_at_a_gate_is_recorded_finished_with_exit_three() {
     let plan = IdlePlan::new(
         "until-idle-record",

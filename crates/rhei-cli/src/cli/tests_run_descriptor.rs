@@ -154,11 +154,11 @@ pub(super) mod run_descriptor_tests {
         let workspace = workspace();
         publish_run_descriptor(&descriptor("ee33ff", &workspace.path, "2026-08-22T14:03:22Z"));
 
-        finalize_run_descriptor(3);
+        finalize_run_descriptor(1);
 
         let read = read_descriptor(&run_descriptor_path(&workspace.path)).expect("published");
         assert_eq!(read.status, RunStatus::Failed);
-        assert_eq!(read.exit_code, Some(3));
+        assert_eq!(read.exit_code, Some(1));
         // The control server is gone with the process; leaving its URL behind
         // would send a reader to a closed socket.
         assert_eq!(read.control_url, None);
@@ -166,18 +166,36 @@ pub(super) mod run_descriptor_tests {
         let entry = run_registry_dir().expect("registry dir").join("ee33ff.json");
         let kept = read_descriptor(&entry).expect("the entry outlives the run");
         assert_eq!(kept.status, RunStatus::Failed);
-        assert_eq!(kept.exit_code, Some(3), "the entry carries the answer, not a dangling pointer");
+        assert_eq!(kept.exit_code, Some(1), "the entry carries the answer, not a dangling pointer");
     }
 
+    /// `0` and the idle stop of `--until-idle` both finalize as `finished`, in
+    /// run.json and the registry copy alike; `exit_code` alone tells them apart.
+    /// §FS-rhei-run-headless.2 §FS-rhei-run-json.5
     #[test]
-    fn a_zero_exit_finalizes_as_finished() {
+    fn a_zero_or_idle_exit_finalizes_as_finished() {
         let _registry = IsolatedRegistry::new();
-        let workspace = workspace();
-        publish_run_descriptor(&descriptor("aabbcc", &workspace.path, "2026-08-22T14:03:22Z"));
-        finalize_run_descriptor(0);
-        let read = read_descriptor(&run_descriptor_path(&workspace.path)).expect("published");
-        assert_eq!(read.status, RunStatus::Finished);
-        assert_eq!(read.exit_code, Some(0));
+        for (id, code) in [("aabbcc", 0), ("1d1e00", EXIT_IDLE)] {
+            let workspace = workspace();
+            publish_run_descriptor(&descriptor(id, &workspace.path, "2026-08-22T14:03:22Z"));
+            finalize_run_descriptor(code);
+            let registry = run_registry_path(id).expect("registry path");
+            for path in [run_descriptor_path(&workspace.path), registry] {
+                let read = read_descriptor(&path).expect("finalized");
+                assert_eq!((read.status, read.exit_code), (RunStatus::Finished, Some(code)));
+            }
+        }
+    }
+
+    /// The one mapping the descriptor and the evidence manifest both read.
+    /// §FS-rhei-run-headless.2 §FS-rhei-evidence.9.1
+    #[test]
+    fn the_terminal_status_follows_the_exit_code() {
+        assert_eq!(RunStatus::for_exit_code(0).label(), "finished");
+        assert_eq!(RunStatus::for_exit_code(EXIT_IDLE).label(), "finished");
+        for failing in [1, 2, 7, 101, 130, 143, -1] {
+            assert_eq!(RunStatus::for_exit_code(failing).label(), "failed", "exit {failing}");
+        }
     }
 
     /// Six hex characters collide eventually. A finalizing run must not stamp

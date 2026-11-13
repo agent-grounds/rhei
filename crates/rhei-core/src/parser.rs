@@ -202,6 +202,8 @@ mod plan_task_tooling_ast_tests;
 #[cfg(test)]
 mod plan_task_tooling_tests;
 #[cfg(test)]
+mod plan_tasks_section_tests;
+#[cfg(test)]
 mod plan_tests;
 #[cfg(test)]
 mod states_line_tests;

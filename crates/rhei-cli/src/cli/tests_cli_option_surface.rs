@@ -64,7 +64,6 @@ fn show_help_documents_the_ticket_target_and_the_machine_form() {
 /// alongside it. Calling the unit agents promised `--parallel 1` one agent
 /// where a two-arm state runs two (#673). §FS-rhei-run.5.3
 #[test]
-#[ignore = "red until #673: --parallel help names agents, not tasks and fan-out; implement removes this"]
 fn run_help_says_parallel_counts_tasks_and_their_fan_out_arms_run_alongside() {
     let mut command = cli_command();
     let run = command.find_subcommand_mut("run").expect("`run` subcommand");

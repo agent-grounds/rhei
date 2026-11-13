@@ -354,7 +354,7 @@ Within the sequential execution loop (see [Agents Specification](rhei-agents.spe
 
 ### 6.3. Parallel Mode
 
-Programs respect the same independence rules as agents in parallel mode. Independent tasks with program states can run concurrently up to `--parallel N`.
+Programs respect the same independence rules as agents in parallel mode. Independent tasks with program states can run concurrently up to `--parallel N` tasks ([§FS-rhei-run.5.3](rhei-run.spec.md#53-what---parallel-counts)).
 
 ### 6.4. Flags
 

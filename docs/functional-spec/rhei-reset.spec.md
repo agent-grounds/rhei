@@ -198,47 +198,70 @@ movement row are one task-keyed record ([§FS-rhei-complete.3.1](rhei-complete.s
 validates the pair and removes both rows together; it never leaves exceptional
 metadata orphaned or prunes only the movement.
 
-Artifact paths that still carry unresolved placeholders after `{task_id}` is
-substituted (`{state}`, `{visit_count}`, `{model}`, …) are matched by the
-literal prefix up to the first remaining placeholder, so `auth.1` never matches
-`auth.10`.
+A declared artifact path whose only placeholder is `{task_id}` names one file,
+which the reset removes. A path that still carries another placeholder once
+`{task_id}` is substituted (`{state}`, `{visit_count}`, `{rhei_id}`, `{model}`,
+…), before the id or after it, is matched **in full, one path component at a
+time**: each unresolved placeholder stands for any part of one component and
+never for a `/`, the ticket id has to stand where `{task_id}` stands, and the
+literal text around every placeholder, the text after the last one included, has
+to be there too. So under `runtime/{state}/{task_id}.md`, `--task paper.2` removes
+`runtime/review/paper.2.md` and leaves `runtime/` itself, and every other
+ticket's files in it, where they are, and `auth.1` never matches `auth.10`. A
+reset never removes a path in which the ticket id does not stand where
+`{task_id}` stands in the declared path, nor one that does not end as the declared
+path ends. Under `runtime/fix-summary/{task_id}.{visit_count}.md`, the ci-heal
+example's summary, `x.1.1`'s path matches its own `x.1.1.1.md` and never
+`x.1.1.md`, which is `x.1`'s first summary: only the declared `.md` after
+`{visit_count}` tells the two apart, since no id is longer than `x.1.1`. A file
+that only begins as a declared path does, such as `a.build-notes.txt` beside
+`runtime/findings/{task_id}-{visit_count}.md`, is no ticket's declared path, and
+the reset leaves it.
 
-That prefix carries the ticket id only when `{task_id}` comes before every other
-placeholder. A path with a placeholder **before** `{task_id}`, such as
-`runtime/{state}/{task_id}.md` or `runtime/{rhei_id}/{task_id}.md`, is matched one
-path component at a time instead: each unresolved placeholder stands for any part
-of one component and never for a `/`, and the ticket id has to stand where
-`{task_id}` stands. So `--task paper.2` removes `runtime/review/paper.2.md` and
-leaves `runtime/` itself, and every other ticket's files in it, where they are. A
-reset never removes a path in which the ticket id does not stand where `{task_id}`
-stands in the declared path.
+The names rhei writes itself are matched by prefix: logs, spawn records and
+reports as `task-<ticket-id>-`, snapshot sessions and captures as
+`<ticket-id>-`, a capture's id in the form its file name spells it. Rhei always
+writes `-` after the id there, so `auth.1` never matches `auth.10`.
 
 A placeholder reaches files of every naming, not only the declared path's own:
 under `runtime/{state}/{task_id}-{visit_count}.md`, `{state}` reaches
 `runtime/results/` and `runtime/supervise/`, and `{visit_count}` takes `docs`, so
 `x.build`'s path matches `x.build-docs`'s result and brief,
-`runtime/results/x.build-docs.md` and `runtime/supervise/x.build-docs.md`. A path
-a component pattern matches is therefore the ticket's only where **no longer
-project id could stand where `{task_id}` stands** in it: in the component that
-holds `{task_id}`, no project id longer than the ticket's, qualified or
-rhei-local, may begin where the text before it reads as the declared text before
-`{task_id}` and run over the place the ticket id stands. Such a path is no
-shorter ticket's, whatever the rest of its name reads as, so `--task x.build`
-leaves both of those files.
+`runtime/results/x.build-docs.md` and `runtime/supervise/x.build-docs.md`. One
+directory can hold several namings, too: under `runtime/supervise/{task_id}-{state}.md`,
+`x.build`'s path matches `x.build-docs`'s brief `runtime/supervise/x.build-docs.md`,
+and a machine that declares both `runtime/notes/{task_id}.md` and
+`runtime/notes/{task_id}-{state}.md` has `x.build`'s second path match
+`x.build-docs`'s first. So a path a ticket's declared path or prefix matches is
+that ticket's only where **no longer id of a ticket the reset keeps could stand
+where the ticket's id stands** in it: in the component that holds the id, no id
+of a ticket the reset leaves out, qualified or rhei-local, longer than the
+ticket's, may begin where the text before it reads as the text declared before
+the id, and run over the place the ticket's id stands. Nothing after that longer
+id is asked, so while `x.build-docs` is kept, `--task x.build` leaves each of
+those files, and leaves `x.build-docs-review.md` under `runtime/out/{task_id}-{state}.md`.
 
-Below its first placeholder a pattern enters only real directories and never
-descends through a symbolic link, so it cannot lead a reset out of the execution
-root; a link it matches as its last component is removed as a link, and what the
-link points at is left alone.
+Such a path is ambiguous, and a kept ticket's claim wins. Under
+`runtime/findings/{task_id}-{visit_count}.md`, `a.build`'s second output
+`a.build-2.md` reads as `a.build-2`'s id as well, so `--task a.build` leaves it
+while `a.build-2` is kept. A ticket the reset reaches stakes no claim against
+another: `--rhei a`, which reaches both, removes `a.build-2.md`, and so does a
+`--task` scope that reaches both. A file one in-scope ticket's path takes where a
+longer in-scope id could stand counts as lost by both tickets
+([§FS-rhei-reset.2.5.3](rhei-reset.spec.md#253-the-held-supervisor)).
+
+From its first placeholder, or from the component that holds the ticket id where
+that comes first, a declared path enters only real directories and never descends
+through a symbolic link, so it cannot lead a reset out of the execution root. A
+link it matches at or below the component that holds the id is the ticket's path:
+it is removed as a link where it resolves, and what it points at is left alone; a
+dangling one satisfies no input and is left where it is. A link above that
+component, at a level every ticket's path passes through, is neither entered nor
+removed.
 
 This list is the one both narrowings remove, `--rhei` and `--task`
-([§FS-rhei-reset.2.5](rhei-reset.spec.md#25-ticket-scope---task)). A file matched by prefix — a log, a spawn record, a report, a
-snapshot session, a capture, or a `{task_id}` artifact's literal prefix —
-belongs to the **longest** ticket id in the project whose prefix it matches, and
-goes only when that ticket is in scope; a file a component pattern matches goes
-only when the ticket it is owned by under the rule above is in scope. A `{task_id}-{state}` path leaves `x.build-` as the
-prefix, which `x.build-docs-review.md` matches too; that file is
-`x.build-docs`'s, so `--task x.build` leaves it.
+([§FS-rhei-reset.2.5](rhei-reset.spec.md#25-ticket-scope---task)), and the rule above is the one way either attributes a file
+to a ticket: a file goes only when a ticket in scope owns it under that rule.
 
 The export directory is matched by its complete ticket id, never by a prefix:
 resetting `auth.1` does not remove `runtime/exports/auth.10/`. Pre-qualification

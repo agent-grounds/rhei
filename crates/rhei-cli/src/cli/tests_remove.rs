@@ -149,14 +149,18 @@ fn allocation_skips_and_refuses_retired_ids() {
 #[test]
 fn ownership_never_follows_a_loose_prefix() {
     let others = vec!["auth.10".to_string(), "auth.fix-cache".to_string()];
-    assert!(!prefix_is_ambiguous("task-auth.1-pending.log", "task-auth.1-", "auth.1", &others));
+    let prefix_is_ambiguous = |name: &str, id: &str, others: &[String]| {
+        let logs = PathBuf::from("runtime/logs");
+        let named = NamedPrefix::new(logs.clone(), "task-", id);
+        name.starts_with(&named.prefix()) && !named.owns(&logs.join(name), others.iter().map(String::as_str))
+    };
+    assert!(!prefix_is_ambiguous("task-auth.1-pending.log", "auth.1", &others));
     assert!(prefix_is_ambiguous(
         "task-auth.fix-cache-pending.log",
-        "task-auth.fix-",
         "auth.fix",
         &others
     ));
-    assert!(!prefix_is_ambiguous("task-auth.fix-pending.log", "task-auth.fix-", "auth.fix", &["auth.1".into()]));
+    assert!(!prefix_is_ambiguous("task-auth.fix-pending.log", "auth.fix", &["auth.1".into()]));
 }
 
 /// Only rhei's own pre-spawn header, for this ticket, is a log nothing ran in.

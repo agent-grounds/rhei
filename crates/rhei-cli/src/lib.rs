@@ -330,7 +330,7 @@ include!("cli/reset_command.rs");
 include!("cli/reset_task_scope.rs");
 include!("cli/reset_task_scope_report.rs");
 include!("cli/reset_held_supervisor.rs");
-include!("cli/reset_prefix_owners.rs");
+include!("cli/reset_runtime_owners.rs");
 include!("cli/reset_component_pattern.rs");
 include!("cli/file_locks.rs");
 include!("cli/migrate_export_priors.rs");

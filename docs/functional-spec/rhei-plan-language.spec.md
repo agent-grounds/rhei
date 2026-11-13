@@ -994,7 +994,9 @@ either: a `**Prior:**` on a parent gates that parent's own visit only and does
 not hold its children. A child with no `**Prior:**` of its own is
 dependency-ready at once, beside its parent's prerequisites
 ([§FS-rhei-list.3.1](rhei-list.spec.md#31-what---ready-means)), so each child that must wait for a prerequisite carries the
-`**Prior:**` itself.
+`**Prior:**` itself. The same holds at every level: a grandchild or deeper
+descendant is held only by its own `**Prior:**`, never by one on any of its
+ancestors.
 
 ```markdown
 ### Task 2: Implementation

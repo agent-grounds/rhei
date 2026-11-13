@@ -181,10 +181,11 @@ point `**Prior:**` at the completed task.
 
 Nesting does not carry ordering down to the children either. A `**Prior:**` on a parent
 gates that parent's own visit only: it does not hold its children, and a child
-with no `**Prior:**` of its own is ready at once, while the parent's
+with no `**Prior:**` of its own is dependency-ready at once, while the parent's
 prerequisites are still open
 ([§FS-rhei-plan-language.3.1](rhei-plan-language.spec.md#31-dependency-integrity)). So give each child that must wait
-the `**Prior:**` itself; `rhei list --ready` shows which tasks would start.
+the `**Prior:**` itself, and the same at every level below: a descendant is
+held only by its own `**Prior:**`; `rhei list --ready` shows which tasks would start.
 
 ```markdown
 ### Task 2: Build on the ground

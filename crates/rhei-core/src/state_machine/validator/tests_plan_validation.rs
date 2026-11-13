@@ -442,6 +442,11 @@ structure:
             "did not find expected message; got:\n{}",
             joined
         );
+        // The error also says the other direction. §FS-rhei-plan-language.3.1
+        assert!(
+            joined.contains("does not hold its children"),
+            "ancestor error must say a parent's Prior does not hold its children; got:\n{joined}"
+        );
     }
 
     #[test]

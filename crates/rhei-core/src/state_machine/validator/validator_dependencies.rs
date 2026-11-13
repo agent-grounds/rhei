@@ -193,10 +193,11 @@ fn validate_dependency_integrity(
                 }
                 _ => {}
             }
+            // Says both directions: a parent's Prior does not hold its children. §FS-rhei-plan-language.3.1
             if ancestors.iter().any(|ancestor| ancestor == dep) {
                 report.errors.push(format!(
-                    "Task {} cannot list ancestor Task {} as **Prior:**; parent/child structure already defines containment. Make the dependent work a top-level sibling if it must wait for Task {}.",
-                    task.id, dep, dep
+                    "Task {} cannot list ancestor Task {} as **Prior:**; a parent's **Prior:** gates only its own visit and does not hold its children. Make the dependent work a top-level sibling if it must wait for Task {dep}, and give each child (and each descendant below it) that must wait for Task {dep}'s prerequisites that **Prior:** itself.",
+                    task.id, dep
                 ));
             }
         }

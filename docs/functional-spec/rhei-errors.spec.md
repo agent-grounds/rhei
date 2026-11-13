@@ -442,6 +442,54 @@ A filesystem failure while rendering into scratch space names the file by its
 position inside the template — a path the user can open — and points the remedy
 at `$TMPDIR` rather than at a directory that no longer exists.
 
+### 4.1. A Refused Rendering Names the Template File
+
+`rhei instantiate` validates what it rendered before anything is published
+([§FS-rhei-templates.6.1.2](rhei-templates.spec.md#612-behavior)). When that validation refuses a rendered file — a
+plan or task file that does not parse, or any other error located in one — the
+rendered copy is not a file the reader can fix: under `--dry-run` it is scratch,
+for a project member it is hidden staging, and a failed real run removes it. So
+the refusal is about the template. This holds however the rendering was laid:
+the default `--output`, `--into` a Panta project, or a member of a project
+template ([§FS-rhei-templates.6.4](rhei-templates.spec.md#64-laying-a-panta-project)).
+
+1. **The template file is named.** The refusal names the file the rendered file
+   was rendered from — the file at the same template-relative path in the
+   template that rendered it — as the reader can open it from the invocation
+   directory. A project template's member is rendered from its `includes:`
+   entry's template, so the file named is that template's, never a path under
+   the project template.
+2. **A rendered location still shown is marked.** Where the refusal still shows
+   the rendered location, it says that the location is the rendering of that
+   template file, and gives its status: proposed and not written when nothing
+   was published there, removed when a real run wrote it and then discarded it.
+   It never presents that location as a file that exists.
+3. **The help points at the template.** The help directs the reader to fix the
+   named template file, or the values it was rendered with, and to run the same
+   `rhei instantiate` again. It offers no `rhei validate` of the rendered
+   location, which holds nothing left to validate ([§FS-rhei-library.7.5](rhei-library.spec.md#75-a-refused-proposed-placement-names-the-original-files-and-the-placement-to-retry)).
+4. **A built-in template** is extracted into a temporary directory before it
+   renders, and that directory is no more inspectable than scratch. The refusal
+   names the built-in template and the file's path within it, never the
+   extraction directory.
+5. **No counterpart, no guess.** A rendered file with no file at its path in the
+   template that rendered it — a task file an `includes:` union renamed
+   ([§FS-rhei-library.6](rhei-library.spec.md#6-includes-a-template-built-from-templates)), or a file rendering generated — is attributed to the
+   included template's file where that is recorded, and otherwise to the
+   template by the reference the caller gave. A template file that does not
+   exist is never named.
+6. **The line is the rendering's.** Rendering can move lines — a `{% if %}`
+   block left out, a value that spans several — so the line a parse error quotes
+   is a line of the rendering. It is presented as a line of the template file
+   only where it is known to be that line.
+
+Only where the refusal points changes. The parse message, its source excerpt
+and its per-error help stay whole, and the refusal header of
+[§FS-rhei-library.7.5](rhei-library.spec.md#75-a-refused-proposed-placement-names-the-original-files-and-the-placement-to-retry) is unchanged. With `--keep-on-error` the rendering is kept
+and the help still validates it ([§FS-rhei-errors.1.2.1](rhei-errors.spec.md#121-the-target-a-help-names)); the refusal still names
+the template file it was rendered from, because editing the kept copy changes
+nothing the next `rhei instantiate` reads.
+
 ## 5. Machine-Readable Errors
 
 Commands with a JSON output mode emit errors as a single-line JSON object on

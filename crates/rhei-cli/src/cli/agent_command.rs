@@ -68,7 +68,8 @@ fn remove_outer_rhei_identity(cmd: &mut std::process::Command) {
 /// `<command...> <mode flags...> <autonomous_args...> <effort args...> <accounting flags...>
 ///  <prompt_flag> <prompt>? <model_flag> <model>? <snapshot_args...>
 ///  <strict MCP option?> <mcp/skill flags...> --?`
-/// `--` is appended last when `stdin_prompt` is `true`, to match
+/// `--` is appended last when `stdin_prompt` is `true` and the resolved family
+/// takes a separator (§FS-rhei-agents.2.2.2), to match
 /// `codex exec --`-style invocations that expect stdin: past a separator a flag
 /// is prompt text, so everything rhei has to say to the agent — the snapshot,
 /// MCP and skill flags included — is emitted before it
@@ -222,8 +223,8 @@ fn build_agent_command(
 
     // Last, after everything rhei has to say to the agent: past a separator a
     // flag is prompt text, which the agent neither applies nor complains about.
-    // §FS-rhei-agents.2.2
-    if profile.stdin_prompt {
+    // §FS-rhei-agents.2.2 The family decides, as for `--strict-mcp-config`. §FS-rhei-agents.2.2.2
+    if profile.stdin_prompt && resolved.family() != "pi" {
         cmd.arg("--");
     }
 

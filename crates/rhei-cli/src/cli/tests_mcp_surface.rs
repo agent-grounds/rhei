@@ -239,7 +239,6 @@ mod mcp_surface {
     }
 
     #[test]
-    #[ignore = "red until #659: a family pi wrapper still gets `-p <prompt>`; implement removes this"]
     fn mcp_surface_other_families_keep_existing_arguments() {
         let dir = tempfile::tempdir().expect("root");
         for family in ["codex", "gemini", "cursor", "kilocode", "pi"] {

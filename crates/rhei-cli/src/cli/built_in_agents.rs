@@ -177,14 +177,15 @@ fn built_in_agents() -> BTreeMap<String, CustomAgentProfile> {
     // are intentionally empty; isolation is the caller's responsibility
     // (e.g. sandbox/container).
 
-    // §FS-rhei-agents.2: Built-in pi profile.
+    // §FS-rhei-agents.2: Built-in pi profile. pi reads a piped stdin as its
+    // prompt, so `-p` goes bare and no prompt reaches argv. §FS-rhei-agents.2.2.2
     agents.insert(
         "pi".to_string(),
         CustomAgentProfile {
             command: flags(&["pi"]),
             prompt_flag: Some("-p".to_string()),
             model_flag: Some("--model".to_string()),
-            stdin_prompt: false,
+            stdin_prompt: true,
             skill_flag: Some("--skill".to_string()),
             effort: Some(effort(
                 &["off", "minimal", "low", "medium", "high", "xhigh"],

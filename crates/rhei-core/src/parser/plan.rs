@@ -8,11 +8,11 @@ use crate::text::parse_task_id;
 use regex::Regex;
 
 use super::builder::{title_case_kind, unwind_to_level, NodeBuilder};
-use super::plan_tooling;
 use super::{
     is_retired_states_line, parse_frontmatter, parse_structure, retired_states_line,
     unescape_state, ParseError, Result,
 };
+use super::{plan_tooling, task_heading_above_tasks};
 
 pub fn parse(input: &str) -> Result<Rhei> {
     // A leading mark would hide the header. §FS-rhei-language-reference.1 §REQ-cross-platform.9
@@ -64,6 +64,8 @@ pub fn parse(input: &str) -> Result<Rhei> {
     let mut in_tasks_section = false;
     let mut tasks_section_line: Option<usize> = None;
     let mut pre_tasks_h2_seen = false;
+    // The line of the nearest heading above, while it is node-shaped. §FS-rhei-errors.1.7
+    let mut node_heading_above: Option<usize> = None;
     let mut first_nonempty_line: Option<usize> = None;
 
     let mut rhei_title: Option<String> = None;
@@ -151,6 +153,9 @@ pub fn parse(input: &str) -> Result<Rhei> {
         }
 
         if !in_tasks_section && !in_code_block {
+            if task_heading_above_tasks::is_heading(line) {
+                node_heading_above = re_node_header.is_match(line).then_some(line_number);
+            }
             if is_retired_states_line(line) {
                 return Err(retired_states_line(line_number));
             }
@@ -215,6 +220,11 @@ pub fn parse(input: &str) -> Result<Rhei> {
                 || re_model_like.is_match(line)
                 || re_target_like.is_match(line)
             {
+                // Under a task heading, `## Tasks` is what is missing. §FS-rhei-errors.1.7
+                if let Some(heading_line) = node_heading_above {
+                    let rest = input.lines().skip(line_number);
+                    return Err(task_heading_above_tasks::refusal(heading_line, rest, &re_tasks));
+                }
                 return Err(ParseError::new(
                     "Metadata field appears outside a task",
                     Some(line_number),

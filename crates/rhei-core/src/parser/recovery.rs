@@ -1,11 +1,12 @@
 use crate::ast::Rhei;
 
-use super::{parse, ParseError};
+use super::{parse, task_heading_above_tasks, ParseError, ParseErrorKind};
 
 pub fn parse_collect(input: &str) -> (Option<Rhei>, Vec<ParseError>) {
     let mut errors: Vec<ParseError> = Vec::new();
     let mut working = input.to_string();
     let mut line_map: Vec<usize> = (1..=input.lines().count()).collect();
+    let mut missing_tasks_reported = false;
 
     // Safety valve in case a recovery step fails to make progress: cap
     // iterations at a generous multiple of the authored line count.
@@ -15,13 +16,35 @@ pub fn parse_collect(input: &str) -> (Option<Rhei>, Vec<ParseError>) {
         match parse(&working) {
             Ok(rhei) => return (Some(rhei), errors),
             Err(err) => {
-                // Only recover from well-understood per-task errors. For
+                // Only recover from well-understood local errors. For
                 // structural issues (missing header, unknown node kind,
                 // depth mismatches) stop immediately — continuing would
                 // produce cascading, misleading error lists.
                 let mut err = err;
                 remap_error_line(&mut err, &line_map);
-                let recoverable = is_recoverable_error(&err.message);
+                // The heading diagnostic already explains the missing section at EOF. §FS-rhei-errors.1.7
+                if missing_tasks_reported
+                    && err.line.is_none()
+                    && matches!(
+                        err.message.as_str(),
+                        "Missing '## Tasks' section"
+                            | "Tasks section must be the final '##' chapter and appear as '## Tasks'"
+                    )
+                {
+                    return (None, errors);
+                }
+                // Deduplicate the missing section, but keep scanning independent sections.
+                // §FS-rhei-errors.1.7 §FS-rhei-validate.4.2
+                let missing_tasks = matches!(
+                    err.kind,
+                    ParseErrorKind::TaskHeadingAboveTasks { tasks_section_follows: false }
+                );
+                let duplicate = missing_tasks && missing_tasks_reported;
+                missing_tasks_reported |= missing_tasks;
+                let recoverable = match err.kind {
+                    ParseErrorKind::TaskHeadingAboveTasks { .. } => true,
+                    ParseErrorKind::Plain => is_recoverable_error(&err.message),
+                };
                 let Some(line) = err.line.filter(|_| recoverable) else {
                     errors.push(err);
                     return (None, errors);
@@ -32,9 +55,17 @@ pub fn parse_collect(input: &str) -> (Option<Rhei>, Vec<ParseError>) {
                     errors.push(err);
                     return (None, errors);
                 };
-                let (stripped, stripped_line_map, made_progress) =
-                    strip_for_recovery(&working, &line_map, working_line, &err.message);
-                errors.push(err);
+                let (stripped, stripped_line_map, made_progress) = match err.kind {
+                    ParseErrorKind::TaskHeadingAboveTasks { .. } => {
+                        strip_heading_block(&working, &line_map, working_line)
+                    }
+                    ParseErrorKind::Plain => {
+                        strip_for_recovery(&working, &line_map, working_line, &err.message)
+                    }
+                };
+                if !duplicate {
+                    errors.push(err);
+                }
                 if !made_progress {
                     return (None, errors);
                 }
@@ -138,30 +169,35 @@ fn strip_for_recovery(
         if start == 0 && end == lines.len() {
             return (input.to_string(), line_map.to_vec(), false);
         }
-        let mut kept: Vec<&str> = Vec::with_capacity(lines.len());
-        kept.extend_from_slice(&lines[..start]);
-        kept.extend_from_slice(&lines[end..]);
-        let mut kept_line_map: Vec<usize> = Vec::with_capacity(line_map.len());
-        kept_line_map.extend_from_slice(&line_map[..start]);
-        kept_line_map.extend_from_slice(&line_map[end..]);
-        let mut out = kept.join("\n");
-        if input.ends_with('\n') {
-            out.push('\n');
-        }
-        return (out, kept_line_map, true);
+        return drop_lines(input, &lines, line_map, start..end);
     }
 
     // Default recovery: drop just the offending line.
-    let mut kept: Vec<&str> = Vec::with_capacity(lines.len().saturating_sub(1));
-    kept.extend_from_slice(&lines[..idx]);
-    if idx + 1 < lines.len() {
-        kept.extend_from_slice(&lines[idx + 1..]);
+    drop_lines(input, &lines, line_map, idx..idx + 1)
+}
+
+/// Drop the task heading at `line` and the block it opens, so a misplaced task in a
+/// content section is reported once and the plan after it is still read. Every field
+/// in the block sits under that heading. §FS-rhei-errors.1.7
+fn strip_heading_block(input: &str, line_map: &[usize], line: usize) -> (String, Vec<usize>, bool) {
+    let lines: Vec<&str> = input.lines().collect();
+    if line == 0 || line > lines.len() || line > line_map.len() {
+        return (input.to_string(), line_map.to_vec(), false);
     }
-    let mut kept_line_map: Vec<usize> = Vec::with_capacity(line_map.len().saturating_sub(1));
-    kept_line_map.extend_from_slice(&line_map[..idx]);
-    if idx + 1 < line_map.len() {
-        kept_line_map.extend_from_slice(&line_map[idx + 1..]);
-    }
+    let start = line - 1;
+    drop_lines(input, &lines, line_map, start..task_heading_above_tasks::block_end(&lines, start))
+}
+
+/// The source and line map with `range` of `lines` removed, and `true` for progress.
+/// Shared by field recovery and misplaced-heading recovery. §FS-rhei-errors.1.7
+fn drop_lines(
+    input: &str,
+    lines: &[&str],
+    line_map: &[usize],
+    range: std::ops::Range<usize>,
+) -> (String, Vec<usize>, bool) {
+    let kept: Vec<&str> = [&lines[..range.start], &lines[range.end..]].concat();
+    let kept_line_map: Vec<usize> = [&line_map[..range.start], &line_map[range.end..]].concat();
     let mut out = kept.join("\n");
     if input.ends_with('\n') {
         out.push('\n');

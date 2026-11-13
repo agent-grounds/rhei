@@ -14,6 +14,7 @@ mod plan;
 mod plan_tooling;
 mod recovery;
 mod task_file_metadata;
+mod task_heading_above_tasks;
 mod workspace;
 
 pub use plan::parse;
@@ -31,7 +32,8 @@ use crate::ast::{Metadata, Structure, DEFAULT_MAX_LEVELS, DEFAULT_NODE_KIND, MAX
 use serde_yaml::Value as YamlValue;
 
 /// Parser error with a message, an optional line number, and — once the error
-/// has crossed a file boundary — the file the line belongs to.
+/// has crossed a file boundary — the file the line belongs to. Misplaced task
+/// headings also carry a kind for recovery and help. §FS-rhei-errors.1.7
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ParseError {
     pub message: String,
@@ -42,11 +44,27 @@ pub struct ParseError {
     /// caller passed in. Diagnostics need this to render a code frame: a
     /// message alone strands the reader with no line and no source.
     pub file: Option<std::path::PathBuf>,
+    /// Which refusal this is, where a reader needs more than the message: the
+    /// CLI picks its help from it and recovery its next step.
+    pub kind: ParseErrorKind,
+}
+
+/// The refusals a caller tells apart without reading their message. §FS-rhei-errors.1.7
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ParseErrorKind {
+    /// Any other refusal: the message and the line say all there is.
+    #[default]
+    Plain,
+    /// Task metadata under a task heading that sits before `## Tasks`; the
+    /// error's line is the heading's. `tasks_section_follows` says whether a
+    /// `## Tasks` comes later, which decides the edit: move the task under
+    /// it, or add it above the heading. §FS-rhei-errors.1.7
+    TaskHeadingAboveTasks { tasks_section_follows: bool },
 }
 
 impl ParseError {
     pub fn new<M: Into<String>>(msg: M, line: Option<usize>) -> Self {
-        Self { message: msg.into(), line, file: None }
+        Self { message: msg.into(), line, file: None, kind: ParseErrorKind::Plain }
     }
 
     /// Attach the source file this error's line belongs to.

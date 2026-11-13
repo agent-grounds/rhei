@@ -53,7 +53,6 @@ fn the_control_with_a_tasks_section_lists_the_task() {
 }
 
 #[test]
-#[ignore = "red until #685: rhei list names the missing '## Tasks' at line 3 with the add-above edit; implement removes this"]
 fn list_names_the_missing_tasks_section_at_the_task_heading() {
     let run = run_on("rhei-685-list", ITALY, "list");
 
@@ -61,7 +60,6 @@ fn list_names_the_missing_tasks_section_at_the_task_heading() {
 }
 
 #[test]
-#[ignore = "red until #685: rhei validate reports the missing '## Tasks' once, as the cause; implement removes this"]
 fn validate_reports_the_missing_tasks_section_once_as_the_cause() {
     let run = run_on("rhei-685-validate", ITALY, "validate");
 
@@ -74,7 +72,6 @@ fn validate_reports_the_missing_tasks_section_once_as_the_cause() {
 }
 
 #[test]
-#[ignore = "red until #685: a task heading in a content section is named, with the move under '## Tasks' as help; implement removes this"]
 fn list_names_a_task_heading_left_in_a_content_section() {
     let plan = "# Rhei: Italy\n\n## Notes\n\n### Task 1: Book the trains\n**State:** pending\n\n\
                 ## Tasks\n\n### Task 2: Pack\n**State:** pending\n";

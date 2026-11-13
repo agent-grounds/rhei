@@ -98,6 +98,31 @@ and `rh <TAB>` completes exactly like `rhei <TAB>`.
 - Generated completions call back into the current binary through the `COMPLETE` environment variable and reflect the current binary's command tree, global options, subcommands, flags, value enums, and supported dynamic argument values.
 - `rhei instantiate <TEMPLATE>` completes discovered project and user template names using the same precedence as `rhei templates` ([§FS-rhei-templates.1](rhei-templates.spec.md#1-template-discovery)): `<project>/.agent-grounds/rhei/templates/<name>/` first, then `~/.agent-grounds/rhei/templates/<name>/`, with the deprecated `.agents/rhei/templates/` searched after each. If the partially typed value is path-like (absolute, dot-prefixed, or contains `/`), directory completion is used instead.
 
+### 5.1. Invalid Completion Environment
+
+An inherited `COMPLETE` value can request dynamic shell completion before the
+ordinary command is parsed. If the completion library rejects that value as an
+unknown shell, rhei must identify the environment cause rather than leave the
+reader looking for a problem with their interactive shell:
+
+- Exit with status 2, write nothing to stdout, and end the stderr diagnostic
+  with a newline.
+- Name `COMPLETE`, show its full supplied value (quoted or escaped as needed),
+  and explain that this environment variable requested shell completion. Do
+  not substitute the library's path basename or file-stem interpretation for
+  the supplied value.
+- Tell the reader to unset `COMPLETE` and retry the original command, applying
+  the actionable-help rule in [§FS-rhei-errors.1.2](rhei-errors.spec.md#12-help).
+- Refuse before running the ordinary command: a refused `complete` or `reset`
+  must leave the plan, task states, and runtime artifacts unchanged.
+
+This diagnostic preserves the `COMPLETE` callback protocol in
+[§FS-rhei-completions.5](rhei-completions.spec.md#5-output-contract), including the completion library's
+accepted shell names and shell path forms. A shell-valued variable such as
+`COMPLETE=bash` still requests completion rather than running the ordinary
+command. The unset, empty, and `0` off values and completion warning suppression
+remain as specified in [§FS-rhei-templates.1.3](rhei-templates.spec.md#13-the-deprecation-warning).
+
 ## 6. Completion Contract
 
 Completion is part of the CLI UX, not a best-effort extra. The generated scripts

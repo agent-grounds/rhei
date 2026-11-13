@@ -25,7 +25,9 @@ pub const PATIENCE: Duration = Duration::from_secs(60);
 /// wrote before it spawned this attempt. While `hold-<state>` exists the worker
 /// stays inside its visit (`exec sleep`, so the parent-death signal reaches
 /// it); with `straggler` present it first leaves a child in its group that
-/// ignores `SIGTERM`. Otherwise an agent writes its result and exits 0.
+/// ignores `SIGTERM`. Otherwise it writes a result where one is asked for - an
+/// agent at the path its prompt's `## Result` names, a program (no prompt) at
+/// `$RHEI_RESULT_PATH` - and exits 0.
 const WORKER: &str = r#"#!/bin/sh
 set -u
 fixture='@FIXTURE@'
@@ -49,9 +51,14 @@ if [ -e "$fixture/hold-$state" ]; then
   mv "$fixture/pids/$state.tmp" "$fixture/pids/$state"
   exec sleep 300
 fi
+result_path=''
 if [ -n "$root" ]; then
   result_path="$(printf '%s\n' "$prompt" | sed -n '/^## Result$/,/^## /s/^- `\([^`]*\)`$/\1/p')"
-  mkdir -p "$(dirname "${result_path:?}")"
+elif [ -z "$prompt" ]; then
+  result_path="${RHEI_RESULT_PATH:-}"
+fi
+if [ -n "$result_path" ]; then
+  mkdir -p "$(dirname "$result_path")"
   printf '## Result\n\nCovered.\n' > "$result_path"
 fi
 exit 0

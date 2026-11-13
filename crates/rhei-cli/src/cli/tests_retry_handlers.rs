@@ -113,6 +113,53 @@ transitions:
         }
     }
 
+    /// Record one more attempt of the poll state `waiting` killed together with its run.
+    fn kill_waiting(root: &Path) {
+        let next = plan(root, "waiting");
+        write_killed_record(&next, "2026-11-13T10:00:00Z", "plan.1", "waiting", "mock").unwrap();
+    }
+
+    /// A poll visit its kills halted is granted one configured budget, and each
+    /// granted attempt allows one more kill; the plan and its ledger stay put.
+    // §FS-rhei-retry.2 §FS-rhei-retry.3 §FS-rhei-agents.3.2.3
+    #[test]
+    fn retry_grants_a_poll_visit_its_kills_halted_one_more_kill_per_attempt() {
+        let fixture = Fixture::new("waiting");
+        let poll = AttemptBudget::Poll { max_attempts: 2 };
+        kill_waiting(fixture.dir.path());
+        kill_waiting(fixture.dir.path());
+        assert_eq!(plan(fixture.dir.path(), "waiting").kills_spent(poll), Some(2));
+        let before = fs::read(&fixture.input).unwrap();
+        fixture.invoke(false).unwrap();
+        let next = plan(fixture.dir.path(), "waiting");
+        let record = next.previous.as_ref().expect("the visit's record");
+        assert_eq!(record.grants.len(), 1, "{record:?}");
+        assert_eq!(record.grants[0].attempts, 2, "one configured budget");
+        assert_eq!(next.attempt, 3, "the next run spawns it as attempt 3");
+        assert_eq!(next.kills_spent(poll), None, "the grant lifts the halt");
+        assert_eq!(fs::read(&fixture.input).unwrap(), before);
+        assert!(!fixture.dir.path().join("runtime/state-transitions.log").exists());
+        kill_waiting(fixture.dir.path());
+        assert_eq!(plan(fixture.dir.path(), "waiting").kills_spent(poll), None, "a third kill");
+        kill_waiting(fixture.dir.path());
+        assert_eq!(plan(fixture.dir.path(), "waiting").kills_spent(poll), Some(4), "spent again");
+    }
+
+    /// A poll visit its kills did not halt - never run, or killed once, which
+    /// is free - is refused in today's words, and nothing is written.
+    // §FS-rhei-retry.2 §FS-rhei-retry.3
+    #[test]
+    fn retry_refuses_a_poll_visit_its_kills_did_not_halt_without_writing() {
+        let refusal = "cannot retry a poll state; polling has its own exhaustion rule";
+        let fixture = Fixture::new("waiting");
+        fixture.refuses(false, refusal);
+        assert!(!fixture.dir.path().join("runtime").exists(), "nothing written");
+        kill_waiting(fixture.dir.path());
+        fixture.refuses(false, refusal);
+        let record = plan(fixture.dir.path(), "waiting").previous.expect("the free kill's record");
+        assert!(record.grants.is_empty(), "{record:?}");
+    }
+
     #[test]
     fn retry_refuses_missing_current_record() {
         let fixture = Fixture::new("work");

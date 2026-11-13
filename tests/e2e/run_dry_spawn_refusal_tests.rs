@@ -205,37 +205,31 @@ fn refusal_prediction(kind: &str, parallel: &str, cause: Refusal) {
 }
 
 #[test]
-#[ignore = "red until #662: dry run predicts a refused agent spawn; implement removes this"]
 fn dry_run_refuses_unaccounted_agent_log_sequential() {
     refusal_prediction("agent", "1", Refusal::UnaccountedLog);
 }
 
 #[test]
-#[ignore = "red until #662: dry run predicts a refused agent spawn; implement removes this"]
 fn dry_run_refuses_unaccounted_agent_log_pooled() {
     refusal_prediction("agent", "2", Refusal::UnaccountedLog);
 }
 
 #[test]
-#[ignore = "red until #662: dry run predicts a refused program spawn; implement removes this"]
 fn dry_run_refuses_unaccounted_program_log_sequential() {
     refusal_prediction("program", "1", Refusal::UnaccountedLog);
 }
 
 #[test]
-#[ignore = "red until #662: dry run predicts a refused program spawn; implement removes this"]
 fn dry_run_refuses_unaccounted_program_log_pooled() {
     refusal_prediction("program", "2", Refusal::UnaccountedLog);
 }
 
 #[test]
-#[ignore = "red until #662: dry run skips the agent ledger refusal; implement removes this"]
 fn dry_run_refuses_unreadable_ledger_for_agent() {
     refusal_prediction("agent", "1", Refusal::UnreadableLedger);
 }
 
 #[test]
-#[ignore = "red until #662: dry run skips the program ledger refusal; implement removes this"]
 fn dry_run_refuses_unreadable_ledger_for_pooled_program() {
     refusal_prediction("program", "2", Refusal::UnreadableLedger);
 }

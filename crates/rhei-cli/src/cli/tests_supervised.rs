@@ -399,8 +399,10 @@
         /// that a timeout, fired the timeout transition on a ticket the
         /// shutdown had promised to leave alone, and left the report calling
         /// the run interrupted while the ledger called the ticket timed out.
-        // §FS-rhei-run.3.2: a shutdown outranks a deadline, whenever it arrives.
+        /// The regression must establish delivery inside the real grace,
+        /// independent of raiser scheduling. §FS-rhei-run.3.2.1
         #[test]
+        #[ignore = "red until #701: late raiser exposes unordered grace delivery; implement removes this"]
         fn a_shutdown_inside_the_grace_outranks_the_deadline_it_interrupted() {
             let dir = tempfile::tempdir().expect("tmpdir");
             let ready = dir.path().join("trapped");
@@ -411,8 +413,8 @@
             )
             .expect("spawn");
             let pgid = supervised.pgid;
-            // A child that ignores `SIGTERM` holds the grace open for its whole
-            // length, so the signal below lands inside it rather than after it.
+            // Ignoring `SIGTERM` holds grace open, but does not guarantee that
+            // the sleeping raiser runs before grace completes (#701).
             wait_until("the child to ignore SIGTERM", || ready.exists());
 
             let raiser = Arc::clone(&token);

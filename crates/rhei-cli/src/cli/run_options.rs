@@ -35,7 +35,9 @@ struct StandaloneExecutionFlags {
     /// to start work when one changed since it was sealed (see `rhei seal`)
     #[arg(long)]
     strict_inputs: bool,
-    /// Maximum number of agents to run concurrently (0 = unlimited)
+    // A `//` note, so the citation stays out of `--help`. §FS-rhei-run.5.3
+    /// Maximum number of tasks to run concurrently; each task's all_targets / all_models
+    /// arms run alongside it (0 = unlimited)
     #[arg(long, default_value_t = 1, add = ArgValueCompleter::new(complete_parallel))]
     parallel: usize,
     /// Override profile-derived and built-in pricing with a local price book

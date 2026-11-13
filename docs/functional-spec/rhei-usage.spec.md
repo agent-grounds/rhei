@@ -172,7 +172,8 @@ first positional argument (`rhei complete auth.1`, `rhei release auth.1`,
 `rhei transition auth.1 --from …`) or through `--task`. The positional slot on
 these commands is a *ticket or plan*: an argument that names an existing path
 is the plan, and an id-shaped argument that names no path is the ticket, with
-the plan resolved from the working directory as usual ([§FS-rhei-complete.2.1](rhei-complete.spec.md#21-ticket-targets)).
+the plan resolved from the working directory as usual, where a qualified id also
+picks its rhei among loose plans ([§FS-rhei-complete.2.1](rhei-complete.spec.md#21-ticket-targets), [§FS-rhei-panta.6.7](rhei-panta.spec.md#67-a-ticket-picks-its-rhei-among-loose-plans)).
 `--task` always names the ticket, which leaves the positional free to name the
 plan for a caller that wants to be explicit about both.
 

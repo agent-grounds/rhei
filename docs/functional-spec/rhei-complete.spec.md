@@ -53,8 +53,10 @@ other command) and the ticket id, resolved in this order:
    ticket.
 3. Without `--task`, a positional that names no existing path, contains no path
    separator, does not end in `.md`, and parses as a ticket id is the ticket;
-   the plan is inferred from the working directory exactly as when the
-   positional is omitted.
+   the plan is inferred from the working directory as when the positional is
+   omitted, except that the ticket's rhei prefix may choose among several loose
+   rheis there ([§FS-rhei-panta.6.7](rhei-panta.spec.md#67-a-ticket-picks-its-rhei-among-loose-plans)). A ticket given through `--task` with no
+   plan named is inferred the same way.
 4. Anything else is reported as a plan path that does not exist.
 
 With neither a positional ticket nor `--task`, the error shows the positional

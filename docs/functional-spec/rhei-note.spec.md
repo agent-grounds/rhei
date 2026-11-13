@@ -58,7 +58,10 @@ has no such environment either, and names the task the same way. With neither
 the plan like every other ([§FS-rhei-completions](rhei-completions.spec.md#fs-rhei-completions-rhei-completion-ux-specification)).
 
 `rhei note` resolves the project from the working directory, the way
-`rhei complete` resolves a bare ticket id ([§FS-rhei-panta.6](rhei-panta.spec.md#6-project-scope-and-command-behavior)). It takes no plan
+`rhei complete` resolves a bare ticket id ([§FS-rhei-panta.6](rhei-panta.spec.md#6-project-scope-and-command-behavior)): beside several
+loose plans, the writing task's rhei prefix picks the plan ([§FS-rhei-panta.6.7](rhei-panta.spec.md#67-a-ticket-picks-its-rhei-among-loose-plans)).
+`--restate` and `--strike` name entries, not the plan, and take no part in that
+choice. It takes no plan
 positional: the store is not plan markdown, and the verb never reads, locks, or
 rewrites a plan.
 

@@ -259,9 +259,10 @@ subdirectory below it.
 An invocation directory holding more than one rhei but no `index.panta.md`
 is ambiguous: the error names the candidates and both fixes — pass one
 explicitly, or run `rhei init` ([§FS-rhei-init](rhei-init.spec.md#fs-rhei-init-rhei-init)) to make the directory a
-project. When the walk reaches the filesystem root without a match, the
-error says what was searched for and how to point the command at a plan, not
-merely that a required argument is missing.
+project. A command that was given a ticket may settle that ambiguity by the
+ticket's rhei prefix instead ([§FS-rhei-panta.6.7](rhei-panta.spec.md#67-a-ticket-picks-its-rhei-among-loose-plans)). When the walk reaches the
+filesystem root without a match, the error says what was searched for and how
+to point the command at a plan, not merely that a required argument is missing.
 
 `rhei reset` is excluded from omitted-target resolution: it destroys runtime
 state across its whole scope ([§FS-rhei-panta.6.4](rhei-panta.spec.md#64-reset-validate-list-viz)), so an inferred target would turn a
@@ -568,6 +569,69 @@ recorded hop and the single `rhei recover <execution-root>` invocation. Readers
 do not need write permission to the project: root guards live in the platform
 state directory keyed by canonical root. With no marker, loading and command
 scope are unchanged.
+
+### 6.7. A ticket picks its rhei among loose plans
+
+Two loose plans side by side are the smallest multi-plan setup there is, and
+the id a caller types inside a project — `rhei release italy.1` — already names
+exactly one ticket in exactly one rhei there. So where the omitted-target walk
+would refuse because the invocation directory holds more than one rhei and no
+`index.panta.md`, it first asks the ticket the command was given.
+
+**What consults the ticket.** Exactly these inputs, and no others:
+
+1. the ticket of a single-ticket command — `show`, `retry`, `transition`,
+   `complete`, `release`, `remove` — given as the positional or through
+   `--task` with no plan named ([§FS-rhei-usage.2.2.1](rhei-usage.spec.md#221-naming-a-ticket), [§FS-rhei-complete.2.1](rhei-complete.spec.md#21-ticket-targets));
+2. `rhei next --task` ([§FS-rhei-next.2.1](rhei-next.spec.md#21-ticket-targets)); `rhei next` without `--task`
+   selects a ticket rather than being given one, and stays ticketless;
+3. `rhei note`'s writing task: `--task`, otherwise `RHEI_TASK_ID`
+   ([§FS-rhei-note.1](rhei-note.spec.md#1-usage)) — which is what lets a program state of a single-file plan,
+   run in the plan's parent directory with `RHEI_TASK_ID` set
+   ([§FS-rhei-programs.2](rhei-programs.spec.md#2-environment-variables)), leave a note beside its sibling plans;
+4. `rhei new --under` ([§FS-rhei-new.1.3](rhei-new.spec.md#13-options-that-create-a-ticket)).
+
+Id filters do not choose a plan: `rhei list --parent` and `--has-prior`,
+`rhei cost --task`, and `rhei note --restate` and `--strike` name tickets
+*inside* a plan already resolved, and resolve it exactly as with no ticket.
+`--rhei` is unchanged as well: it narrows a scope only after the plan resolves,
+so it never picks a loose plan.
+
+**Which tickets are eligible.** A project-qualified id — a dotted id whose
+leading segment is a name, the shape that qualifies a `**Prior:**` entry
+([§AR-rhei-panta.3](../architecture/rhei-panta.spec.md#3-identity-and-id-namespacing)) — such as `italy.1` or `italy.review`. `--under` also takes
+its documented single-segment form, a rhei id such as `italy`. A rhei-local id
+(`1`, `1.2`) or a single name given as a ticket names no rhei and is not
+eligible. Eligibility only decides which ids may match: the prefix is compared,
+never prepended to anything.
+
+**The match.** Each candidate the walk counted under rule 4 has the id loading
+would give it — the file stem or directory name ([§AR-rhei-panta.3](../architecture/rhei-panta.spec.md#3-identity-and-id-namespacing)), so no plan
+is read to decide. When exactly one candidate's id equals the ticket's leading
+segment, the walk resolves to that candidate, and the command proceeds as if
+that plan had been named. An entry whose id cannot be derived — an invalid
+stem, or the reserved `basin.rhei.md` — is a non-match rather than an error that
+aborts the pick, and it is still listed among the candidates.
+
+**What still refuses.** No match, or more than one, refuses with exit `1`.
+For no match the error does not claim the prefix names a rhei — `review.1` may
+be subtask 1 of a named ticket `review`, which inside a project resolves as a
+shorthand — it says that no rhei here has the id `review`, lists each candidate
+with its id, and offers both the qualified form (`rhei release italy.1`) and the
+plan form (`rhei release rome.rhei.md --task 1`), as well as `rhei init`. For
+two candidates sharing the id, it says that the id names two rheis there and
+names both entries. A command with no ticket, or with an ineligible one, keeps
+the ambiguity refusal of [§FS-rhei-panta.6](rhei-panta.spec.md#6-project-scope-and-command-behavior) unchanged; for the ticket commands
+its help adds that the ticket may be named by its rhei.
+
+**What it never changes.** Rules 1–3 still win first, and rule 4 still picks a
+lone rhei without asking the ticket. The match is made in the invocation
+directory only: an unmatched prefix refuses there rather than climbing to an
+ancestor project, so rule 4 still never applies to ancestors, and loose plans
+in a subdirectory of a project win over that project's rheis of the same id
+exactly as a lone loose plan does today. A positional that names an existing
+path is still the plan ([§FS-rhei-complete.2.1](rhei-complete.spec.md#21-ticket-targets) rule 2). `rhei reset` never
+infers its target, and a ticket does not change that.
 
 ## 7. Related Specifications
 

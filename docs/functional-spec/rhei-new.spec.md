@@ -37,7 +37,7 @@ rather than a silent no-op ([§FS-rhei-new.5.3](rhei-new.spec.md#53-mode-confusi
 
 | Flag                  | Default          | Description                                                       |
 |-----------------------|------------------|-------------------------------------------------------------------|
-| `--project <PATH>`    | inferred         | The project or plan to write into, resolved exactly as every other command resolves one: omitted, the enclosing project, workspace, or lone plan; named, a member rhei widens to the project it belongs to ([§FS-rhei-panta.6](rhei-panta.spec.md#6-project-scope-and-command-behavior)) |
+| `--project <PATH>`    | inferred         | The project or plan to write into, resolved exactly as every other command resolves one: omitted, the enclosing project, workspace, or lone plan, or, beside several loose plans, the one a `--under` value names ([§FS-rhei-panta.6.7](rhei-panta.spec.md#67-a-ticket-picks-its-rhei-among-loose-plans)); named, a member rhei widens to the project it belongs to ([§FS-rhei-panta.6](rhei-panta.spec.md#6-project-scope-and-command-behavior)) |
 | `--id <ID>`           | derived          | Explicit id: for a rhei, the one otherwise derived from the title; for a ticket, the segment otherwise taken from the sibling numbering — a name works there too, so `--id review --under plat` writes `plat.review` ([§FS-rhei-new.4](rhei-new.spec.md#4-ids)) |
 | `--description <TEXT>`| empty            | Body content — the ticket's description, or the rhei's lead paragraph ([§FS-rhei-new.3.4](rhei-new.spec.md#34-what-a-description-may-contain)) |
 | `--description-file <PATH>` | —          | Read the description from a file; `-` reads standard input ([§FS-rhei-new.3.4](rhei-new.spec.md#34-what-a-description-may-contain)) |
@@ -80,7 +80,7 @@ with `--dir` and put a `states.yaml` in its directory — before the create, whi
 
 | Flag                       | Default            | Description                                              |
 |----------------------------|--------------------|----------------------------------------------------------|
-| `--under <PARENT>`         | —                  | Owning rhei id (`auth`, `basin`) for a top-level ticket, or ticket id (`auth.1`) for a subtask |
+| `--under <PARENT>`         | —                  | Owning rhei id (`auth`, `basin`) for a top-level ticket, or ticket id (`auth.1`) for a subtask. With `--project` omitted, its rhei segment also chooses among loose plans ([§FS-rhei-panta.6.7](rhei-panta.spec.md#67-a-ticket-picks-its-rhei-among-loose-plans)) |
 | `--kind <KIND>`            | `task`             | Heading keyword, checked against `structure.nodeKinds` ([§FS-rhei-plan-language.3.7](rhei-plan-language.spec.md#37-node-kind-validity)) |
 | `--state <STATE>`          | the machine's initial | `**State:**`, checked against the owning rhei's machine ([§FS-rhei-new.3.2](rhei-new.spec.md#32-state)) |
 | `--prior <ID>`             | none               | `**Prior:**` entry; repeatable, and a comma-separated list is accepted |

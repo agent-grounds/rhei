@@ -27,6 +27,12 @@ id regardless of how the target was written ([§FS-rhei-panta.6](rhei-panta.spec
 A ticket named explicitly with `--task` must itself be in scope: targeting a
 ticket outside `--rhei` is an error rather than a silent widening.
 
+With no plan named, a qualified `--task` id picks its rhei among several loose
+plans in the working directory, as `rhei release` does with the same id
+([§FS-rhei-panta.6.7](rhei-panta.spec.md#67-a-ticket-picks-its-rhei-among-loose-plans)): `next --task` is the "claim it" step of the one gesture
+[§FS-rhei-usage.2.2.1](rhei-usage.spec.md#221-naming-a-ticket) describes. Without `--task`, `rhei next` has no ticket to
+go by and resolves its plan as before.
+
 ### 2.2. Project Scope (`--rhei`)
 
 `rhei next` reads the whole project by default, since every load yields a

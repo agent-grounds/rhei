@@ -58,6 +58,30 @@ fn runtime_evidence(
                     classify_owned_path(root, &entry.path(), id, assessment);
                 }
             }
+            // A placeholder before the id: the path is the ticket's only where its id
+            // stands where `{task_id}` does. §FS-rhei-reset.2.1
+            ScopedTarget::Pattern(pattern) => {
+                let paths = match pattern.entries() {
+                    Ok(paths) => paths,
+                    Err((dir, err)) => {
+                        assessment
+                            .history
+                            .push(("unreadable".into(), format!("{}: {err}", display_path(&dir))));
+                        continue;
+                    }
+                };
+                for path in paths {
+                    let longer = others.iter().filter(|other| other.len() > id.len());
+                    if longer.into_iter().any(|other| pattern.for_id(other).matches(&path)) {
+                        assessment.unsafe_path(format!(
+                            "{} may belong to another ticket",
+                            relative_to(root, &path)
+                        ));
+                        continue;
+                    }
+                    classify_owned_path(root, &path, id, assessment);
+                }
+            }
         }
     }
     Ok(())

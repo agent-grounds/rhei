@@ -43,23 +43,11 @@ jobs:
           echo "next=$next" >> "$GITHUB_OUTPUT"
           echo "current_tag=$tag" >> "$GITHUB_OUTPUT"
 
-      - name: Gate - commits since last tag
-        id: gate_commits
-        shell: bash
-        run: |
-          set -euo pipefail
-          count="$(git rev-list --count "${{ steps.versions.outputs.current_tag }}"..HEAD)"
-          echo "count=$count" >> "$GITHUB_OUTPUT"
-          if [ "$count" -eq 0 ]; then
-            echo "::notice::No commits since ${{ steps.versions.outputs.current_tag }}; skipping."
-          fi
-
-      # The release script answers, because "due" is "the list `prepare` would
-      # write is not empty": it holds, green, while no pull request that changed
-      # code has merged since the tag. Every later step waits on `ok`. §AR-ci-release.3
+      # Always ask due: ancestry must be valid even for an empty range. §FS-rhei-distribution.5.3
+      # It holds until a code-changing pull request has merged since the tag;
+      # every later step waits on its `ok` output. §AR-ci-release.3
       - name: Gate - non-doc/CI changes since last tag
         id: gate_substantive
-        if: steps.gate_commits.outputs.count != '0'
         shell: bash
         run: |
           set -euo pipefail

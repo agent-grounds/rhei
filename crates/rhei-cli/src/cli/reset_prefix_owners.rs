@@ -1,5 +1,6 @@
-// Which ticket a runtime file matched by prefix belongs to: the longest ticket
-// id in the project whose prefix it matches.
+// Which ticket a runtime file matched by prefix, or by a component pattern,
+// belongs to: the longest ticket id in the project whose prefix or pattern it
+// matches.
 //
 // Its own part because it is the one question a narrowed reset asks of every
 // ticket in the project, not only of those in its scope: `x.build`'s prefix is
@@ -7,11 +8,15 @@
 
 // §AR-source-file-size.3 §FS-rhei-reset.2.1
 
-/// Every prefix a project ticket's runtime files are matched by, per directory.
+/// Every prefix a project ticket's runtime files are matched by, per directory, and
+/// every component pattern.
 /// §FS-rhei-reset.2.1
 #[derive(Default)]
 struct PrefixOwners {
     by_dir: BTreeMap<PathBuf, BTreeSet<String>>,
+    /// Every ticket's component patterns, for the same question about a path one
+    /// of them matches.
+    patterns: Vec<ComponentPattern>,
 }
 
 impl PrefixOwners {
@@ -30,8 +35,12 @@ impl PrefixOwners {
                 let ids: &[&str] = if local_id == task_id { &[task_id] } else { &[task_id, local_id] };
                 for id in ids {
                     for target in scoped_runtime_targets(&runtime, id, machine) {
-                        if let ScopedTarget::Prefixed { dir, prefix } = target {
-                            owners.by_dir.entry(dir).or_default().insert(prefix);
+                        match target {
+                            ScopedTarget::Prefixed { dir, prefix } => {
+                                owners.by_dir.entry(dir).or_default().insert(prefix);
+                            }
+                            ScopedTarget::Pattern(pattern) => owners.patterns.push(pattern),
+                            ScopedTarget::Exact(_) => {}
                         }
                     }
                 }
@@ -55,6 +64,23 @@ impl PrefixOwners {
         paths.retain(|path| {
             let name = path.file_name().and_then(|name| name.to_str()).unwrap_or_default();
             !self.owned_by_longer(dir, prefix, name)
+        });
+        Ok(paths)
+    }
+
+    /// The paths `pattern` matches that no longer id's pattern matches too, which
+    /// are what a narrowed reset removes for it; the directory a listing failed in,
+    /// with the error, where one did. §FS-rhei-reset.2.1
+    fn pattern_entries(
+        &self,
+        pattern: &ComponentPattern,
+    ) -> Result<Vec<PathBuf>, (PathBuf, std::io::Error)> {
+        let mut paths = pattern.entries()?;
+        paths.retain(|path| {
+            !self
+                .patterns
+                .iter()
+                .any(|other| other.id.len() > pattern.id.len() && other.matches(path))
         });
         Ok(paths)
     }

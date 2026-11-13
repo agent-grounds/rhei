@@ -43,6 +43,10 @@ struct AuthoredStates {
     /// task's machine no longer declares — renamed since the run. Writing it
     /// back would leave a plan that no longer validates.
     undeclared: Vec<(String, String, String)>,
+    /// Under `--task`, each ticket that stays in the state it stands in but whose
+    /// records the reset removes, with that state: its supervisor is held for it.
+    /// §FS-rhei-reset.2.5.3
+    emptied_in_place: BTreeMap<String, String>,
 }
 
 /// Parse one execution root's ledger into `task-id → the first state it left`.
@@ -119,6 +123,12 @@ fn collect_authored_states(
         moves: Vec::new(),
         stranded: Vec::new(),
         undeclared: Vec::new(),
+        emptied_in_place: BTreeMap::new(),
+    };
+    // Read before the removal, which the caller makes after. §FS-rhei-reset.2.5.3
+    let losing = match scope.tickets() {
+        Some(_) => scoped_removals(loaded, input, scope, machines).losing,
+        None => BTreeSet::new(),
     };
 
     for task in in_scope {
@@ -144,6 +154,9 @@ fn collect_authored_states(
         }
 
         let target = reset_destination(recorded, &current, machine);
+        if target == current && losing.contains(&task_id) {
+            result.emptied_in_place.insert(task_id.clone(), current.clone());
+        }
         if target != current {
             result.moves.push(StateMove {
                 task_id: task_id.clone(),

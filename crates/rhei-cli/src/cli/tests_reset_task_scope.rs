@@ -1,7 +1,7 @@
 // The three rules a `--task` reset rests on that its end-to-end tests reach only
 // through whole runs: the closure and the edge each ticket is listed by, the
 // stripping that keeps a kept ticket's lines in a file it shares, and the
-// longest id a prefix-matched file belongs to.
+// longest id a file matched by prefix or component pattern belongs to.
 
 // §AR-source-file-size.3 §FS-rhei-reset.2.5
 
@@ -189,6 +189,39 @@ structure:
         assert_eq!(short, vec![logs.join("task-x.build-pending.log")]);
         let long = owners.entries(&logs, "task-x.build-docs-").expect("list");
         assert_eq!(long, vec![logs.join("task-x.build-docs-pending.log")]);
+    }
+
+    /// A placeholder before `{task_id}` matches one path component and never a `/`,
+    /// and a path a shorter id's pattern matches is the longest id's whose pattern
+    /// matches it too. §FS-rhei-reset.2.1
+    #[test]
+    fn a_component_pattern_never_crosses_a_slash_and_goes_to_the_longest_id() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let root = dir.path();
+        for file in [
+            "runtime/review/x.build-1.md",
+            "runtime/review/x.build-docs-1.md",
+            "runtime/review/nested/x.build-1.md",
+            "runtime/results/x.build.md",
+        ] {
+            fs::create_dir_all(root.join(file).parent().expect("a parent")).expect("dirs");
+            fs::write(root.join(file), "x\n").expect("a file");
+        }
+        let template = "runtime/{state}/{task_id}-{visit_count}.md";
+        assert!(ComponentPattern::applies_to(template));
+        assert!(!ComponentPattern::applies_to("runtime/out/{task_id}-{state}.md"));
+
+        let short = ComponentPattern::new(root, template, "x.build");
+        let long = short.for_id("x.build-docs");
+        let mut found = short.entries().expect("list");
+        found.sort();
+        let (mine, theirs) =
+            (root.join("runtime/review/x.build-1.md"), root.join("runtime/review/x.build-docs-1.md"));
+        assert_eq!(found, vec![mine.clone(), theirs.clone()]);
+
+        let owners = PrefixOwners { patterns: vec![short.clone(), long.clone()], ..Default::default() };
+        assert_eq!(owners.pattern_entries(&short).expect("list"), vec![mine]);
+        assert_eq!(owners.pattern_entries(&long).expect("list"), vec![theirs]);
     }
 
     /// The kept line names five tickets and counts the rest. §FS-rhei-reset.4

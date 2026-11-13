@@ -20,7 +20,6 @@ use super::killed_run_support::*;
 /// charged nothing.
 // §FS-rhei-agents.8.1.1 §FS-rhei-agents.8.4 §FS-rhei-agents.3.2.1
 #[test]
-#[ignore = "red: the fixture's finalize program writes no result, so no run of this machine reaches done"]
 fn a_run_killed_during_an_agent_visit_resumes_it_as_its_next_attempt() {
     let fx = Fixture::new("killed-run-agent");
     fx.hold("cover");
@@ -136,7 +135,6 @@ fn a_run_killed_during_a_program_visit_refuses_and_leaves_it_to_a_person() {
 /// group is gone, the next run resumes.
 // §FS-rhei-agents.8.1.1 §DA-supervised-process-groups
 #[test]
-#[ignore = "red: the fixture's finalize program writes no result, so no run of this machine reaches done"]
 fn a_killed_agent_whose_group_still_runs_is_refused_until_it_is_stopped() {
     let fx = Fixture::new("killed-run-straggler");
     fx.hold("cover");

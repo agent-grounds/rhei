@@ -188,7 +188,6 @@ fn assert_parent_prior_guidance(skill_name: &str, skill: &str, heading: &str, en
 /// wait carries it, beside the unchanged rule that a child never names its
 /// parent. §FS-rhei-plan-language.3.1 §FS-rhei-install-skills.4.3
 #[test]
-#[ignore = "red until #692: the writer skills do not say a parent's Prior leaves its children unordered; implement removes this"]
 fn issue_692_writer_skills_say_a_parent_prior_does_not_hold_its_children() {
     let bin_dir = unique_temp_dir("parent-prior-guidance-bin");
     let cwd = unique_temp_dir("parent-prior-guidance-cwd");

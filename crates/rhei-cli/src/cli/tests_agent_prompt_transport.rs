@@ -254,9 +254,9 @@ mod agent_prompt_transport_tests {
         assert!(pi.stdin_prompt);
     }
 
-    /// A pi-family profile laid over the built-in the way settings lay it: the
-    /// fields the entry writes win, the rest are the built-in's.
-    fn pi_family(id: &str, entry: serde_json::Value) -> CustomAgentProfile {
+    /// A settings entry laid over the built-ins the way settings lay it: the
+    /// fields the entry writes win, the rest are its family's.
+    fn laid_over_built_ins(id: &str, entry: serde_json::Value) -> CustomAgentProfile {
         let mut agents = built_in_agents();
         let mut fields = agents
             .iter()
@@ -309,7 +309,7 @@ mod agent_prompt_transport_tests {
     /// is spared the separator too. §FS-rhei-agents.2.2.2
     #[test]
     fn a_pi_family_wrapper_pipes_its_prompt_with_no_separator() {
-        let wrapper = pi_family("pi-wrap", serde_json::json!({"family": "pi", "command": ["wrapper"]}));
+        let wrapper = laid_over_built_ins("pi-wrap", serde_json::json!({"family": "pi", "command": ["wrapper"]}));
         let argv = composed(&resolved(wrapper, "pi-wrap", None), &ResolvedTooling::default(), &[]);
 
         assert!(!argv.iter().any(|arg| arg.contains(PROMPT)), "prompt on stdin: {argv:?}");
@@ -343,7 +343,7 @@ mod agent_prompt_transport_tests {
     /// separator either way. §FS-rhei-agents.2.2.2 §FS-rhei-agents.1.1.2
     #[test]
     fn a_pi_family_entry_that_turns_stdin_off_carries_the_prompt_after_p() {
-        let entry = pi_family(
+        let entry = laid_over_built_ins(
             "pi-argv",
             serde_json::json!({"family": "pi", "command": ["pi"], "stdin_prompt": false}),
         );
@@ -364,5 +364,121 @@ mod agent_prompt_transport_tests {
             let argv = composed(&resolved(builtin(id), id, None), &skill_tooling(), &[]);
             assert_eq!(argv.last().map(String::as_str), Some("--"), "{id}: {argv:?}");
         }
+    }
+
+    /// What a stdin command line ends with: the separator and anything after it.
+    fn ending(argv: &[String]) -> &[String] {
+        let separator = argv.iter().position(|arg| arg == "--").unwrap_or(argv.len());
+        &argv[separator..]
+    }
+
+    /// The built-in `codex` profile, and an entry that runs `codex exec` with
+    /// the built-in's prompt transport but under another id.
+    fn codex_exec_entry() -> CustomAgentProfile {
+        CustomAgentProfile {
+            command: vec!["codex".to_string(), "exec".to_string()],
+            model_flag: Some("--model".to_string()),
+            stdin_prompt: true,
+            ..Default::default()
+        }
+    }
+
+    /// agent-grounds/rhei#670: `codex exec fork <id>` with no PROMPT forks and
+    /// exits 0 without reading stdin, so a codex line closes its options with
+    /// `--` and then names stdin as the prompt with `-`. §FS-rhei-agents.2.2.2
+    #[test]
+    #[ignore = "red until #670: the built-in codex still ends at a bare `--`; implement removes this"]
+    fn builtin_codex_ends_a_stdin_line_with_the_separator_then_a_dash() {
+        let argv = composed(&resolved(builtin("codex"), "codex", None), &skill_tooling(), &[]);
+
+        assert!(!argv.iter().any(|arg| arg.contains(PROMPT)), "prompt on stdin: {argv:?}");
+        assert_eq!(ending(&argv), ["--", "-"], "codex ends `-- -`: {argv:?}");
+    }
+
+    /// The family decides, so a codex wrapper and a same-id `agents.codex` entry
+    /// end as the built-in does. §FS-rhei-agents.2.2.2 §FS-rhei-agents.1.1.2
+    #[test]
+    #[ignore = "red until #670: codex-family entries still end at a bare `--`; implement removes this"]
+    fn a_codex_family_wrapper_and_a_same_id_codex_entry_end_with_the_separator_then_a_dash() {
+        let wrapper =
+            laid_over_built_ins("cdx", serde_json::json!({"family": "codex", "command": ["wrap"]}));
+        let wrapped = composed(&resolved(wrapper, "cdx", None), &ResolvedTooling::default(), &[]);
+        assert_eq!(ending(&wrapped), ["--", "-"], "a family: codex wrapper: {wrapped:?}");
+
+        let same_id =
+            composed(&resolved(codex_exec_entry(), "codex", None), &ResolvedTooling::default(), &[]);
+        assert_eq!(ending(&same_id), ["--", "-"], "a same-id codex entry: {same_id:?}");
+    }
+
+    /// The ticket's own shape: codex's fork reached through the resume slot,
+    /// with an MCP server attached. Everything rhei says to codex stays ahead
+    /// of the separator, and the stdin marker is the last argument.
+    /// §FS-rhei-agents.2.2.2 §FS-rhei-snapshots.10.1 §FS-rhei-snapshots.9.3.4
+    #[test]
+    #[ignore = "red until #670: a codex fork line still ends `fork <id> --`, so codex reads no prompt; implement removes this"]
+    fn a_codex_fork_keeps_every_option_before_the_separator_and_ends_with_a_dash() {
+        let tooling = ResolvedTooling {
+            mcp_servers: vec![ResolvedMcpEntry {
+                id: "linear".to_string(),
+                optional: false,
+                definition: Some(McpServerProfile {
+                    command: Some(vec!["mcp-linear".to_string()]),
+                    ..Default::default()
+                }),
+            }],
+            ..Default::default()
+        };
+        let session = "01a1d2ce-0977-79d3-a8d0-e0dd240cac0d".to_string();
+        let snapshot_args = vec!["fork".to_string(), session.clone()];
+        let argv = composed(&resolved(builtin("codex"), "codex", None), &tooling, &snapshot_args);
+
+        let separator = position(&argv, "--");
+        let fork = position(&argv, "fork");
+        assert_eq!(argv.get(fork + 1), Some(&session), "fork carries the session id: {argv:?}");
+        assert!(fork + 1 < separator, "fork <id> precedes the separator: {argv:?}");
+        let overrides: Vec<usize> =
+            argv.iter().enumerate().filter(|(_, arg)| *arg == "-c").map(|(i, _)| i).collect();
+        assert!(
+            argv.iter().any(|arg| arg.starts_with("mcp_servers=")),
+            "the MCP server is attached through a native override: {argv:?}"
+        );
+        assert!(
+            overrides.iter().all(|&i| i + 1 < separator),
+            "every -c override and its value precede the separator: {argv:?}"
+        );
+        assert_eq!(ending(&argv), ["--", "-"], "the stdin marker is the last argument: {argv:?}");
+    }
+
+    /// Only codex gains the `-`: pi keeps no separator, Claude Code and an entry
+    /// with no family keep a bare `--`, and so does an entry that runs codex
+    /// without declaring the family. §FS-rhei-agents.2.2.2
+    #[test]
+    fn every_family_but_codex_keeps_its_stdin_ending() {
+        let pi = composed(&resolved(builtin("pi"), "pi", None), &skill_tooling(), &[]);
+        assert!(ending(&pi).is_empty(), "pi ends with nothing: {pi:?}");
+        assert_ne!(pi.last().map(String::as_str), Some("-"), "pi: {pi:?}");
+
+        let claude =
+            composed(&resolved(builtin("claude-code"), "claude-code", None), &skill_tooling(), &[]);
+        assert_eq!(ending(&claude), ["--"], "claude-code: {claude:?}");
+
+        let custom = CustomAgentProfile {
+            command: vec!["my-agent".to_string()],
+            stdin_prompt: true,
+            ..Default::default()
+        };
+        let custom = composed(&resolved(custom, "my-agent", None), &skill_tooling(), &[]);
+        assert_eq!(ending(&custom), ["--"], "a family-less custom entry: {custom:?}");
+
+        let familyless_codex = composed(
+            &resolved(codex_exec_entry(), "my-codex", None),
+            &ResolvedTooling::default(),
+            &[],
+        );
+        assert_eq!(
+            ending(&familyless_codex),
+            ["--"],
+            "an entry that runs codex but declares no family: {familyless_codex:?}"
+        );
     }
 }

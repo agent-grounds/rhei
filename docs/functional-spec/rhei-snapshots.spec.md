@@ -1192,8 +1192,13 @@ step 8: after `exec`'s own options and before the `--`. Ahead of the mode flags
 does not parse, because `codex exec resume` accepts `-c`, `-m/--model`,
 `--skip-git-repo-check` and `--ephemeral` but not `--sandbox`; past the `--`
 the subcommand is read as prompt text and silently does nothing. Placed
-correctly, the prompt still arrives on stdin under the subcommand, so
-`stdin_prompt` is unaffected. A resumed session appends to the source rollout
+correctly, the subcommand still has to be told to read the prompt rhei pipes.
+`codex exec resume` with no PROMPT reads piped stdin, but only as observed;
+`codex exec fork` with no PROMPT does not: it forks, starts no turn, and
+exits 0. So a codex-family command line ends `-- -` ([§FS-rhei-agents.2.2.2](rhei-agents.spec.md#222-how-a-stdin-command-line-ends)):
+`-` is the PROMPT value codex documents for stdin under `exec`, `resume <uuid>`
+and `fork <uuid>` alike, and with it the prompt arrives under either
+subcommand. A resumed session appends to the source rollout
 file rather than opening a new one, so an emit that follows an inherit
 captures the file it resumed, grown.
 
@@ -1216,6 +1221,15 @@ section delivers would never be reached. Declaring fork for codex needs a
 strategy that says *which argument it takes* — a session id or a path — and
 that is a change to the profile contract in [§FS-rhei-snapshots.9.1](rhei-snapshots.spec.md#91-customagentprofilesession) rather than to this profile.
 It is left open and is not part of this section's answer.
+
+**A profile can reach codex's fork through the resume slot, and it is still a
+resume.** `"session": {"resume": {"flag": "fork"}}` emits `fork <uuid>` where
+`resume <uuid>` would go, and the `-- -` ending is what makes it read its prompt.
+To rhei that is a `ResumeStrategy::Native` whose subcommand happens to be
+named `fork`: the profile declares no `fork`, so step 7's preference for fork
+over resume does not apply to it, and nothing about it is a declared fork. A
+fork strategy that takes a session id is still the second open question of
+[§FS-rhei-snapshot-operations.5](rhei-snapshot-operations.spec.md#5-open-questions).
 
 The built-in codex profile therefore declares a session block ([§FS-rhei-snapshots.9.2](rhei-snapshots.spec.md#92-built-in-profiles)): `resume`
 as the subcommand name and **no `fork`**, `--ephemeral` as `no_session_flag`,
@@ -1300,14 +1314,19 @@ For each spawn with an effective state/task inheritance rule:
 8. Spawn the subprocess with the strategy-defined flags placed after the
    agent's own mode, prompt and model flags and ahead of the MCP and skill
    flags — one slot, whether or not the profile emits a separator. A
-   `stdin_prompt` profile's `--` is the last argument of the whole command
+   `stdin_prompt` profile's `--` is the last option of the whole command
    line ([§FS-rhei-agents.2.2](rhei-agents.spec.md#22-modes)), so every flag
-   named here precedes it as a consequence rather than as a second rule. Past
-   a `--`, an argument is prompt text rather than a flag or a subcommand, so a
-   resume that lands there is read as part of the prompt and does nothing. The
+   named here precedes it as a consequence rather than as a second rule, and
+   what the family puts after it ([§FS-rhei-agents.2.2.2](rhei-agents.spec.md#222-how-a-stdin-command-line-ends))
+   is the prompt's own positional, never a strategy argument. Past a `--`, an
+   argument is prompt text rather than a flag or a subcommand, so a resume
+   that lands there is read as part of the prompt and does nothing. The
    position is a property of the spawn rather than of any one agent: it is the
    same slot for `--session-dir <dir>`, `--fork <path>`, `--continue <id>`, and
-   for a resume the agent spells as a positional subcommand.
+   for a resume the agent spells as a positional subcommand. Such a subcommand
+   may still need telling where its prompt is, and the family's ending is what
+   tells it: a codex `resume <id>`, or a `fork <id>` reached through the resume
+   slot, ends `-- -` and so reads the prompt rhei pipes ([§FS-rhei-snapshots.9.3.4](rhei-snapshots.spec.md#934-codex)).
 
 The sequential and parallel runners use this same preload contract. Snapshot
 resolution never changes scheduler readiness: a task with a pending or

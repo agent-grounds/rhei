@@ -326,6 +326,7 @@ mod shape_example_terminal_tests;
 mod show_json_tests;
 mod show_support;
 mod show_tests;
+mod snapshot_codex_fork_prompt_tests;
 mod snapshot_codex_session_tests;
 mod snapshot_continue_root_tests;
 mod snapshot_prior_authoring_tests;

@@ -16,7 +16,7 @@ use super::*;
 /// `ARGV_LOG`, `NESTED_ROOT`, `FLAT_DIR` and `READ_STDIN` are baked in above
 /// this body by [`write_argv_recording_agent`]; a `{` in here would be a
 /// `format!` placeholder, so nothing in this string is formatted.
-const ARGV_AGENT_BODY: &str = r#"
+pub(super) const ARGV_AGENT_BODY: &str = r#"
 import json
 import uuid
 
@@ -83,7 +83,7 @@ fn write_argv_recording_agent(
 }
 
 /// Every invocation the fake agent recorded, oldest first.
-fn recorded_invocations(dir: &Path) -> Vec<serde_json::Value> {
+pub(super) fn recorded_invocations(dir: &Path) -> Vec<serde_json::Value> {
     let log = fs::read_to_string(dir.join("agent-argv.jsonl")).expect("agent argv log");
     log.lines()
         .filter(|line| !line.trim().is_empty())
@@ -91,7 +91,7 @@ fn recorded_invocations(dir: &Path) -> Vec<serde_json::Value> {
         .collect()
 }
 
-fn argv_of(record: &serde_json::Value) -> Vec<String> {
+pub(super) fn argv_of(record: &serde_json::Value) -> Vec<String> {
     record["argv"]
         .as_array()
         .expect("argv array")
@@ -100,7 +100,7 @@ fn argv_of(record: &serde_json::Value) -> Vec<String> {
         .collect()
 }
 
-fn index_of(argv: &[String], needle: &str) -> usize {
+pub(super) fn index_of(argv: &[String], needle: &str) -> usize {
     argv.iter()
         .position(|arg| arg == needle)
         .unwrap_or_else(|| panic!("expected {needle} in the assembled command; got: {argv:?}"))
@@ -115,13 +115,13 @@ fn run_snapshot_cli(plan_path: &Path, machine_path: &Path, args: &[&str]) -> Cli
     CliRun::from(&output)
 }
 
-fn write_settings(root: &Path, body: &str) {
+pub(super) fn write_settings(root: &Path, body: &str) {
     let settings_dir = root.join(".agent-grounds/rhei");
     fs::create_dir_all(&settings_dir).expect("create .agent-grounds/rhei");
     fs::write(settings_dir.join("settings.json"), body).expect("write settings");
 }
 
-const TWO_STATE_PLAN: &str = r#"# Rhei: Codex Session
+pub(super) const TWO_STATE_PLAN: &str = r#"# Rhei: Codex Session
 
 ## Tasks
 

@@ -430,12 +430,14 @@ roadmap.
   artifacts owned by in-scope tickets rather than whole `runtime/` trees:
   sibling single-file rheis share one execution root, so removing the tree
   would destroy an out-of-scope rhei's state. "Owned" means keyed by an
-  in-scope ticket id — its result file, logs, declared artifact-contract paths,
-  snapshot sessions, worktree refs, accounting captures and task index, its
+  in-scope ticket id — its result file, exact `runtime/exports/<ticket-id>/`
+  directory (independent of state-machine artifact contracts), logs, declared
+  artifact-contract paths, snapshot sessions, worktree refs, accounting captures and task index, its
   lines in the transition ledger, and its runtime ticket metadata (visit
   counts, poll timers) in the owning rhei's index. Leaving any of those behind
-  would be a silent partial reset: a stale declared output can satisfy a
-  required input on the next run, a stale ledger line claims a completion the
+  would be a silent partial reset: a stale export can satisfy the next
+  completion check, a stale declared output can satisfy a required input on
+  the next run, a stale ledger line claims a completion the
   plan no longer holds, and a stale visit count makes a counted loop resume
   mid-flight instead of restarting. Runtime records written before project
   qualification are keyed by the rhei-local id; the reset sweeps those legacy

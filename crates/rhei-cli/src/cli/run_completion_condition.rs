@@ -223,7 +223,9 @@ fn task_has_pending_agent_invocations(
 ///
 /// A target edited in place keeps the visit's finished work: the note naming
 /// the record that answers for it, or the warning for an edit too ambiguous to
-/// pair, is printed on `sink` here.
+/// pair, is printed on the sink `pairing_notes` names. A reader that only asks
+/// passes `None`: the ready filter asks on every slice of a provider wait, and
+/// would otherwise repeat the note each time. §FS-rhei-run.5.1
 // §FS-rhei-agents.3.2 §FS-rhei-agent-visit-pairing.4 §FS-rhei-agent-visit-pairing.5 §FS-rhei-run.3
 #[allow(clippy::too_many_arguments)]
 fn agent_invocations_to_spawn(
@@ -235,9 +237,8 @@ fn agent_invocations_to_spawn(
     state_name: &str,
     state_def: &rhei_validator::StateDef,
     invocations: Vec<ResolvedAgent>,
-    sink: &Arc<dyn rhei_tui::EventSink>,
-    // What the note offers as the way to redo reused work. §FS-rhei-reset.5.1
-    reset: &ResetOffer,
+    // Where the note is said, and what it offers to redo reused work. §FS-rhei-reset.5.1
+    pairing_notes: Option<(&Arc<dyn rhei_tui::EventSink>, &ResetOffer)>,
 ) -> Vec<ResolvedAgent> {
     if state_def.outputs.is_empty() {
         return invocations;
@@ -274,6 +275,8 @@ fn agent_invocations_to_spawn(
         .collect::<Vec<_>>();
     // Said here, where the pass decides, not in the predicate, which is asked
     // again after every exit. §FS-rhei-agent-visit-pairing.4
-    completion.announce_visit_pairing(sink, &pending, reset);
+    if let Some((sink, reset)) = pairing_notes {
+        completion.announce_visit_pairing(sink, &pending, reset);
+    }
     pending
 }

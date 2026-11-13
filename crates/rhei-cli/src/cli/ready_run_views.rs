@@ -76,3 +76,79 @@ fn find_runnable_program_polls_for_mode_selection<'a>(
     })
     .collect()
 }
+
+/// The continuous run's ready set, less every ticket a provider wait holds, so
+/// a run whose every ticket waits reaches its deadline sleep, which opens no
+/// pass, instead of opening one on every slice of it.
+/// §FS-rhei-run.3 step 2 §FS-rhei-run.5.1
+///
+/// That sleep alone decides whether a wait is worth sleeping for. When it would
+/// find nothing to wake for, the scan comes back as it was, so a held ticket
+/// never turns a wait into a halt the unfiltered pass would not have reached.
+fn without_provider_held_tickets<'a>(
+    ready: Vec<&'a rhei_core::ast::Task>,
+    loaded: &LoadedPlan,
+    settings: &RheiSettings,
+    scope: &RheiScope,
+    spawns: &SpawnSiteRoots<'_>,
+) -> Vec<&'a rhei_core::ast::Task> {
+    let free: Vec<_> = ready
+        .iter()
+        .copied()
+        .filter(|task| !provider_holds_ticket(task, loaded, settings, spawns))
+        .collect();
+    if free.is_empty()
+        && !ready.is_empty()
+        && earliest_pending_agent_deadline(&loaded.rhei, &spawns.machines.set, settings, scope, spawns)
+            .is_none()
+    {
+        return ready;
+    }
+    free
+}
+
+/// Whether a provider wait holds this ticket at the instant `spawns` was read:
+/// it has an invocation still to be spawned, and each such invocation waits on
+/// an active deadline of its execution identity. One on a free identity keeps
+/// the ticket ready; one the pre-spawn completion check finds satisfied keeps
+/// nothing ready. A program or gating state has no provider to wait on.
+/// §FS-rhei-run.3 step 2 §FS-rhei-run.3.3
+fn provider_holds_ticket(
+    task: &rhei_core::ast::Task,
+    loaded: &LoadedPlan,
+    settings: &RheiSettings,
+    spawns: &SpawnSiteRoots<'_>,
+) -> bool {
+    let machines = spawns.machines;
+    let machine = machines.for_task(&task.id);
+    let state = normalized_state_name(task.state.as_str(), machine);
+    let Some(state_def) = machine.states.get(&state) else { return false };
+    if state_def.program.is_some() || state_def.gating {
+        return false;
+    }
+    let resolved =
+        resolve_agent_invocations_for_task(machine, &state, settings, spawns.opts, Some(task));
+    let Ok(invocations) = resolved else { return false };
+    let held = |resolved: &ResolvedAgent| {
+        resolved_provider_deadline(&loaded.rhei, &machines.set, resolved, spawns.read_at).is_some()
+    };
+    // Nothing held, nothing to drop: the completion check is read only for a wait.
+    if !invocations.iter().any(held) {
+        return false;
+    }
+    let task_id = task.id.to_string();
+    let task_root = spawns.tasks.artifact_root(&task_id);
+    let runtime_dir = machines.agent_runtime_dir(&task_id, task_root, spawns.runtime_dir);
+    let pending = agent_invocations_to_spawn(
+        loaded,
+        spawns.tasks.workspace_root,
+        &runtime_dir,
+        task,
+        machine,
+        &state,
+        state_def,
+        invocations,
+        None,
+    );
+    !pending.is_empty() && pending.iter().all(held)
+}

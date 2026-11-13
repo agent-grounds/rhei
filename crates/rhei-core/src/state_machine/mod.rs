@@ -26,6 +26,7 @@ include!("validator/state_machine_prompt_templates.rs");
 include!("validator/state_machine_machine_only.rs");
 include!("validator/state_machine_snapshots.rs");
 include!("validator/state_machine_runtime_validation.rs");
+include!("validator/exit_code_overlap.rs");
 include!("validator/state_machine_profiles.rs");
 include!("validator/validation_helpers.rs");
 include!("validator/state_machine_dead_ends.rs");

@@ -2671,7 +2671,7 @@ earlier stay's log, whose name this stay took because the ledger lacks an
 arrival:
 
 ```text
-refusing to spawn: <path> belongs to an earlier stay in '<state>' (spawn record at moves <m>), but the ledger records no arrival in '<state>' before that stay, so this stay took the same entry number
+refusing to spawn: <path> belongs to an earlier stay in '<state>': the spawn record at moves <m> names it, so the ledger misses an arrival in '<state>' and this stay took the same entry number
 ```
 
 and the remedy line points at the ledger, not at a reset: a `**State:**` line

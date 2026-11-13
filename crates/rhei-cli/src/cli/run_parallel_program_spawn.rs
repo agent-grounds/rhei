@@ -225,6 +225,7 @@ fn spawn_parallel_program_work_item(
             task_id_str: task_id_for_panic,
             state_name: state_for_panic,
             slot,
+            budget_arm: None,
         });
         let _ = tx.send(message);
     });

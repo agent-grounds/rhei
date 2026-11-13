@@ -163,7 +163,7 @@ fn spawn_parallel_agent_work_item(
         emit_run_message(sink, rhei_tui::MessageLevel::Warn, warning.clone());
     }
     if !gate.required.is_empty() {
-        let fired = route_unavailable_required_tooling(
+        let routed = route_unavailable_required_tooling(
             input,
             machines,
             sink,
@@ -171,8 +171,11 @@ fn spawn_parallel_agent_work_item(
             &item.current_state,
             &gate.required,
             opts,
-        )?;
-        return Ok(if fired {
+        );
+        // Admitted but never started, so its reservation goes back here; an edge the gate
+        // fired has already converted the travel unit, which stays spent. §FS-rhei-budgets.6.2.1
+        budget_settle_visit(workspace_root, &item.task_id_str, plan.budget_arm.as_deref(), sink);
+        return Ok(if routed? {
             ParallelAgentSpawnOutcome::Advanced
         } else {
             ParallelAgentSpawnOutcome::Skipped
@@ -353,6 +356,7 @@ fn spawn_parallel_agent_work_item(
     let price_book_origin_for_thread = opts.price_book_origin();
     let task_id_for_panic = tid.clone();
     let state_for_panic = sname.clone();
+    let budget_arm_for_panic = budget_arm_for_thread.clone();
     // Read before the plan moves into the worker, like the outlook above:
     // only here are the machine and the thread's inputs both in hand.
     // §FS-rhei-metrics.2
@@ -502,6 +506,7 @@ fn spawn_parallel_agent_work_item(
             task_id_str: task_id_for_panic,
             state_name: state_for_panic,
             slot,
+            budget_arm: budget_arm_for_panic,
         });
         let _ = tx.send(message);
     });

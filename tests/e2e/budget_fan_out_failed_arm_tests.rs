@@ -22,7 +22,6 @@ use super::budget_support::*;
 /// converted by an applied edge or given back. Nothing is left outstanding.
 // §FS-rhei-budgets.6.2.1
 #[test]
-#[ignore = "red until #672: a fan-out arm whose spawn fails is never settled; implement removes this"]
 fn a_fan_out_arm_whose_spawn_fails_is_charged_the_reserve_at_its_own_exit() {
     let fan = fan_out("budget-fan-out-spawn-fails", [BROKEN, UNRECORDED], "plain");
     let run = fan.run_continuing_on_error();
@@ -67,7 +66,6 @@ fn a_fan_out_arm_whose_spawn_fails_is_charged_the_reserve_at_its_own_exit() {
 /// being given back as well.
 // §FS-rhei-budgets.6.2.1 §FS-rhei-budgets.4.1
 #[test]
-#[ignore = "red until #672: a fan-out arm stopped at the tooling gate keeps its reservation; implement removes this"]
 fn a_fan_out_arm_stopped_at_the_tooling_gate_gives_its_reservation_back() {
     let fan = fan_out_without_tooling("budget-fan-out-tooling-gate", [CLAUDE, UNRECORDED]);
     let run = fan.run_continuing_on_error();

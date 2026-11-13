@@ -130,16 +130,17 @@ impl SpawnPlan {
     }
 }
 
-/// The sentence a log an earlier stay's record names is refused with, and on
+/// The sentence a log an earlier stay's record names is refused with — what was
+/// verified, the record, and not where the ledger lost the arrival — and on
 /// the line after it the remedy, which points at the ledger rather than at a
 /// reset: the stay is one missing arrival, not a runtime to throw away.
 // §FS-rhei-agents.8.1 §FS-rhei-authoring.7
 fn earlier_stay_log_message(log: &Path, record_path: &Path, record: &SpawnRecord) -> String {
     let state = &record.state;
     format!(
-        "refusing to spawn: {} belongs to an earlier stay in '{state}' (spawn record at moves \
-         {}), but the ledger records no arrival in '{state}' before that stay, so this stay took \
-         the same entry number\n  help: a `**State:**` line edited by hand writes no arrival in \
+        "refusing to spawn: {} belongs to an earlier stay in '{state}': the spawn record at moves \
+         {} names it, so the ledger misses an arrival in '{state}' and this stay took the same \
+         entry number\n  help: a `**State:**` line edited by hand writes no arrival in \
          the ledger, and `rhei transition` does; move {} and {} aside and run again",
         log.display(),
         record.moves,

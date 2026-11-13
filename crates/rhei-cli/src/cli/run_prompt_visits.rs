@@ -179,6 +179,7 @@ fn render_retry_notice(render_context: &RuntimeTemplateContext<'_>, task_root: &
         task_root,
         &memory.runtime_dir,
         &task_id,
+        Stay::of(render_context.machine, render_context.state_name, render_context.current_state_raw),
     )
     .unwrap_or(LogNumber::Entry(1));
     let plan = plan_spawn_attempt(

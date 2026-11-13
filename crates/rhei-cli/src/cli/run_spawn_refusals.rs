@@ -7,9 +7,9 @@ struct SpawnRefusal {
     task: String,
     state: String,
     identity: Option<String>,
-    /// Admission belongs to this counted visit; allocation keeps its existing
-    /// state-based lifetime. §FS-rhei-run.3.4
-    visit: Option<u64>,
+    /// Admission belongs to this arrival, including uncounted ledger entries;
+    /// allocation keeps its existing state-based lifetime. §FS-rhei-run.3.4
+    arrival: Option<LogNumber>,
     reason: String,
 }
 
@@ -33,7 +33,7 @@ impl SpawnRefusals {
         task: &str,
         state: &str,
         identity: Option<&str>,
-        visit: u64,
+        arrival: LogNumber,
         admitted: BudgetAdmission,
         sink: &Arc<dyn rhei_tui::EventSink>,
     ) -> Option<Option<String>> {
@@ -60,7 +60,7 @@ impl SpawnRefusals {
                     task: task.to_owned(),
                     state: state.to_owned(),
                     identity: identity.map(str::to_owned),
-                    visit: Some(visit),
+                    arrival: Some(arrival),
                     reason: halt,
                 });
                 if let Some(event) = event {
@@ -89,7 +89,7 @@ impl SpawnRefusals {
             task: task.to_owned(),
             state: state.to_owned(),
             identity: identity.map(str::to_owned),
-            visit: None,
+            arrival: None,
             reason: refusal.reason.clone(),
         });
     }
@@ -114,7 +114,7 @@ impl SpawnRefusals {
                 task: task.to_owned(),
                 state: state.to_owned(),
                 identity: identity.map(str::to_owned),
-                visit: None,
+                arrival: None,
                 reason: reason.clone(),
             });
         }
@@ -127,33 +127,44 @@ impl SpawnRefusals {
     fn halt_help(
         &self,
         rhei: &rhei_core::ast::Rhei,
-        machines: &rhei_validator::MachineSet,
-    ) -> Option<String> {
-        let refusals: Vec<String> = self
-            .entries
-            .iter()
-            .chain(&self.admissions)
-            .filter_map(|entry| {
-                let task = find_task_by_id(&rhei.tasks, &parse_task_id(&entry.task))?;
-                let machine = machines.for_task(&task.id);
-                let same_visit = entry.visit.map_or(true, |visit| {
-                    render_visit_count(
-                        rhei.metadata.as_ref(), &task.id, &entry.state, task.state.as_str(), machine,
-                    ) == visit
-                });
-                (same_visit && normalized_state_name(task.state.as_str(), machine) == entry.state).then(|| {
-                    format!(
-                        "Task {} in state '{}': {}",
-                        entry.task,
-                        entry.state,
-                        entry.reason.lines().next().unwrap_or_default()
-                    )
-                })
-            })
-            .collect();
-        (!refusals.is_empty()).then(|| format!(
+        spawns: &SpawnSiteRoots<'_>,
+        settings: &RheiSettings,
+    ) -> MietteResult<Option<String>> {
+        let mut refusals = Vec::new();
+        for entry in self.entries.iter().chain(&self.admissions) {
+            let Some(task) = find_task_by_id(&rhei.tasks, &parse_task_id(&entry.task)) else { continue };
+            let machine = spawns.machines.for_task(&task.id);
+            if normalized_state_name(task.state.as_str(), machine) != entry.state {
+                continue;
+            }
+            if let Some(arrival) = entry.arrival {
+                // Use the spawn's own arrival identity: an uncounted round trip
+                // changes its ledger entry even between scans. §FS-rhei-run.3.4
+                let task_root = spawns.tasks.artifact_root(&entry.task);
+                let runtime = spawns.machines.agent_runtime_dir(&entry.task, task_root, spawns.runtime_dir);
+                let visit = render_visit_count(
+                    rhei.metadata.as_ref(), &task.id, &entry.state, task.state.as_str(), machine,
+                );
+                if resolve_log_number_report(machine, &entry.state, visit, task_root, &runtime, &entry.task)? != arrival {
+                    continue;
+                }
+                // Reconcile against all requested arms, using the scheduler's
+                // resolver; keep still-required fanout siblings. §FS-rhei-run.3.4
+                let invocations = resolve_agent_invocations_for_task(
+                    machine, &entry.state, settings, spawns.opts, Some(task),
+                )?;
+                if !invocations.iter().any(|agent| resolved_agent_log_identity(agent) == entry.identity) {
+                    continue;
+                }
+            }
+            refusals.push(format!(
+                "Task {} in state '{}': {}",
+                entry.task, entry.state, entry.reason.lines().next().unwrap_or_default()
+            ));
+        }
+        Ok((!refusals.is_empty()).then(|| format!(
             "spawning was refused; see the refusal diagnostic above and resolve its cause before re-running.\n{}",
             refusals.join("\n")
-        ))
+        )))
     }
 }

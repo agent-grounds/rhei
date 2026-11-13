@@ -1322,7 +1322,7 @@ fn run_agent_mode(
             return Err(miette!(
                 help = run_halt_help(
                     &loaded.rhei,
-                    spawn_refusals.halt_help(&loaded.rhei, &machines.set),
+                    spawn_refusals.halt_help(&loaded.rhei, &spawns, settings)?,
                 ),
                 "rhei run halted with non-terminal tasks remaining and no further advancement possible"
             ));

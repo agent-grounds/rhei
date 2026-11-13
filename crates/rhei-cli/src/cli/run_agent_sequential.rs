@@ -169,7 +169,7 @@ fn run_sequential_agent_invocation(
     )?;
     // Retain and report admission through the same path as the pool. §FS-rhei-run.3.4
     let Some(arm) = progress.spawn_refusals.admission(
-        task_id_str, current_state, identity.as_deref(), visit_count, admitted, sink,
+        task_id_str, current_state, identity.as_deref(), log_number, admitted, sink,
     ) else {
         progress.stalled_tasks.insert(task_id_str.clone());
         return Ok(());

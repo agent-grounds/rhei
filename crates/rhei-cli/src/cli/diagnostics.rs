@@ -391,7 +391,8 @@ fn render_workspace_parse_diagnostic(groups: &[ParseErrorGroup]) -> String {
     let mut index = 1usize;
     for group in groups {
         lines.push(String::new());
-        lines.push(format!("{}:", display_path(&group.path)));
+        // §FS-rhei-errors.4.1
+        lines.push(format!("{}:", diagnostic_location(&group.path)));
         for err in &group.errors {
             match err.line {
                 Some(line_number) => {
@@ -427,7 +428,8 @@ fn render_multi_parse_diagnostic(
 
     let mut lines = vec![
         "-- PARSE ERROR ----------------------------".to_string(),
-        format!("in {}", display_path(path)),
+        // A rendered file is named as its template's rendering. §FS-rhei-errors.4.1
+        format!("in {}", diagnostic_location(path)),
     ];
     lines.push(String::new());
     lines
@@ -470,7 +472,7 @@ fn nested_parse_report(err: &rhei_core::parser::ParseError) -> Report {
     };
     let Ok(source) = std::fs::read_to_string(path) else {
         // The file moved or is unreadable; the message still stands on its own.
-        return miette!(help = plan_authoring_help(), "{}: {}", path.display(), err.message);
+        return miette!(help = plan_authoring_help(), "{}: {}", diagnostic_location(path), err.message);
     };
     // The project loader stops at the first error per entry, so the diagnostic
     // that actually explains the mistake — the structural one recovery reaches
@@ -620,11 +622,14 @@ fn validation_report(
         // boundary for an otherwise-valid old authored shape. §FS-rhei-migrate.5
         help.push(format!("rhei migrate export-priors {}", help_target_word_or(input)));
     }
-    // §FS-rhei-errors.1.2.1
-    help.push(format!(
-        "fix the errors above, then re-check with: {}",
-        help_command_or("validate", input)
-    ));
+    // §FS-rhei-errors.1.2.1, unless the plan is a discarded rendering. §FS-rhei-errors.4.1
+    help.push(match rendering_retry_help() {
+        Some(retry) => format!("fix the errors above {retry}"),
+        None => format!(
+            "fix the errors above, then re-check with: {}",
+            help_command_or("validate", input)
+        ),
+    });
     miette!(
         help = help.join("\n"),
         "{}", render_validation_diagnostic(input, state_machine_sources, errors)
@@ -638,7 +643,8 @@ fn render_parse_diagnostic(
 ) -> String {
     let mut lines = vec![
         "-- PARSE ERROR ----------------------------".to_string(),
-        format!("in {}", display_path(path)),
+        // A rendered file is named as its template's rendering. §FS-rhei-errors.4.1
+        format!("in {}", diagnostic_location(path)),
     ];
     lines.push(String::new());
     lines.push("I got stuck while reading this markdown plan.".to_string());
@@ -671,7 +677,8 @@ fn render_validation_diagnostic(
 ) -> String {
     let mut lines = vec![
         "-- VALIDATION ERROR ----------------------".to_string(),
-        format!("in {}", display_path(input)),
+        // §FS-rhei-errors.4.1
+        format!("in {}", diagnostic_location(input)),
     ];
     lines.push(String::new());
     if let [source] = state_machine_sources {

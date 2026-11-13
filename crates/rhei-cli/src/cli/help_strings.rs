@@ -34,6 +34,10 @@ fn settings_help() -> String {
 /// Help for a plan whose markdown does not carry what a command needs.
 /// §FS-rhei-errors.1.2.1
 fn plan_authoring_help() -> String {
+    // A discarded rendering holds nothing to validate. §FS-rhei-errors.4.1
+    if let Some(retry) = rendering_retry_help() {
+        return format!("check the task metadata (**State:**, **Prior:**, **Assignee:**) {retry}");
+    }
     format!(
         "check the plan's task metadata (**State:**, **Prior:**, **Assignee:**), then re-run: {}",
         help_command("validate")

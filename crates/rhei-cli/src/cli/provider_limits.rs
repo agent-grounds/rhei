@@ -36,11 +36,24 @@ impl ProviderLimit {
     }
 }
 
+/// The identity a wait is keyed on and every spawn gate matches: the agent
+/// and the provider the invocation resolves (§FS-rhei-agents.1.4). A `pi`
+/// invocation that resolves none keys on the text before the first `/` of the
+/// model rhei hands it, when both halves are non-empty; that provider keys the
+/// wait and nothing else, so `model_provider` stays unset. §FS-rhei-agents.2.5
 fn resolved_provider_identity(resolved: &ResolvedAgent) -> Option<ProviderIdentity> {
-    Some(ProviderIdentity {
-        agent: resolved.agent.id().to_string(),
-        provider: resolved.model_provider.clone()?,
-    })
+    let provider = match &resolved.model_provider {
+        Some(provider) => provider.clone(),
+        None if resolved.family() == "pi" => {
+            let (provider, model) = resolved.handed_model()?.split_once('/')?;
+            if provider.is_empty() || model.is_empty() {
+                return None;
+            }
+            provider.to_string()
+        }
+        None => return None,
+    };
+    Some(ProviderIdentity { agent: resolved.agent.id().to_string(), provider })
 }
 
 /// Strip ANSI CSI/OSC decoration without changing any other text. The caller
@@ -212,16 +225,17 @@ fn classify_provider_limit_with_local_resolver(
     observed: std::time::SystemTime,
     resolve_local: &impl Fn(&NaiveDateTime) -> Option<DateTime<Utc>>,
 ) -> Option<ProviderLimit> {
-    // The identity is recorded whole, but only its provider half is a
-    // recognition condition. §FS-rhei-agents.2.3
-    let identity = resolved_provider_identity(resolved)?;
-    if !RECOGNIZED_PROVIDERS.contains(&identity.provider.as_str())
+    // Only the provider the invocation resolves is tested, never one derived
+    // for a pi wait; the identity is recorded whole. §FS-rhei-agents.2.3
+    let declared = resolved.model_provider.as_deref()?;
+    if !RECOGNIZED_PROVIDERS.contains(&declared)
         || status.success()
         || timed_out
         || interrupted
     {
         return None;
     }
+    let identity = resolved_provider_identity(resolved)?;
 
     let matching = captured_lines
         .iter()

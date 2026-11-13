@@ -17,7 +17,6 @@ use serde_json::json;
 /// the target's own provider is untouched. §FS-rhei-agents.2.5
 // §FS-rhei-run.3.3 §FS-rhei-run-json.2.1
 #[test]
-#[ignore = "red until #664: the pi reference spelling is charged and writes no wait; implement removes this"]
 fn a_pi_reference_target_waits_without_spending_an_attempt() {
     let outage = Outage { target: TARGET_WITHOUT_PROVIDER, ..Outage::pi(gave_up()) };
     let fixture = outage.fixture("pi-reference-waits");
@@ -55,7 +54,6 @@ fn a_pi_reference_target_waits_without_spending_an_attempt() {
 /// clears the wait. Single worker first, then the pool, which reaches the gate
 /// from its own call site. §FS-rhei-agents.2.5 §FS-rhei-run.3.3
 #[test]
-#[ignore = "red until #664: no wait is derived, so nothing holds the next spawn; implement removes this"]
 fn a_wait_derived_from_a_pi_reference_holds_the_next_spawn() {
     let single = Outage { target: TARGET_WITHOUT_PROVIDER, ..Outage::pi(gave_up()) };
     let fixture = single.fixture("pi-reference-holds");

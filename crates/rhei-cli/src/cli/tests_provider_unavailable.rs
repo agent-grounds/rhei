@@ -107,7 +107,6 @@ mod provider_unavailable {
     /// The incident spelling, whose provider is only pi's own model reference,
     /// is recognized and keyed as the respelling is. §FS-rhei-agents.2.5
     #[test]
-    #[ignore = "red until #664: the pi reference spelling is not recognized; implement removes this"]
     fn the_pi_reference_spelling_is_recognized_under_the_respellings_identity() {
         let incident = stdout(&gave_up(SIGNAL, SIGNAL));
         let reference = resolved("pi:openai-codex/gpt-6.1-sol");

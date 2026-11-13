@@ -49,7 +49,6 @@ mod provider_wait_identity {
     /// provider; a resolved provider wins; no `/` or an empty half, or another
     /// family, keys nothing. §FS-rhei-agents.2.5 §FS-rhei-run.3.3
     #[test]
-    #[ignore = "red until #664: a pi reference keys no wait today; implement removes this"]
     fn a_pi_model_reference_keys_the_wait_when_no_provider_is_resolved() {
         let reference = resolved("pi:openai-codex/gpt-6.1-sol");
         assert_eq!(key(&reference), identity("pi", "openai-codex"), "the incident spelling");

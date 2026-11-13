@@ -220,8 +220,11 @@ contracts, sharing only serialized ledger appends.
 
 Conformance tests for an advancing claim observe the provisional state-write
 boundary, sidecar contention and subsequent acquisition, and the committed
-state and claim-before-transition ledger order. Those observations use finite,
-portable test patience; they do not establish a command-latency guarantee.
+state and claim-before-transition ledger order. Tests of a claim that rolls
+back observe the same boundary and sidecar, and a competing ledger writer's
+contention and its acquisition once the claim releases. Every one of those
+positive observations uses the same finite, portable test patience, never a
+shorter per-test wait; they do not establish a command-latency guarantee.
 
 ### 3.2. Output (claim mode)
 

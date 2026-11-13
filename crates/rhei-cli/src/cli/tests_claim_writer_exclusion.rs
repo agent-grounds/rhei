@@ -210,3 +210,28 @@ fn claim_rollback_excludes_and_revalidates_an_ordinary_transition() {
         ""
     );
 }
+
+/// Every positive wait on a claim boundary, in the commit and rollback tests and in
+/// the claim-transaction ledger-writer test, uses `TEST_PATIENCE` rather than a
+/// shorter literal of its own. §FS-rhei-next.3.1
+#[test]
+#[ignore = "red until #709: the rollback and ledger-writer claim tests still wait 2 s; implement removes this"]
+fn claim_boundary_waits_use_portable_patience() {
+    // Built by concatenation so this test's own source does not match.
+    let short_wait = concat!("recv_timeout(Duration::", "from_secs(");
+    for (file, source) in [
+        ("tests_claim_writer_exclusion.rs", include_str!("tests_claim_writer_exclusion.rs")),
+        ("tests_claim_transaction.rs", include_str!("tests_claim_transaction.rs")),
+    ] {
+        let offenders: Vec<usize> = source
+            .lines()
+            .enumerate()
+            .filter(|(_, line)| line.contains(short_wait))
+            .map(|(index, _)| index + 1)
+            .collect();
+        assert!(
+            offenders.is_empty(),
+            "{file} waits on a claim boundary with a literal instead of TEST_PATIENCE at lines {offenders:?}"
+        );
+    }
+}

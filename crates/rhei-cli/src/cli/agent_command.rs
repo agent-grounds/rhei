@@ -196,7 +196,10 @@ fn build_agent_command(
     // Append MCP and skill flags. Only entries whose definition resolved
     // (registry hit or inline) are emitted; this matches `RHEI_MCP_SERVERS`
     // §FS-rhei-agents.2 §FS-rhei-agents.6: Emit available tooling flags only.
-    if let Some(flag) = profile.mcp_flag.as_deref() {
+    if uses_codex_mcp_config(resolved) {
+        // §FS-rhei-agents.1.1.2.1: The same native mapping gates availability and builds argv.
+        append_codex_mcp_config(&mut cmd, tooling, checkout_root);
+    } else if let Some(flag) = profile.mcp_flag.as_deref() {
         for entry in &tooling.mcp_servers {
             if entry.definition.is_some() {
                 cmd.arg(flag).arg(&entry.id);
@@ -266,24 +269,18 @@ fn build_agent_command(
 /// Expand `${VAR}` references in a string against the current process
 /// environment. Unknown variables expand to the empty string, matching the
 /// §FS-rhei-agents.1.1.4: Expand MCP profile environment references.
+/// Preserve the surrounding UTF-8 verbatim for native MCP values (§FS-rhei-agents.1.1.2.1).
 fn expand_env_vars(input: &str) -> String {
     let mut out = String::with_capacity(input.len());
-    let bytes = input.as_bytes();
-    let mut i = 0;
-    while i < bytes.len() {
-        if bytes[i] == b'$' && i + 1 < bytes.len() && bytes[i + 1] == b'{' {
-            if let Some(end_rel) = bytes[i + 2..].iter().position(|&b| b == b'}') {
-                let name_start = i + 2;
-                let name_end = name_start + end_rel;
-                let name = &input[name_start..name_end];
-                out.push_str(&std::env::var(name).unwrap_or_default());
-                i = name_end + 1;
-                continue;
-            }
-        }
-        out.push(bytes[i] as char);
-        i += 1;
+    let mut rest = input;
+    while let Some(start) = rest.find("${") {
+        let Some(end) = rest[start + 2..].find('}') else { break };
+        out.push_str(&rest[..start]);
+        let name_end = start + 2 + end;
+        out.push_str(&std::env::var(&rest[start + 2..name_end]).unwrap_or_default());
+        rest = &rest[name_end + 1..];
     }
+    out.push_str(rest);
     out
 }
 

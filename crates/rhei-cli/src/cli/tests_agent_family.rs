@@ -54,7 +54,6 @@ mod agent_family {
     /// Native attachment is inherited with the other Codex profile fields.
     /// §FS-rhei-agents.1.1.2.1
     #[test]
-    #[ignore = "red until #666: Codex inherits native -c attachment; implement removes this"]
     fn codex_mcp_catalogue_and_family_select_native_config() {
         let (profile, _) = resolve("cdx", serde_json::json!({ "family": "codex" }));
         assert_eq!(built_in_agents()["codex"].mcp_flag.as_deref(), Some("-c"));

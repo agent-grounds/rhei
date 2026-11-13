@@ -9,6 +9,7 @@ const DEFAULT_MCP_STARTUP_TIMEOUT: &str = "10s";
 /// held to the preflight. Servers start in `checkout_root`, or in a declared
 /// `working_directory` when the agent attaches them with `mcp_flag`, the one
 /// wiring that can carry it. §FS-rhei-agents.6.2 §FS-rhei-mcp-config-file.2
+/// Native Codex definitions must also be representable (§FS-rhei-agents.1.1.2.1).
 fn gate_tooling_at_spawn(
     resolved: &ResolvedAgent,
     tooling: &ResolvedTooling,
@@ -16,6 +17,9 @@ fn gate_tooling_at_spawn(
 ) -> ToolingGateResult {
     let carries_working_directory = resolved.profile.mcp_flag.is_some();
     let preflight = |def: &McpServerProfile| {
+        if uses_codex_mcp_config(resolved) {
+            codex_mcp_config_entry(def, checkout_root)?;
+        }
         preflight_mcp_server(def, checkout_root, carries_working_directory)
     };
     gate_tooling_for_agent(resolved, tooling, &preflight)
@@ -49,16 +53,10 @@ fn preflight_mcp_command(
     let Some(program) = command.first().filter(|program| !program.is_empty()) else {
         return Err("has an empty 'command'".to_string());
     };
-    let start_dir = match def.working_directory.as_deref().filter(|_| carries_working_directory) {
-        Some(dir) => {
-            let dir = checkout_root.join(dir);
-            if !dir.is_dir() {
-                return Err(format!("working directory '{}' does not exist", dir.display()));
-            }
-            dir
-        }
-        None => checkout_root.to_path_buf(),
-    };
+    let start_dir = mcp_command_directory(def, checkout_root, carries_working_directory);
+    if carries_working_directory && def.working_directory.is_some() && !start_dir.is_dir() {
+        return Err(format!("working directory '{}' does not exist", start_dir.display()));
+    }
     let path = match def.env.get("PATH") {
         Some(value) => Some(std::ffi::OsString::from(expand_env_vars(value))),
         None => std::env::var_os("PATH"),
@@ -70,6 +68,19 @@ fn preflight_mcp_command(
             start_dir.display()
         )),
         None => Err(format!("command '{program}' is not on PATH")),
+    }
+}
+
+/// The directory used by both native attachment and command preflight.
+/// §FS-rhei-agents.1.1.2.1 §FS-rhei-agents.6.2
+fn mcp_command_directory(
+    def: &McpServerProfile,
+    checkout_root: &Path,
+    carries_working_directory: bool,
+) -> PathBuf {
+    match def.working_directory.as_deref().filter(|_| carries_working_directory) {
+        Some(dir) => checkout_root.join(dir),
+        None => checkout_root.to_path_buf(),
     }
 }
 

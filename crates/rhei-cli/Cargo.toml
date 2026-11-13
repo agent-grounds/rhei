@@ -40,6 +40,9 @@ notify = "6"
 regex = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+# Native Codex MCP overrides are TOML inline tables, including literal server ids.
+# Match the locked, Rust 1.82-compatible TOML writer. §FS-rhei-agents.1.1.2.1
+toml_edit = { version = "=0.22.20", default-features = false, features = ["display"] }
 # Already in the graph via miette; named directly only to pass a
 # `WordSplitter` to the diagnostic handler (miette does not re-export it).
 textwrap = { version = "0.16", default-features = false }

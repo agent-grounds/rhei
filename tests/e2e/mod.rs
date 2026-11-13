@@ -412,6 +412,7 @@ mod until_idle_deadline_tests;
 mod until_idle_drain_tests;
 mod until_idle_frontend_tests;
 mod until_idle_outcome_tests;
+mod until_idle_record_tests;
 mod until_idle_support;
 mod validate_parallel_layout_tests;
 mod validate_retry_cache_tests;

@@ -192,7 +192,11 @@ was typed: a run that queued behind another began when it got the lock, and
 `rhei runs` orders by this field.
 
 The descriptor is rewritten once more when the process ends, with the terminal
-`status` and the run's `exit_code`. A run that is `SIGKILL`ed writes nothing
+`status` and the run's `exit_code`. The status follows the exit code: `finished`
+for `0` and for `3`, the idle stop of `--until-idle`
+([§FS-rhei-run-json.5](rhei-run-json.spec.md#5-exit-codes)), and `failed` for any other. An idle stop is the plan
+working as authored, recorded as the same plan state is without the flag, so
+`exit_code` alone tells idle from complete. A run that is `SIGKILL`ed writes nothing
 further and is left saying `running` — which is why liveness is decided by the
 run lock and not by this field ([§FS-rhei-run-headless.3](rhei-run-headless.spec.md#3-run-identity-and-liveness)).
 

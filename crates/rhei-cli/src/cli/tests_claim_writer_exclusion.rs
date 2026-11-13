@@ -163,7 +163,7 @@ fn claim_rollback_excludes_and_revalidates_an_ordinary_transition() {
         set_claim_faults(vec![(ClaimFaultPoint::AssigneeWrite, "ownership disk full")]);
         set_claim_after_state_write_hook(move || {
             provisional_tx.send(()).expect("provisional state signal");
-            release_rx.recv_timeout(Duration::from_secs(2)).expect("release claim");
+            release_rx.recv_timeout(TEST_PATIENCE).expect("release claim");
         });
         next_command(
             &claimant_plan,
@@ -177,13 +177,13 @@ fn claim_rollback_excludes_and_revalidates_an_ordinary_transition() {
         .map_err(|error| error.to_string())
     });
 
-    provisional_rx.recv_timeout(Duration::from_secs(2)).expect("provisional claim state");
+    provisional_rx.recv_timeout(TEST_PATIENCE).expect("provisional claim state");
     let (lock_tx, lock_rx) = mpsc::channel();
     let (done_tx, done_rx) = mpsc::channel();
     let transition =
         spawn_waiting_transition(plan.clone(), machine.clone(), lock_tx, done_tx);
     assert_eq!(
-        lock_rx.recv_timeout(Duration::from_secs(2)).expect("transition lock attempt"),
+        lock_rx.recv_timeout(TEST_PATIENCE).expect("transition lock attempt"),
         PlanLockEvent::Contended,
         "the ordinary transition must wait through claim restoration"
     );
@@ -194,12 +194,12 @@ fn claim_rollback_excludes_and_revalidates_an_ordinary_transition() {
 
     release_tx.send(()).expect("release claimant");
     assert_eq!(
-        lock_rx.recv_timeout(Duration::from_secs(2)).expect("transition lock acquisition"),
+        lock_rx.recv_timeout(TEST_PATIENCE).expect("transition lock acquisition"),
         PlanLockEvent::Acquired
     );
     let claim_error = claimant.join().expect("claimant thread").expect_err("claim fails");
     assert!(claim_error.contains("assignee persistence injection"));
-    done_rx.recv_timeout(Duration::from_secs(2)).expect("transition completion");
+    done_rx.recv_timeout(TEST_PATIENCE).expect("transition completion");
     let transition_error =
         transition.join().expect("transition thread").expect_err("stale move is refused");
     assert!(transition_error.contains("is in state 'draft', expected 'pending'"));
@@ -215,7 +215,6 @@ fn claim_rollback_excludes_and_revalidates_an_ordinary_transition() {
 /// the claim-transaction ledger-writer test, uses `TEST_PATIENCE` rather than a
 /// shorter literal of its own. §FS-rhei-next.3.1
 #[test]
-#[ignore = "red until #709: the rollback and ledger-writer claim tests still wait 2 s; implement removes this"]
 fn claim_boundary_waits_use_portable_patience() {
     // Built by concatenation so this test's own source does not match.
     let short_wait = concat!("recv_timeout(Duration::", "from_secs(");

@@ -402,33 +402,34 @@
         /// The regression must establish delivery inside the real grace,
         /// independent of raiser scheduling. §FS-rhei-run.3.2.1
         #[test]
-        #[ignore = "red until #701: late raiser exposes unordered grace delivery; implement removes this"]
         fn a_shutdown_inside_the_grace_outranks_the_deadline_it_interrupted() {
             let dir = tempfile::tempdir().expect("tmpdir");
             let ready = dir.path().join("trapped");
-            let token = Arc::new(StopToken::new());
+            let token = StopToken::new();
             let mut supervised = Supervised::spawn(
                 &mut sh(&format!("trap '' TERM; : > {}; {CHILD_SLEEP}", ready.display())),
                 "unit@grace",
             )
             .expect("spawn");
             let pgid = supervised.pgid;
-            // Ignoring `SIGTERM` holds grace open, but does not guarantee that
-            // the sleeping raiser runs before grace completes (#701).
+            // Keep the real group alive through SIGTERM so it needs the grace.
             wait_until("the child to ignore SIGTERM", || ready.exists());
 
-            let raiser = Arc::clone(&token);
-            let handle = std::thread::spawn(move || {
-                std::thread::sleep(SUPERVISED_TERMINATE_GRACE / 10);
-                raiser.raise(Signal::SIGINT as i32);
+            // §FS-rhei-run.3.2.1: delivery completes at grace entry before any exit or timed poll.
+            supervised.on_grace_entry = Some(|stop| {
+                assert!(!stop.is_set(), "termination entered grace as a timeout");
+                stop.raise(Signal::SIGINT as i32);
             });
+            assert!(!token.is_set(), "the wait must start without shutdown");
 
             // A deadline already in the past, so the wait enters the grace as a
             // timeout and the operator interrupts it there.
             let ended = supervised
                 .wait(Some(Duration::from_millis(0)), &token, &ignore_notice)
                 .expect("wait");
-            handle.join().expect("raiser");
+            assert!(supervised.on_grace_entry.is_none(), "the grace delivery seam was reached");
+            assert!(token.is_set(), "the grace delivery completed");
+            assert!(supervised.reaped, "termination reaped the child before returning");
             assert_eq!(
                 ended.cause,
                 EndCause::Interrupted,

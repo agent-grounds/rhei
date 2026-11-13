@@ -57,6 +57,7 @@ mod tests {
     include!("validator/tests_machine_only.rs");
     include!("validator/tests_dead_end_states.rs");
     include!("validator/tests_poll.rs");
+    include!("validator/tests_exit_code_overlap.rs");
     include!("validator/tests_supervision.rs");
     include!("validator/tests_snapshots.rs");
     include!("validator/tests_prompt_templates.rs");

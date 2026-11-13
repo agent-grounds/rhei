@@ -16,9 +16,15 @@ mod entry_log_numbers {
         fs::write(runtime.join("state-transitions.log"), lines).expect("ledger");
     }
 
-    /// The entry number of `plan.1` in `state`, with one root for both ledgers.
+    /// The entry number of `plan.1` in `state`, the state it is in, with one
+    /// root for both ledgers.
     fn entry(root: &std::path::Path, state: &str) -> Result<u64, String> {
-        ticket_entry_number(root, &root.join("runtime"), "plan.1", state)
+        entry_in(root, state, Stay::Current)
+    }
+
+    /// The same, asked about a state the ticket is in or has left, as `stay` says.
+    fn entry_in(root: &std::path::Path, state: &str, stay: Stay) -> Result<u64, String> {
+        ticket_entry_number(root, &root.join("runtime"), "plan.1", state, stay)
     }
 
     /// A ticket placed in a state is on its first entry whether or not the
@@ -32,7 +38,11 @@ mod entry_log_numbers {
 
         ledger_at(dir.path(), "plan.1 measure@cover\nplan.1 cover@measure\n");
         assert_eq!(entry(dir.path(), "measure"), Ok(2), "placed there, then one arrival");
-        assert_eq!(entry(dir.path(), "cover"), Ok(1), "arrived once, never placed");
+        assert_eq!(
+            entry_in(dir.path(), "cover", Stay::Elsewhere),
+            Ok(1),
+            "arrived once, never placed, and left"
+        );
     }
 
     /// Other tickets' lines are someone else's history.
@@ -72,7 +82,7 @@ mod entry_log_numbers {
     fn an_unknown_metadata_row_counts_nothing() {
         let dir = tempfile::tempdir().expect("tmpdir");
         ledger_at(dir.path(), "plan.1 work@verifying\nplan.1 !future-v9 work\n");
-        assert_eq!(entry(dir.path(), "work"), Ok(1));
+        assert_eq!(entry_in(dir.path(), "work", Stay::Elsewhere), Ok(1), "placed, then left");
     }
 
     /// No ledger at all is a fresh ticket: entry 1.
@@ -109,7 +119,7 @@ mod entry_log_numbers {
         ledger_at(owning.path(), "plan.1 work@verifying\nplan.1 verifying@work\n");
         ledger_at(running.path(), "plan.1 work@verifying\nplan.1 verifying@work\n");
         let number =
-            ticket_entry_number(owning.path(), &running.path().join("runtime"), "plan.1", "work");
+            ticket_entry_number(owning.path(), &running.path().join("runtime"), "plan.1", "work", Stay::Current);
         assert_eq!(number, Ok(3), "placed once, one arrival in each ledger");
     }
 
@@ -171,6 +181,7 @@ transitions:
                 dir.path(),
                 &dir.path().join("runtime"),
                 "plan.1",
+                Stay::Current,
             )
         };
         assert_eq!(resolve("counted"), Ok(LogNumber::Visit(4)), "visits:");

@@ -145,7 +145,10 @@ impl SpawnRefusals {
                 let visit = render_visit_count(
                     rhei.metadata.as_ref(), &task.id, &entry.state, task.state.as_str(), machine,
                 );
-                if resolve_log_number_report(machine, &entry.state, visit, task_root, &runtime, &entry.task)? != arrival {
+                // The ticket is still in the refused state, checked above. §FS-rhei-agents.8.1
+                let now =
+                    resolve_log_number_report(machine, &entry.state, visit, task_root, &runtime, &entry.task, Stay::Current)?;
+                if now != arrival {
                     continue;
                 }
                 // Reconcile against all requested arms, using the scheduler's

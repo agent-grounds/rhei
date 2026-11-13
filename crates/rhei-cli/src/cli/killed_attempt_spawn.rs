@@ -61,6 +61,7 @@ impl NamedSpawn<'_> {
     // §FS-rhei-agents.8.1.1 §FS-rhei-evidence.11.1 §FS-rhei-evidence.11.3
     fn plan(&self, worker: Option<&str>) -> Result<(SpawnPlan, LogNumber), PlanRefusal> {
         let (task_id, state_name) = (self.task_id, self.state_name);
+        // Every spawn site plans for the state the ticket is in. §FS-rhei-agents.8.1
         let number = resolve_log_number(
             self.machine,
             state_name,
@@ -68,6 +69,7 @@ impl NamedSpawn<'_> {
             self.task_root,
             self.runtime_dir,
             task_id,
+            Stay::Current,
         )
         .map_err(PlanRefusal::Ledger)?;
         let mut plan = SpawnPlan {

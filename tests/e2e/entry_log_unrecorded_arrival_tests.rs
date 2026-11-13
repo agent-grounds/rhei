@@ -62,6 +62,34 @@ if not bounced.exists():
 result('checked\n')
 "#;
 
+/// The machine of a ticket edited back into a state it has left: `check` sends
+/// it from `gate` to the gating `park` once, and finishes it the next time.
+const REVISIT_MACHINE: &str = r#"name: revisit
+version: 1
+states:
+  park:
+    initial: true
+    description: Wait for a person
+    gating: true
+  gate:
+    description: Select the gates
+    agent: mock
+    agent_timeout: 20s
+  check:
+    description: Check the selection
+    program:
+      command: CHECK
+    program_timeout: 20s
+  done:
+    description: Done
+    final: true
+transitions:
+  - { from: park, to: gate, description: Go }
+  - { from: gate, to: check, description: Selected }
+  - { from: check, to: park, exit_code: 10, description: Ask again }
+  - { from: check, to: done, exit_code: 0, description: Checked }
+"#;
+
 /// Runs the ticket from `prepare` to the `park` gate, so it can be moved into
 /// `gate` between two runs.
 fn parked_fixture(name: &str) -> (TestDir, std::path::PathBuf, std::path::PathBuf) {
@@ -139,4 +167,54 @@ fn a_recorded_arrival_gives_the_next_stay_its_own_entry() {
     let (dir, plan, machine) = parked_fixture("entry-log-recorded-arrival");
     assert_success(&run_transition(&plan, &machine, "1", "park", "gate"));
     assert_two_gate_entries(&dir, &plan, &machine);
+}
+
+/// A ticket edited by hand back into an uncounted state it arrived in and left
+/// is on a stay no ledger line lands in: that current stay is an arrival, so it
+/// runs as entry 2 instead of being refused for the first stay's log.
+// §FS-rhei-agents.8.1 §FS-rhei-authoring.7
+#[test]
+fn a_hand_edit_back_into_a_state_it_left_gives_the_stay_its_own_entry() {
+    let dir = unique_temp_dir("entry-log-hand-edited-revisit");
+    let plan = write_fixture_file(
+        &dir,
+        "plan.rhei.md",
+        &ONE_TICKET.replace("**State:** measure", "**State:** park"),
+    );
+    let check = write_python_agent(&dir, "check.py", CHECK);
+    let machine = write_fixture_file(
+        &dir,
+        "states.yaml",
+        &REVISIT_MACHINE.replace("CHECK", &fixture_command(&check)),
+    );
+    let agent = write_python_agent(&dir, "gate.py", GATE);
+    settings(&dir, &agent);
+    assert_success(&run_transition(&plan, &machine, "1", "park", "gate"));
+    assert_success(&run_cli("run", &plan, &machine, &RUN));
+    assert_task_state(&plan, &machine, "1", "park");
+    let parked = fs::read_to_string(&plan).expect("plan");
+    fs::write(&plan, parked.replace("**State:** park", "**State:** gate"))
+        .expect("edit the state back by hand");
+
+    let run = run_cli("run", &plan, &machine, &RUN);
+    let combined = format!("{}{}", run.stdout, run.stderr);
+    assert!(!combined.contains("refusing to spawn"), "nothing to refuse:\n{combined}");
+    assert_success(&run);
+    assert_task_state(&plan, &machine, "1", "done");
+    assert_eq!(
+        names_in(&dir, "runtime/logs"),
+        [
+            "task-plan.1-check-2.log",
+            "task-plan.1-check.log",
+            "task-plan.1-gate-2.log",
+            "task-plan.1-gate.log",
+        ],
+    );
+    assert!(read(&dir, "runtime/logs/task-plan.1-gate.log").contains("GATE-1"));
+    assert!(read(&dir, "runtime/logs/task-plan.1-gate-2.log").contains("GATE-2"));
+    assert_eq!(
+        read(&dir, "runtime/state-transitions.log"),
+        "plan.1 park@gate\nplan.1 gate@check\nplan.1 check@park\nplan.1 gate@check\nplan.1 check@done\n",
+        "the ledger has no arrival for the hand-edited stay"
+    );
 }

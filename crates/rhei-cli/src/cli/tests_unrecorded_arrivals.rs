@@ -17,9 +17,15 @@ mod unrecorded_arrivals {
         fs::write(runtime.join("state-transitions.log"), lines).expect("ledger");
     }
 
-    /// The entry number of `plan.1` in `state`, with one root for both ledgers.
+    /// The entry number of `plan.1` in `state`, the state it is in, with one
+    /// root for both ledgers.
     fn entry(root: &std::path::Path, state: &str) -> Result<u64, String> {
-        ticket_entry_number(root, &root.join("runtime"), "plan.1", state)
+        entry_in(root, state, Stay::Current)
+    }
+
+    /// The same, asked about a state the ticket is in or has left, as `stay` says.
+    fn entry_in(root: &std::path::Path, state: &str, stay: Stay) -> Result<u64, String> {
+        ticket_entry_number(root, &root.join("runtime"), "plan.1", state, stay)
     }
 
     /// The reported ledger: the ticket was edited from `park` into `gate`, left
@@ -31,7 +37,11 @@ mod unrecorded_arrivals {
         let dir = tempfile::tempdir().expect("tmpdir");
         ledger_at(dir.path(), "plan.1 prepare@park\nplan.1 gate@check\nplan.1 check@gate\n");
         assert_eq!(entry(dir.path(), "gate"), Ok(2), "edited in, left, came back");
-        assert_eq!(entry(dir.path(), "check"), Ok(1), "arrived once, every move recorded");
+        assert_eq!(
+            entry_in(dir.path(), "check", Stay::Elsewhere),
+            Ok(1),
+            "arrived once and left, every move recorded"
+        );
 
         ledger_at(
             dir.path(),
@@ -44,12 +54,15 @@ mod unrecorded_arrivals {
     /// last ledger line does not land in: that stay is an arrival too.
     // §FS-rhei-agents.8.1
     #[test]
-    #[ignore = "red until #667: the current stay is not counted when the last ledger line does not \
-                land in its state; implement removes this"]
     fn the_current_stay_counts_when_no_line_lands_in_it() {
         let dir = tempfile::tempdir().expect("tmpdir");
         ledger_at(dir.path(), "plan.1 a@b\nplan.1 b@c\n");
         assert_eq!(entry(dir.path(), "b"), Ok(2), "arrived once, then edited back into it");
+        assert_eq!(
+            entry_in(dir.path(), "b", Stay::Elsewhere),
+            Ok(1),
+            "read after the move out of it: that stay is over, not unrecorded"
+        );
         assert_eq!(entry(dir.path(), "a"), Ok(2), "placed there, left, edited back into it");
     }
 
@@ -75,7 +88,7 @@ mod unrecorded_arrivals {
         let owning = tempfile::tempdir().expect("owning root");
         let running = tempfile::tempdir().expect("run root");
         let number = |state: &str| {
-            ticket_entry_number(owning.path(), &running.path().join("runtime"), "plan.1", state)
+            ticket_entry_number(owning.path(), &running.path().join("runtime"), "plan.1", state, Stay::Current)
         };
         ledger_at(owning.path(), "plan.1 work@verifying\nplan.1 verifying@review\n");
         ledger_at(running.path(), "plan.1 work@verifying\nplan.1 verifying@work\n");
@@ -87,7 +100,7 @@ mod unrecorded_arrivals {
     }
 
     /// A planned name whose log a spawn record at that name names, at an
-    /// earlier `moves`, belongs to an earlier stay the ledger records no arrival
+    /// earlier `moves`, belongs to an earlier stay the ledger misses an arrival
     /// for: the refusal says so and points at the ledger, not at a reset.
     // §FS-rhei-agents.8.1 §FS-rhei-agents.8.4
     #[test]
@@ -121,9 +134,9 @@ mod unrecorded_arrivals {
         assert_eq!(
             first,
             format!(
-                "refusing to spawn: {} belongs to an earlier stay in 'gate' (spawn record at \
-                 moves 1), but the ledger records no arrival in 'gate' before that stay, so this \
-                 stay took the same entry number",
+                "refusing to spawn: {} belongs to an earlier stay in 'gate': the spawn record at \
+                 moves 1 names it, so the ledger misses an arrival in 'gate' and this stay took \
+                 the same entry number",
                 plan.log.display()
             )
         );

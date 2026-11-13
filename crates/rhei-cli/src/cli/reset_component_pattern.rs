@@ -1,17 +1,21 @@
-// A declared `{task_id}` artifact path with a placeholder before the id, matched
-// one path component at a time, and whose a path it matches is.
+// A declared `{task_id}` artifact path with another placeholder, matched in full
+// one path component at a time, and the one rule that says whose a path it
+// matches is.
 //
 // Its own part because it is one rule with several readers: cut at its first
-// placeholder, such a path leaves a prefix no ticket id stands in, and a reset that
-// swept that prefix took every ticket's files under it. Both narrowings, the
-// bare-id check, the writability check and `rhei remove` ask it.
+// placeholder, such a path either carries no ticket id or drops the text after the
+// last placeholder, and a reset that swept that prefix took other tickets' files.
+// Both narrowings, the bare-id check, the writability check and `rhei remove` ask
+// it, and so do the prefixes rhei writes itself.
 
 // §AR-source-file-size.3 §FS-rhei-reset.2.1
 
-/// A declared artifact path that puts an unresolved placeholder (`{state}`,
-/// `{rhei_id}`, …) before `{task_id}`, resolved for one ticket id. Each
-/// placeholder matches any part of one path component and never a `/`, and the
-/// id has to stand where `{task_id}` stands. §FS-rhei-reset.2.1
+/// A declared artifact path that still carries an unresolved placeholder (`{state}`,
+/// `{visit_count}`, `{rhei_id}`, …) once `{task_id}` is resolved for one ticket id,
+/// before the id or after it. Each placeholder matches any part of one path component
+/// and never a `/`, the id has to stand where `{task_id}` stands, and the literal text
+/// around every placeholder, the text after the last one included, has to be there.
+/// §FS-rhei-reset.2.1
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct ComponentPattern {
     /// The execution root the declared path is relative to.
@@ -34,10 +38,10 @@ struct PatternComponent {
 }
 
 impl ComponentPattern {
-    /// Whether `template` has another placeholder before `{task_id}`, so the
-    /// literal prefix up to its first placeholder carries no ticket id.
+    /// Whether `template` has another placeholder besides `{task_id}`, so it names no
+    /// one file and is matched one component at a time. §FS-rhei-reset.2.1
     fn applies_to(template: &str) -> bool {
-        template.contains("{task_id}") && template.find('{') != template.find("{task_id}")
+        template.contains("{task_id}") && template.replace("{task_id}", "").contains('{')
     }
 
     fn new(root: &Path, template: &str, id: &str) -> Self {
@@ -56,88 +60,111 @@ impl ComponentPattern {
 
     /// Every path under `root` it matches now, read one level at a time; the
     /// directory a listing failed in, with the error, where one did. From its first
-    /// placeholder down it enters only real directories, never a symbolic link, and a
-    /// link is matched only as the last component. §FS-rhei-reset.2.1
+    /// placeholder, or the component holding the id where that comes first, it enters
+    /// only real directories, never a symbolic link. A link at or below the id's
+    /// component is one of the paths, never entered. §FS-rhei-reset.2.1
     fn entries(&self) -> Result<Vec<PathBuf>, (PathBuf, std::io::Error)> {
         let mut level = vec![self.root.clone()];
-        let mut placeholder_seen = false;
+        let mut links = Vec::new();
+        let (mut guarded, mut at_id) = (false, false);
         for (depth, component) in self.components.iter().enumerate() {
             let last = depth + 1 == self.components.len();
-            placeholder_seen |= component.pieces.len() > 1;
-            let present = |path: &Path| match fs::symlink_metadata(path) {
-                Ok(_) if last => true,
-                Ok(meta) if placeholder_seen => meta.is_dir(),
-                Ok(_) => path.is_dir(),
-                Err(_) => false,
-            };
+            at_id |= component.id_slot.is_some();
+            guarded |= at_id || component.pieces.len() > 1;
             let mut next = Vec::new();
-            for dir in &level {
-                if let [literal] = component.pieces.as_slice() {
-                    let path = dir.join(literal);
-                    if present(&path) {
+            let mut take = |path: PathBuf| match fs::symlink_metadata(&path) {
+                Ok(_) if last => next.push(path),
+                Ok(meta) if guarded && meta.file_type().is_symlink() => {
+                    if at_id {
+                        links.push(path);
+                    }
+                }
+                Ok(meta) if guarded => {
+                    if meta.is_dir() {
                         next.push(path);
                     }
+                }
+                Ok(_) => {
+                    if path.is_dir() {
+                        next.push(path);
+                    }
+                }
+                Err(_) => {}
+            };
+            for dir in &level {
+                if let [literal] = component.pieces.as_slice() {
+                    take(dir.join(literal));
                     continue;
                 }
                 if !dir.is_dir() {
                     continue;
                 }
                 for entry in fs::read_dir(dir).map_err(|err| (dir.clone(), err))?.flatten() {
-                    let path = entry.path();
                     let name = entry.file_name();
-                    let matched = name.to_str().is_some_and(|name| pieces_match(&component.pieces, name));
-                    if matched && present(&path) {
-                        next.push(path);
+                    if name.to_str().is_some_and(|name| pieces_match(&component.pieces, name)) {
+                        take(entry.path());
                     }
                 }
             }
             level = next;
         }
+        level.extend(links);
         Ok(level)
     }
 
     /// Whether `path` is this ticket's: it matches, component for component, and no
-    /// longer id of `ids` could stand where `{task_id}` stands in it. A placeholder
-    /// reaches files of every naming, so that a longer id's own instance of the same
-    /// path does not match proves nothing. §FS-rhei-reset.2.1 §FS-rhei-remove.4.2
-    fn owns<'a>(&self, path: &Path, ids: impl IntoIterator<Item = &'a str>) -> bool {
-        let Some(names) = self.names(path) else { return false };
-        let id = self.id.as_str();
-        let longer: Vec<&str> =
-            ids.into_iter().filter(|other| other.len() > id.len() && other.contains(id)).collect();
-        names.iter().zip(&self.components).all(|(name, component)| {
-            pieces_match(&component.pieces, name)
-                && component.id_slot.as_ref().is_none_or(|(before, after)| {
-                    !longer_id_stands(name, id, before, after, &longer)
-                })
+    /// id of `kept`, the tickets the operation leaves as they stand, could stand
+    /// where `{task_id}` stands in it. §FS-rhei-reset.2.1 §FS-rhei-remove.4.2
+    fn owns<'k>(&self, path: &Path, kept: impl IntoIterator<Item = &'k str>) -> bool {
+        self.matches(path) && !kept.into_iter().any(|other| self.could_stand(path, other))
+    }
+
+    /// Whether `path`, through the component holding the id or in full, reads as
+    /// this pattern does.
+    fn matches(&self, path: &Path) -> bool {
+        self.names(path).is_some_and(|names| {
+            names.iter().zip(&self.components).all(|(name, component)| pieces_match(&component.pieces, name))
         })
     }
 
-    /// `path`'s components under `root`, where there are as many as it has.
+    /// Whether `other`, another ticket's id, could stand where this ticket's id stands
+    /// in `path`. §FS-rhei-reset.2.1
+    fn could_stand(&self, path: &Path, other: &str) -> bool {
+        self.names(path).is_some_and(|names| {
+            names.iter().zip(&self.components).any(|(name, component)| {
+                component.id_slot.as_ref().is_some_and(|(before, after)| {
+                    id_could_stand(name, &self.id, before, after, other)
+                })
+            })
+        })
+    }
+
+    /// `path`'s components under `root`: all it has, or, for a link it lists above
+    /// its last component, those through the component holding the id.
     fn names<'p>(&self, path: &'p Path) -> Option<Vec<&'p str>> {
         let rest = path.strip_prefix(&self.root).ok()?;
         let names: Option<Vec<&str>> = rest.components().map(|part| part.as_os_str().to_str()).collect();
-        names.filter(|names| names.len() == self.components.len())
+        let through_id = self.components.iter().position(|component| component.id_slot.is_some())? + 1;
+        names.filter(|names| (through_id..=self.components.len()).contains(&names.len()))
     }
 }
 
-/// Whether one of `longer` could stand where `{task_id}` stands in `name`: it
-/// begins where the text before it reads as `before`, the declared text before
-/// `{task_id}`, and runs over a place `id` is matched at. Nothing after the id is
-/// asked of it. §FS-rhei-reset.2.1
-fn longer_id_stands(name: &str, id: &str, before: &[String], after: &[String], longer: &[&str]) -> bool {
-    let starts: Vec<usize> = (0..=name.len())
-        .filter(|&at| name.is_char_boundary(at) && pieces_match(before, &name[..at]))
-        .collect();
-    let mine: Vec<usize> = starts
-        .iter()
-        .copied()
-        .filter(|&at| name[at..].starts_with(id) && pieces_match(after, &name[at + id.len()..]))
-        .collect();
-    longer.iter().any(|other| {
-        starts.iter().any(|&from| {
-            name[from..].starts_with(other)
-                && mine.iter().any(|&at| from <= at && at + id.len() <= from + other.len())
+/// The one ownership rule, for a declared path and a prefix rhei writes alike:
+/// whether `other`, an id longer than `id`, could stand where `id` stands in `name`,
+/// one path component. It begins where the text before it reads as `before`, the
+/// text declared before the id, and runs over a place `id` stands at, where the
+/// text after `id` reads as `after`. Nothing after `other` is asked: a placeholder
+/// reaches files of every naming, and one directory can hold several. A path such
+/// an id of a kept ticket could stand in is ambiguous, and the kept ticket's claim
+/// wins. §FS-rhei-reset.2.1 §FS-rhei-remove.4.2
+fn id_could_stand(name: &str, id: &str, before: &[String], after: &[String], other: &str) -> bool {
+    if other.len() <= id.len() || !other.contains(id) {
+        return false;
+    }
+    let place = |at: usize| name.is_char_boundary(at) && pieces_match(before, &name[..at]);
+    (0..=name.len()).filter(|&from| place(from) && name[from..].starts_with(other)).any(|from| {
+        (from..=from + other.len() - id.len()).any(|at| {
+            place(at) && name[at..].starts_with(id) && pieces_match(after, &name[at + id.len()..])
         })
     })
 }

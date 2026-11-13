@@ -198,7 +198,12 @@ Ownership is exact: a path belongs to the ticket when the machine's `{task_id}`
 pattern resolves to it for that id, never by a loose prefix, so removing
 `auth.1` never touches `auth.10` or `auth.1x`. A target that is ambiguous,
 shared with another ticket, escapes the execution root, or is a symlink is
-refused, not cleaned. A path the machine does not declare is left alone.
+refused, not cleaned. A path is ambiguous where the ticket's declared path or
+prefix matches it and a longer id of another ticket, retired ones included, could
+stand where the ticket's id stands, the rule a narrowed reset asks with every ticket
+it keeps ([§FS-rhei-reset.2.1](rhei-reset.spec.md#21-narrowed-reset---rhei)); removal keeps every other ticket. A path the machine
+does not declare is left alone, and that includes a file that only begins as a
+declared path does.
 
 A nonempty work product is evidence ([§FS-rhei-remove.2](rhei-remove.spec.md#2-untouched)), not residue, so removal never reaches
 it. Removal deletes no history: shared ledgers, the note store, run reports,

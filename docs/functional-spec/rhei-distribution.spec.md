@@ -111,6 +111,11 @@ changed more than docs and CI. Docs and CI are the paths under `docs/` and
   released. The previous release tag is `v<version>`, where the version is the
   one the inline release heading names; a release whose previous tag does not
   exist is refused.
+- The previous release tag must be an ancestor of `HEAD`. If it is not, the
+  release fails with an error naming that tag, before any forge lookup or
+  write; the changelog, archives and working tree remain unchanged. A history
+  rewrite can leave a tag on another history, where the range would include
+  rewritten commits whose pull request associations may have been lost.
 - Each commit is mapped through the forge to the pull requests it belongs to,
   and only a merged pull request counts. One pull request that merged as several
   commits is listed once.
@@ -136,6 +141,14 @@ release section, then `Older releases`, and no `## Unreleased`. The check reads
 headings only, not the entries, so a maintainer may still correct an entry by
 hand after a release.
 
+The historical 0.6.1 correction restores exactly the omitted pull requests
+#440, #441, #442, #443, #444, #445, #446, #449, #452, #453, #456, #457, #458 and
+#459, retaining the original 14 entries. Both `docs/changelog/0.6.1.md` and the
+GitHub `v0.6.1` release body list all 28 once, with their titles and links in
+newest-first order; empty pull request #487 is excluded. The 0.6.1 archive index
+line reports `28 pull requests.` This corrects the historical publication
+without regenerating it from today's history or adding an entry for the fix.
+
 ### 5.2. When the forge cannot answer
 
 The notes are read from the forge, so a release that cannot ask it has no notes
@@ -158,7 +171,15 @@ first step is where the reason is clearest.
 ### 5.3. When the scheduled release waits
 
 The scheduled release is due when the list of [§FS-rhei-distribution.5.1](rhei-distribution.spec.md#51-what-a-releases-notes-list) is not empty, and asks the
-same question the release answers. Before it cuts anything:
+same question the release answers. Before it cuts anything, it validates the
+release range.
+
+It first checks the ancestry prerequisite of
+[§FS-rhei-distribution.5.1](rhei-distribution.spec.md#51-what-a-releases-notes-list).
+An off-history previous tag fails the run with an error naming the tag, before
+any forge lookup, docs/CI shortcut or write, leaving the changelog, archives,
+working tree and step output file unchanged. This also applies when the tag
+and `HEAD` have identical trees. For a valid range:
 
 - Nothing changed outside docs and CI since the previous release tag: it does
   not release, and says `Only docs/CI changes since <tag>; skipping.` This is

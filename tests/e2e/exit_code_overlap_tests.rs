@@ -32,7 +32,6 @@ transitions:
 const PLAN: &str = "# Rhei: Overlap\n\n## Tasks\n\n### Task 1: Analyze\n**State:** analyze\n";
 
 #[test]
-#[ignore = "red until #663: rhei states and rhei validate accept two exit-12 rules; implement removes this"]
 fn states_and_validate_refuse_two_exit_code_rules_for_one_code() {
     for (first, second) in [("human-intervention", "native"), ("native", "human-intervention")] {
         let dir = unique_temp_dir("exit-code-overlap");

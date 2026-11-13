@@ -48,7 +48,6 @@ transitions:
     }
 
     #[test]
-    #[ignore = "red until #663: two equal integers load; implement removes this"]
     fn exit_code_overlap_refuses_equal_integers() {
         assert_overlap_refused(
             false,
@@ -63,7 +62,6 @@ transitions:
     }
 
     #[test]
-    #[ignore = "red until #663: an exact duplicate rule loads; implement removes this"]
     fn exit_code_overlap_refuses_exact_duplicate() {
         assert_overlap_refused(
             false,
@@ -77,7 +75,6 @@ transitions:
     }
 
     #[test]
-    #[ignore = "red until #663: an integer inside another rule's array loads; implement removes this"]
     fn exit_code_overlap_refuses_integer_in_array() {
         assert_overlap_refused(
             false,
@@ -90,7 +87,6 @@ transitions:
     }
 
     #[test]
-    #[ignore = "red until #663: two arrays sharing a value load; implement removes this"]
     fn exit_code_overlap_refuses_arrays_sharing_a_value() {
         assert_overlap_refused(
             false,
@@ -103,7 +99,6 @@ transitions:
     }
 
     #[test]
-    #[ignore = "red until #663: two nonzero rules load; implement removes this"]
     fn exit_code_overlap_refuses_two_nonzero() {
         assert_overlap_refused(
             false,
@@ -116,7 +111,6 @@ transitions:
     }
 
     #[test]
-    #[ignore = "red until #663: a conditioned rule overlapping an unconditioned one loads; implement removes this"]
     fn exit_code_overlap_refuses_when_only_one_rule_has_a_condition() {
         assert_overlap_refused(
             false,
@@ -129,7 +123,6 @@ transitions:
     }
 
     #[test]
-    #[ignore = "red until #663: two overlapping rules with the same condition load; implement removes this"]
     fn exit_code_overlap_refuses_identical_conditions() {
         assert_overlap_refused(
             false,
@@ -142,7 +135,6 @@ transitions:
     }
 
     #[test]
-    #[ignore = "red until #663: two overlapping non-self-loop rules from a poll state load; implement removes this"]
     fn exit_code_overlap_refuses_two_exits_from_a_poll_state() {
         assert_overlap_refused(
             true,
@@ -156,7 +148,6 @@ transitions:
     }
 
     #[test]
-    #[ignore = "red until #663: two overlapping self-loops on a poll state load; implement removes this"]
     fn exit_code_overlap_refuses_two_self_loops_on_a_poll_state() {
         assert_overlap_refused(
             true,

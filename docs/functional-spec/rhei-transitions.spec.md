@@ -582,7 +582,7 @@ transitions:
     on_enter: "cli:bash ./workflow.sh notify-build-failure"
 ```
 
-The `exit_code` field on the transition is only meaningful for program states. Declaring `exit_code` on a transition from a non-program state is a validation error. See [Program States Specification](rhei-programs.spec.md) for the complete exit-code evaluation algorithm and validation rules.
+The `exit_code` field on the transition is only meaningful for program states. Declaring `exit_code` on a transition from a non-program state is a validation error, and so are two `exit_code` rules from one state that can match the same code with no condition to tell them apart ([§FS-rhei-programs.8.2](rhei-programs.spec.md#82-transition-level)). See [Program States Specification](rhei-programs.spec.md) for the complete exit-code evaluation algorithm and validation rules.
 
 ### 3.6. Agent Timeout Trigger (`triggeredBy: 'system'`)
 

@@ -112,3 +112,36 @@ fn collecting_deduplicates_missing_tasks_without_hiding_independent_sections() {
         assert_eq!(errors[1].message, "Metadata field appears outside a task");
     }
 }
+
+/// A retired States declaration is independent of the misplaced-heading error,
+/// even in the same block; collecting keeps both refusals in either field order.
+/// §FS-rhei-errors.1.7 §FS-rhei-plan-language.2.2 §FS-rhei-validate.4.2
+#[test]
+fn collecting_keeps_retired_states_before_and_after_the_triggering_field() {
+    for (fields, states_line) in
+        [("**State:** pending\n**States:** old\n", 5), ("**States:** old\n**State:** pending\n", 4)]
+    {
+        for tasks_section_follows in [false, true] {
+            let mut plan = format!("# Rhei: Italy\n\n### Task 1: Book\n{fields}");
+            if tasks_section_follows {
+                plan.push_str("\n## Tasks\n\n### Task 2: Pack\n**State:** pending\n");
+            }
+            let (rhei, errors) = parse_collect(&plan);
+
+            assert_eq!(errors.len(), 2, "one structural cause and one retired line: {errors:?}");
+            let misplaced = errors
+                .iter()
+                .find(|err| matches!(err.kind, ParseErrorKind::TaskHeadingAboveTasks { .. }))
+                .expect("the misplaced-heading refusal must survive either field order");
+            assert_eq!(misplaced.line, Some(3), "{errors:?}");
+            assert_eq!(
+                misplaced.kind,
+                ParseErrorKind::TaskHeadingAboveTasks { tasks_section_follows }
+            );
+            assert!(misplaced.message.contains("## Tasks"), "{errors:?}");
+            let retired = errors.iter().find(|err| err.line == Some(states_line)).unwrap();
+            assert_eq!(*retired, retired_states_line(states_line), "{errors:?}");
+            assert_eq!(rhei.is_some(), tasks_section_follows, "{errors:?}");
+        }
+    }
+}

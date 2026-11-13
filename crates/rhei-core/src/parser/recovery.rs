@@ -1,19 +1,25 @@
 use crate::ast::Rhei;
 
-use super::{parse, task_heading_above_tasks, ParseError, ParseErrorKind};
+use super::{plan::parse_recovering, ParseError, ParseErrorKind};
 
 pub fn parse_collect(input: &str) -> (Option<Rhei>, Vec<ParseError>) {
     let mut errors: Vec<ParseError> = Vec::new();
     let mut working = input.to_string();
     let mut line_map: Vec<usize> = (1..=input.lines().count()).collect();
     let mut missing_tasks_reported = false;
+    let mut reported_headings = Vec::new();
 
     // Safety valve in case a recovery step fails to make progress: cap
     // iterations at a generous multiple of the authored line count.
     let max_iters = input.lines().count().saturating_mul(2).max(16);
 
     for _ in 0..max_iters {
-        match parse(&working) {
+        let working_headings: Vec<usize> = line_map
+            .iter()
+            .enumerate()
+            .filter_map(|(idx, original)| reported_headings.contains(original).then_some(idx + 1))
+            .collect();
+        match parse_recovering(&working, &working_headings) {
             Ok(rhei) => return (Some(rhei), errors),
             Err(err) => {
                 // Only recover from well-understood local errors. For
@@ -49,23 +55,24 @@ pub fn parse_collect(input: &str) -> (Option<Rhei>, Vec<ParseError>) {
                     errors.push(err);
                     return (None, errors);
                 };
+                // Keep the block: only its dependent metadata errors are suppressed on the next pass.
+                // Independent refusals still see their source. §FS-rhei-errors.1.7 §FS-rhei-validate.4.2
+                if matches!(err.kind, ParseErrorKind::TaskHeadingAboveTasks { .. }) {
+                    reported_headings.push(line);
+                    if !duplicate {
+                        errors.push(err);
+                    }
+                    continue;
+                }
                 let working_line =
                     line_map.iter().position(|original| *original == line).map(|idx| idx + 1);
                 let Some(working_line) = working_line else {
                     errors.push(err);
                     return (None, errors);
                 };
-                let (stripped, stripped_line_map, made_progress) = match err.kind {
-                    ParseErrorKind::TaskHeadingAboveTasks { .. } => {
-                        strip_heading_block(&working, &line_map, working_line)
-                    }
-                    ParseErrorKind::Plain => {
-                        strip_for_recovery(&working, &line_map, working_line, &err.message)
-                    }
-                };
-                if !duplicate {
-                    errors.push(err);
-                }
+                let (stripped, stripped_line_map, made_progress) =
+                    strip_for_recovery(&working, &line_map, working_line, &err.message);
+                errors.push(err);
                 if !made_progress {
                     return (None, errors);
                 }
@@ -93,6 +100,8 @@ fn is_recoverable_error(message: &str) -> bool {
         "**State:** must appear before **Prior:**",
         "**State:** must appear before **Assignee:**",
         "Duplicate **Assignee:**",
+        // The retired declaration is an independent, removable line. §FS-rhei-plan-language.2.2
+        "`**States:**` is no longer part of the plan language",
     ];
     RECOVERABLE_MARKERS.iter().any(|m| message.contains(m))
 }
@@ -176,20 +185,8 @@ fn strip_for_recovery(
     drop_lines(input, &lines, line_map, idx..idx + 1)
 }
 
-/// Drop the task heading at `line` and the block it opens, so a misplaced task in a
-/// content section is reported once and the plan after it is still read. Every field
-/// in the block sits under that heading. §FS-rhei-errors.1.7
-fn strip_heading_block(input: &str, line_map: &[usize], line: usize) -> (String, Vec<usize>, bool) {
-    let lines: Vec<&str> = input.lines().collect();
-    if line == 0 || line > lines.len() || line > line_map.len() {
-        return (input.to_string(), line_map.to_vec(), false);
-    }
-    let start = line - 1;
-    drop_lines(input, &lines, line_map, start..task_heading_above_tasks::block_end(&lines, start))
-}
-
 /// The source and line map with `range` of `lines` removed, and `true` for progress.
-/// Shared by field recovery and misplaced-heading recovery. §FS-rhei-errors.1.7
+/// Used by field and whole-task recovery.
 fn drop_lines(
     input: &str,
     lines: &[&str],

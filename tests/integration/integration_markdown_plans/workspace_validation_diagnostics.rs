@@ -322,6 +322,59 @@ fn project_and_file_keep_independent_errors_and_the_tasks_edit() {
     }
 }
 
+/// A retired declaration inside a misplaced task block remains a separate refusal
+/// in either order and scope, alongside the precise structural edit.
+/// §FS-rhei-errors.1.7 §FS-rhei-plan-language.2.2 §FS-rhei-validate.4.2
+#[test]
+fn project_and_file_keep_retired_states_and_the_tasks_edit_in_either_order() {
+    for (fields, states_line) in [
+        ("**State:** pending\n**States:** old\n", 5),
+        ("**States:** old\n**State:** pending\n", 4),
+    ] {
+        for tasks_section_follows in [false, true] {
+            let mut plan = format!("# Rhei: Italy\n\n### Task 1: Book\n{fields}");
+            if tasks_section_follows {
+                plan.push_str("\n## Tasks\n\n### Task 2: Pack\n**State:** pending\n");
+            }
+            let project = create_panta_project(
+                "rhei-685-retired-states-parity",
+                "# Panta: Parity\n",
+                &[("italy.rhei.md", &plan)],
+                WORKSPACE_STATE_MACHINE,
+            );
+            let by_project = validate_parse_error_for_parity(&project);
+            let by_file = validate_parse_error_for_parity(&project.join("italy.rhei.md"));
+            for scope in [&by_project, &by_file] {
+                assert!(scope.contains("(2 problems)"), "{scope}");
+                assert!(scope.contains("italy.rhei.md"), "{scope}");
+                assert!(scope.contains("line 3: Task heading outside"), "{scope}");
+                assert!(scope.contains("3| ### Task 1: Book"), "{scope}");
+                assert!(
+                    scope.contains(&format!("line {states_line}: `**States:**` is no longer"))
+                        && scope.contains("delete this line")
+                        && scope.contains(&format!("{states_line}| **States:** old")),
+                    "the independent retired-line refusal must keep its source line: {scope}"
+                );
+                assert!(!scope.contains("Metadata field appears outside a task"), "{scope}");
+                assert!(!scope.contains("Missing '## Tasks' section"), "{scope}");
+                let help = scope.split_once("help:").expect("the report needs help").1;
+                let edit = if tasks_section_follows {
+                    "move the task at line 3 under `## Tasks`"
+                } else {
+                    "add a `## Tasks` line above line 3"
+                };
+                assert!(help.contains(edit), "the precise structural edit must survive: {scope}");
+                assert!(!help.contains("check the plan's task metadata"), "{scope}");
+            }
+            assert_eq!(
+                by_project.split(", then re-run:").next(),
+                by_file.split(", then re-run:").next(),
+                "both scopes must retain both independent problems and the precise edit"
+            );
+        }
+    }
+}
+
 /// §FS-rhei-validate.3: a `**Prior:**` naming an unknown rhei is reported under
 /// the id the author wrote — never re-qualified with the citing rhei — and names
 /// both the unknown rhei and the near miss.

@@ -14,7 +14,8 @@ use super::{
 };
 use super::{plan_tooling, task_heading_above_tasks};
 
-pub fn parse(input: &str) -> Result<Rhei> {
+/// Skip dependent metadata under reported headings. §FS-rhei-errors.1.7 §FS-rhei-validate.4.2
+pub(super) fn parse_recovering(input: &str, reported_headings: &[usize]) -> Result<Rhei> {
     // A leading mark would hide the header. §FS-rhei-language-reference.1 §REQ-cross-platform.9
     let input = crate::source::without_byte_order_mark(input);
     // §FS-rhei-plan-language.2.3
@@ -222,6 +223,9 @@ pub fn parse(input: &str) -> Result<Rhei> {
             {
                 // Under a task heading, `## Tasks` is what is missing. §FS-rhei-errors.1.7
                 if let Some(heading_line) = node_heading_above {
+                    if reported_headings.contains(&heading_line) {
+                        continue;
+                    }
                     let rest = input.lines().skip(line_number);
                     return Err(task_heading_above_tasks::refusal(heading_line, rest, &re_tasks));
                 }

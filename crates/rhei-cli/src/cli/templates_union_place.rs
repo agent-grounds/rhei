@@ -11,6 +11,9 @@
     /// One ticket-bearing file a template contributes, with its ids read out.
     #[derive(Debug, Clone)]
     struct PartTickets {
+        /// The rendered file it was read from, relative to the template's root,
+        /// which a refusal of the file it is placed as names. §FS-rhei-errors.4.1
+        source: PathBuf,
         /// `001-coordinate.md` becomes `coordinate`: the name its placed file
         /// keeps under a number of the host's. §FS-rhei-new.3.1
         slug: String,
@@ -35,7 +38,8 @@
                 .map_err(|err| file_io_report(&plan, "failed to read the template's plan", err))?;
             // §REQ-cross-platform.9
             let raw = rhei_core::source::without_byte_order_mark(&raw);
-            return Ok(vec![part_tickets("plan", &tasks_chapter_body(raw))]);
+            let tickets = part_tickets("plan", &tasks_chapter_body(raw));
+            return Ok(vec![PartTickets { source: PathBuf::from("plan.rhei.md"), ..tickets }]);
         }
         let mut entries: Vec<PathBuf> = fs::read_dir(&tasks_dir)
             .map_err(|err| file_io_report(&tasks_dir, "failed to read the template's tasks", err))?
@@ -52,7 +56,8 @@
             // §REQ-cross-platform.9
             let raw = rhei_core::source::without_byte_order_mark(&raw);
             let stem = path.file_stem().and_then(|stem| stem.to_str()).unwrap_or("task");
-            files.push(part_tickets(file_slug(stem), raw));
+            let source = path.strip_prefix(root).unwrap_or(&path).to_path_buf();
+            files.push(PartTickets { source, ..part_tickets(file_slug(stem), raw) });
         }
         Ok(files)
     }
@@ -89,7 +94,7 @@
             .and_then(|value| task_metadata_entries(&value))
             .unwrap_or_default();
         let ids = declared_ids(&body);
-        PartTickets { slug: slug.to_owned(), body, metadata, ids }
+        PartTickets { source: PathBuf::new(), slug: slug.to_owned(), body, metadata, ids }
     }
 
     /// A document's leading `---` frontmatter, and everything after it, where the

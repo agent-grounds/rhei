@@ -99,21 +99,22 @@
         .inspect_err(|_| discard(&target_dir))?;
 
         // From here a refusal located in what was rendered names the template file
-        // it came from, and what became of the rendering. §FS-rhei-errors.4.1
-        let fate = if lay.dry_run || (prospective_member && !lay.keep_on_error) {
+        // it came from, and what the failing phase does with the rendering: until
+        // validation `discard` keeps nothing, published or not. §FS-rhei-errors.4.1
+        let discarded = if lay.dry_run || prospective_member {
             RenderingFate::Proposed
-        } else if lay.keep_on_error {
-            RenderingFate::Kept
         } else {
             RenderingFate::Removed
         };
-        let _rendering = enter_rendering(RenderingAttribution::new(
+        let rendering = RenderingAttribution::new(
             &target_dir,
             lay.template_dir,
             lay.template_ref,
             lay.builtin,
-            fate,
-        ));
+            discarded,
+        )
+        .including(!lay.manifest.includes.is_empty());
+        let before_validation = enter_rendering(rendering.clone());
 
         // A budget identity belongs to a run and never to a template, whether
         // the template is placed or laid standalone. §FS-rhei-library.5
@@ -132,6 +133,12 @@
                 append_laid_fence(&target_dir.join("states.yaml"), &fence)
             })
             .inspect_err(|_| discard(&target_dir))?;
+        drop(before_validation);
+
+        // `fail` below keeps exactly when a real run passed --keep-on-error. §FS-rhei-errors.4.1
+        let retained = lay.keep_on_error && !lay.dry_run;
+        let fate = if retained { RenderingFate::Kept } else { discarded };
+        let _rendering = enter_rendering(rendering.with_fate(fate));
 
         // Dry runs always discard scratch; real failures obey retention. §FS-rhei-templates.6.1.2
         let fail = |settings: Option<&PreparedProjectSettings>, err: Report| -> Report {
@@ -164,7 +171,7 @@
 
         // Kept, what was laid stays where it was asked for, and a help validates it
         // there; otherwise nothing stays to name. §FS-rhei-errors.1.2.1
-        let kept = (lay.keep_on_error && !lay.dry_run).then(|| lay.layout.entrypoint(lay.output_dir));
+        let kept = retained.then(|| lay.layout.entrypoint(lay.output_dir));
         let help_target = kept.as_deref().map(|laid| enter_help_target(HelpTarget::naming(laid)));
         // Both modes validate the intended member in its project, including siblings.
         // §FS-rhei-templates.6.1.2 §FS-rhei-library.7.5

@@ -686,6 +686,11 @@ fn render_validation_diagnostic(
             "I validated this plan using {}, but found a problem.",
             state_machine_label(source.path.as_deref()),
         ));
+        // The sentence stays whole (§FS-rhei-validate.6); a rendered machine is
+        // said to be one, beside it. §FS-rhei-errors.4.1
+        if let Some(rendering) = machine_rendering(source.path.as_deref()) {
+            lines.push(format!("That machine is {rendering}."));
+        }
     } else {
         // Multi-source failures expose the exact resolution used by the pass;
         // the one-source branch above stays byte-for-byte compatible. §FS-rhei-validate.6
@@ -703,6 +708,10 @@ fn render_validation_diagnostic(
                 state_machine_label(source.path.as_deref()),
                 ownership.join("; "),
             ));
+            // §FS-rhei-errors.4.1
+            if let Some(rendering) = machine_rendering(source.path.as_deref()) {
+                lines.push(format!("    which is {rendering}"));
+            }
         }
         lines.push("but found a problem.".to_string());
     }

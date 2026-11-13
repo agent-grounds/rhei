@@ -989,7 +989,12 @@ references, must not reference its own task (self-reference is a 1-cycle), and
 must not reference any ancestor of the task. A child task cannot list its
 parent as `**Prior:**`; if generated follow-up work must wait for a completed
 parent task, author that follow-up as a top-level sibling with `**Prior:**`
-pointing at the completed task.
+pointing at the completed task. Nesting carries no ordering the other way
+either: a `**Prior:**` on a parent gates that parent's own visit only and does
+not hold its children. A child with no `**Prior:**` of its own is
+dependency-ready at once, beside its parent's prerequisites
+([§FS-rhei-list.3.1](rhei-list.spec.md#31-what---ready-means)), so each child that must wait for a prerequisite carries the
+`**Prior:**` itself.
 
 ```markdown
 ### Task 2: Implementation
@@ -1029,6 +1034,18 @@ Invalid child dependency example:
 #### Task fetch-prs.ci-failure-5227: Triage CI failure
 **State:** pending
 **Prior:** Task fetch-prs    ← ERROR: child cannot depend on its parent
+```
+
+A parent's prerequisite, carried by the child that must wait for it:
+
+```markdown
+### Task 2: Build on the ground
+**State:** pending
+**Prior:** Task 1
+
+#### Task 2.1: First part
+**State:** pending
+**Prior:** Task 1    ← Without this line, Task 2.1 is ready while Task 1 is still open
 ```
 
 ### 3.2. State Validity

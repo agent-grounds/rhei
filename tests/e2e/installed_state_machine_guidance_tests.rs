@@ -79,7 +79,7 @@ fn assert_resolution_contract(skill: &str) {
     );
 }
 
-fn binary_outside_checkout(dir: &Path) -> PathBuf {
+pub(super) fn binary_outside_checkout(dir: &Path) -> PathBuf {
     let destination = dir.join("rhei");
     // Copy in a separate process so parallel test forks cannot inherit the
     // destination's write descriptor and keep this executable ETXTBSY.
@@ -94,7 +94,7 @@ fn binary_outside_checkout(dir: &Path) -> PathBuf {
     destination
 }
 
-fn assert_no_filesystem_skill_source(path: &Path) {
+pub(super) fn assert_no_filesystem_skill_source(path: &Path) {
     for ancestor in path.ancestors() {
         assert!(
             !ancestor.join("crates/rhei-cli/skills").is_dir(),

@@ -26,6 +26,11 @@ enum TakenLog {
     StillRunning(Vec<LiveProcess>),
     /// Everything holds but the group record, so nothing says the agent stopped.
     NoGroupRecord,
+    /// No record of a killed run accounts for it, but the spawn record at its
+    /// name does, at an earlier `moves`: an earlier stay's log, whose entry
+    /// number this stay took because the ledger lacks an arrival. The record's
+    /// path, and the record. §FS-rhei-agents.8.1
+    EarlierStay { record_path: PathBuf, record: Box<SpawnRecord> },
     /// No record of a killed run accounts for it.
     Unaccounted,
 }
@@ -39,7 +44,7 @@ impl TakenLog {
             TakenLog::Killed { .. } => 3,
             TakenLog::Program => 2,
             TakenLog::NoGroupRecord => 1,
-            TakenLog::Unaccounted => 0,
+            TakenLog::EarlierStay { .. } | TakenLog::Unaccounted => 0,
         }
     }
 
@@ -100,6 +105,9 @@ impl TakenLog {
                     "{first}; its run was killed, but rhei cannot tell whether that agent has \
                      stopped\n{help}"
                 )
+            }
+            TakenLog::EarlierStay { record_path, record } => {
+                earlier_stay_log_message(log, record_path, record)
             }
             TakenLog::Killed { .. } | TakenLog::Unaccounted => {
                 unaccounted_log_message(log, task_id, reset)

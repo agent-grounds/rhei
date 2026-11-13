@@ -85,6 +85,14 @@ impl NamedSpawn<'_> {
         while plan.log.exists() {
             let verdict = classify_taken_log(&plan, self.task_root, task_id, state_name, program);
             let TakenLog::Killed { started } = &verdict else {
+                // §FS-rhei-agents.8.1: a log the record at its name puts at an earlier stay.
+                let verdict = match (verdict, plan.earlier_stay_record()) {
+                    (TakenLog::Unaccounted, Some(record)) => TakenLog::EarlierStay {
+                        record_path: plan.record.clone(),
+                        record: Box::new(record),
+                    },
+                    (verdict, _) => verdict,
+                };
                 return Err(PlanRefusal::Taken { log: plan.log, verdict });
             };
             let killed = match worker {

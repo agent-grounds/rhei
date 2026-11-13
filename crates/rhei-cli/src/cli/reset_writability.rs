@@ -99,7 +99,7 @@ impl ResetDirectoryCheck {
         &mut self,
         loaded: &LoadedPlan,
         input: &Path,
-        scope: &RheiScope,
+        scope: ResetScope<'_>,
     ) -> MietteResult<()> {
         let (metadata_paths, task_paths) = reset_plan_lock_paths(loaded, input, scope)?;
         let mut sidecars = Vec::new();
@@ -126,7 +126,7 @@ impl ResetDirectoryCheck {
             match target {
                 ScopedTarget::Exact(path) if path.exists() => self.removal(path),
                 ScopedTarget::Exact(_) => {}
-                ScopedTarget::Prefixed { dir, prefix } => match matching_entries(dir, prefix) {
+                ScopedTarget::Prefixed { dir, prefix } => match removals.owners.entries(dir, prefix) {
                     // Only what the removal removes: it skips a dangling link.
                     Ok(paths) => paths.iter().filter(|path| path.exists()).for_each(|path| self.removal(path)),
                     Err(err) => self.unlistable(dir, err),
@@ -170,7 +170,7 @@ impl ResetDirectoryCheck {
 fn reset_sidecars_are_blocked(
     loaded: &LoadedPlan,
     input: &Path,
-    scope: &RheiScope,
+    scope: ResetScope<'_>,
 ) -> MietteResult<bool> {
     let mut check = ResetDirectoryCheck::default();
     check.sidecars(loaded, input, scope)?;
@@ -183,7 +183,7 @@ fn reset_sidecars_are_blocked(
 fn reset_filesystem_refusal(
     loaded: &LoadedPlan,
     input: &Path,
-    scope: &RheiScope,
+    scope: ResetScope<'_>,
     machines: &rhei_validator::MachineSet,
     authored: &AuthoredStates,
 ) -> MietteResult<Option<Report>> {
@@ -196,19 +196,20 @@ fn reset_filesystem_refusal(
         // Scanned after the mark, as the locked rewrite will. §REQ-cross-platform.9
         let (_, raw) = split_byte_order_mark(&marked);
         let moves = authored.by_file.get(&file).unwrap_or(&no_moves);
-        if reset_file_text(raw, moves, loaded.document_role(&file))? != raw {
+        let under = reset_strips_under(scope, moves);
+        if reset_file_text(raw, moves, loaded.document_role(&file), under)? != raw {
             check.entry(&file);
         }
     }
-    for (file, task_ids) in reset_metadata_targets(loaded, input, scope) {
+    for (file, edit) in reset_metadata_targets(loaded, input, scope, authored) {
         let marked = read_plan_source(&file, "failed to read metadata document")?;
         let (_, raw) = split_byte_order_mark(&marked);
-        if reset_metadata_text(&file, raw, &task_ids)? != raw {
+        if reset_metadata_text(&file, raw, &edit)? != raw {
             check.entry(&file);
         }
     }
 
-    if scope.is_some() {
+    if scope.is_narrowed() {
         check.scoped_removals(&scoped_removals(loaded, input, scope, machines))?;
     } else {
         for tree in reset_runtime_preview(loaded, input, scope) {
@@ -255,23 +256,26 @@ fn apply_reset(
     // in; a file whose tasks never moved still has its runtime lines
     // (assignee, result links) stripped. §FS-rhei-reset.2.2
     let no_moves: BTreeMap<String, String> = BTreeMap::new();
-    for (file, _sample_task_id) in reset_target_files(loaded, input, &decision.scope) {
+    let scope = decision.reset_scope();
+    for (file, _sample_task_id) in reset_target_files(loaded, input, scope) {
         let file_authored = decision.authored.by_file.get(&file).unwrap_or(&no_moves);
-        progress.landed |= reset_plan_file_states(&file, loaded.document_role(&file), file_authored, reset_locks.plan(&file)?)?;
+        let role = loaded.document_role(&file);
+        progress.landed |= reset_plan_file_states(&file, role, file_authored, scope, reset_locks.plan(&file)?)?;
     }
     // Clear selected live tickets in their owning documents, including the
-    // basin manifest and tickets that never moved. §FS-rhei-reset.2
-    for (path, task_ids) in reset_metadata_targets(loaded, input, &decision.scope) {
-        progress.landed |= clear_runtime_metadata_in_file(&path, &task_ids, reset_locks.plan(&path)?)?;
+    // basin manifest and tickets that never moved, and hold the supervisors a
+    // ticket scope leaves out. §FS-rhei-reset.2 §FS-rhei-reset.2.5.3
+    for (path, edit) in reset_metadata_targets(loaded, input, scope, &decision.authored) {
+        progress.landed |= clear_runtime_metadata_in_file(&path, &edit, reset_locks.plan(&path)?)?;
     }
 
     // §FS-rhei-panta.6.4: a narrowed reset removes per-ticket artifacts, never
     // whole `runtime/` trees — sibling rheis share one execution root.
-    if decision.scope.is_some() {
+    if scope.is_narrowed() {
         return remove_scoped_runtime_artifacts(
             loaded,
             input,
-            &decision.scope,
+            scope,
             machines,
             reset_locks,
             progress,

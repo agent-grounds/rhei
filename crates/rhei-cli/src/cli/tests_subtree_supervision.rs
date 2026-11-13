@@ -145,6 +145,7 @@ transitions:
             from: from.to_string(),
             to: to.to_string(),
             visit,
+            reset: false,
         }
     }
 

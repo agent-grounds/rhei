@@ -100,21 +100,11 @@ fn shows_run_trace(task: &rhei_core::ast::Task, normalized_state: &str) -> bool 
 fn collect_authored_states(
     loaded: &LoadedPlan,
     input: &Path,
-    scope: &RheiScope,
+    scope: ResetScope<'_>,
     machines: &rhei_validator::MachineSet,
 ) -> AuthoredStates {
-    let mut in_scope: Vec<&rhei_core::ast::Task> = Vec::new();
-    fn collect<'a>(task: &'a rhei_core::ast::Task, out: &mut Vec<&'a rhei_core::ast::Task>) {
-        out.push(task);
-        for child in &task.children {
-            collect(child, out);
-        }
-    }
-    for task in &loaded.rhei.tasks {
-        if task_in_rhei_scope(scope, &task.id.to_string()) {
-            collect(task, &mut in_scope);
-        }
-    }
+    // §FS-rhei-reset.2.5: a ticket scope reaches tickets, not whole trees.
+    let in_scope = scope.tasks(loaded);
 
     // One read per execution root: sibling rheis share one ledger, and a task
     // graph can hold thousands of nodes. Ledger presence is judged per root,
@@ -182,15 +172,19 @@ fn collect_authored_states(
 
 /// Print the moves a reset makes, under `verb` ("Would move" for the preview,
 /// "Moved" for the summary). A count alone was true of the run that corrupted
-/// a supervised chain and of the run that did nothing.
-// §FS-rhei-reset.4
-fn report_state_moves(authored: &AuthoredStates, verb: &str) {
+/// a supervised chain and of the run that did nothing. Under `--task` each move
+/// carries the edge that brought its ticket in. §FS-rhei-reset.4
+fn report_state_moves(authored: &AuthoredStates, verb: &str, tickets: Option<&TicketScope>) {
     if authored.moves.is_empty() {
         println!("No task had moved from its authored state.");
     } else {
         println!("{} {} task(s) back:", verb, authored.moves.len());
         for mv in &authored.moves {
-            println!("  Task {}: {} → {}", mv.task_id, mv.from, mv.to);
+            let edge = tickets.and_then(|tickets| tickets.edge(&mv.task_id)?.label());
+            match edge {
+                Some(edge) => println!("  Task {}: {} → {}   {edge}", mv.task_id, mv.from, mv.to),
+                None => println!("  Task {}: {} → {}", mv.task_id, mv.from, mv.to),
+            }
         }
     }
 

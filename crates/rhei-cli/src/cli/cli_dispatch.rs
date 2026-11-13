@@ -449,7 +449,7 @@ fn dispatch(cli: Cli) -> MietteResult<()> {
             dry_run,
             state_machine.or(before_subcommand).as_deref(),
         ),
-        Commands::Reset { input, rhei, dry_run, yes, state_machine } => {
+        Commands::Reset { input, rhei, task, dry_run, yes, state_machine } => {
             // §FS-rhei-panta.6: reset destroys runtime state, so it is the one
             // plan-taking command that never infers an omitted target.
             let Some(input) = input else {
@@ -464,12 +464,13 @@ help = "preview it first: rhei reset <plan-or-project> --dry-run",
             // Reset never *infers* a target, but an explicit member rhei still
             // loads through its project and narrows to itself. §FS-rhei-panta.6
             let target = resolve_plan_target(Some(input))?;
-            reset_command(
+            // §FS-rhei-reset.2.5.4: with `--task`, that rhei bounds where its ids resolve.
+            reset_scoped_command(
                 target.path(),
                 state_machine.or(before_subcommand).as_deref(),
                 &target.scope_with(&rhei),
-                dry_run,
-                yes,
+                &task,
+                ResetFlags { dry_run, assume_yes: yes },
             )
         }
         Commands::Version => {

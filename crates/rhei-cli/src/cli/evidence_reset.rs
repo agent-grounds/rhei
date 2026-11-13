@@ -44,17 +44,18 @@ fn reset_event_value(
 fn write_reset_event(
     loaded: &LoadedPlan,
     input: &Path,
-    scope: &RheiScope,
+    scope: ResetScope<'_>,
     removed: &[PathBuf],
 ) -> Option<String> {
     let root = evidence_root_for(input);
     if !evidence_dir(&root).is_dir() {
         return None;
     }
+    // §FS-rhei-evidence.10.1: under `--task`, the tickets it reached and their rheis.
     let mut tickets: Vec<String> =
-        loaded.task_roots.keys().filter(|id| task_in_rhei_scope(scope, id)).cloned().collect();
+        loaded.task_roots.keys().filter(|id| scope.contains(id)).cloned().collect();
     tickets.sort();
-    let rheis: Vec<String> = scope.iter().flatten().cloned().collect();
+    let rheis: Vec<String> = scope.rheis().into_iter().flatten().collect();
     let removed: BTreeSet<String> = removed
         .iter()
         .map(|path| evidence_relative(&root, path))

@@ -6,6 +6,46 @@ use super::*;
 use serde_json::{json, Value};
 
 #[test]
+fn codex_mcp_agora_template_uses_native_configuration() {
+    assert_template_attaches(
+        "agora",
+        include_str!("../../crates/rhei-cli/templates/agora/settings.json"),
+    );
+}
+
+#[test]
+fn codex_mcp_spec_implementation_template_uses_native_configuration() {
+    assert_template_attaches(
+        "spec-implementation",
+        include_str!("../../crates/rhei-cli/templates/spec-implementation/settings.json"),
+    );
+}
+
+#[test]
+fn codex_mcp_supervised_delivery_template_uses_native_configuration() {
+    assert_template_attaches(
+        "supervised-delivery",
+        include_str!("../../crates/rhei-cli/templates/supervised-delivery/settings.json"),
+    );
+}
+
+#[test]
+fn codex_mcp_product_management_template_uses_native_configuration() {
+    assert_template_attaches(
+        "product-management",
+        include_str!("../../crates/rhei-cli/templates/product-management/settings.json"),
+    );
+}
+
+fn assert_template_attaches(name: &str, source: &str) {
+    let mut settings: Value = serde_json::from_str(source).expect("shipped template settings JSON");
+    assert!(settings["agents"]["codex"].is_object(), "{name}: shipped Codex profile");
+    settings["mcp_servers"] = json!({"lookup": command_server()});
+    let case = run_case(name, settings, "    mcp_servers: [lookup]\n", "codex");
+    assert_command_attached(&case);
+}
+
+#[test]
 fn codex_mcp_documented_profile_uses_native_configuration() {
     let source = include_str!("../../docs/functional-spec/rhei-agents.spec.md");
     let example = source

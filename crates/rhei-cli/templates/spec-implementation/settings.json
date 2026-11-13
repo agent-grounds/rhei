@@ -10,7 +10,7 @@
       ],
       "model_flag": "--model",
       "stdin_prompt": true,
-      "mcp_flag": "--mcp",
+      "mcp_flag": "-c",
       "writable_roots": {
         "path_flag": "--add-dir"
       },

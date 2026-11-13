@@ -31,7 +31,6 @@ fn panta(name: &str, cross: bool) -> ScopeWorld {
 /// A cross-rhei dependent joins the scope, and a record keyed by a bare local
 /// id at the shared root is kept and reported, as is the reset event's reach.
 #[test]
-#[ignore = "red until #679: `rhei reset --task` is an unknown argument; implement removes this"]
 fn a_cross_rhei_dependent_joins_the_scope_and_bare_id_records_are_kept() {
     let world = panta("reset-task-cross-rhei", true);
     world.write("runtime/results/2.md", "a record from before ids were qualified\n");
@@ -65,7 +64,6 @@ fn a_cross_rhei_dependent_joins_the_scope_and_bare_id_records_are_kept() {
 /// The usual form inside a panta: a member target resolves `2` in `a` and the
 /// closure still reaches `b`, which the preview says.
 #[test]
-#[ignore = "red until #679: `rhei reset --task` is an unknown argument; implement removes this"]
 fn a_member_rhei_target_resolves_ids_in_its_rhei_and_reaches_past_it() {
     let world = panta("reset-task-member-target", true);
 
@@ -86,7 +84,6 @@ fn a_member_rhei_target_resolves_ids_in_its_rhei_and_reaches_past_it() {
 /// An unknown id and an ambiguous shorthand are refused before any preview with
 /// nothing changed, and a ticket named twice is listed once.
 #[test]
-#[ignore = "red until #679: `rhei reset --task` is an unknown argument; implement removes this"]
 fn ids_are_resolved_before_the_preview_and_a_duplicate_is_listed_once() {
     let world = panta("reset-task-ids", false);
     let before = (world.read("a.rhei.md"), world.read("b.rhei.md"));
@@ -105,7 +102,6 @@ fn ids_are_resolved_before_the_preview_and_a_duplicate_is_listed_once() {
 
 /// The kept list stops at five ids and counts the rest.
 #[test]
-#[ignore = "red until #679: `rhei reset --task` is an unknown argument; implement removes this"]
 fn the_kept_line_names_five_tickets_and_counts_the_rest() {
     let world = ScopeWorld::new("reset-task-kept-cap");
     let mut plan = String::from("# Rhei: Many\n\n## Tasks\n");
@@ -133,7 +129,6 @@ fn the_kept_line_names_five_tickets_and_counts_the_rest() {
 /// adds the dependent only once the reset has created the sidecar of a plan it
 /// locks first — that is, after its first read.
 #[test]
-#[ignore = "red until #679: `rhei reset --task` is an unknown argument; implement removes this"]
 fn a_closure_that_grew_while_the_reset_took_its_locks_is_refused() {
     let world = panta("reset-task-lock-race", false);
     for entry in fs::read_dir(&world.root).expect("list the root") {

@@ -133,7 +133,29 @@ struct ParallelProgramCompletion {
 enum ParallelAgentThreadMessage {
     Completed(ParallelAgentCompletion),
     ProgramCompleted(ParallelProgramCompletion),
-    Panicked { task_id_str: String, state_name: String, slot: rhei_tui::Slot },
+    Panicked {
+        task_id_str: String,
+        state_name: String,
+        slot: rhei_tui::Slot,
+        /// The reservation of the agent arm whose worker panicked, so that exit
+        /// settles it; `None` for a program, which is admitted on none.
+        /// §FS-rhei-budgets.6.2.1
+        budget_arm: Option<String>,
+    },
+}
+
+impl ParallelAgentThreadMessage {
+    /// The ticket and reservation of the agent arm this message ends, if it
+    /// names one: what settles the arm wherever the message is read.
+    /// §FS-rhei-budgets.6.2.1
+    fn ended_arm(&self) -> Option<(String, String)> {
+        let (task_id_str, arm) = match self {
+            Self::Completed(completion) => (&completion.task_id_str, &completion.budget_arm),
+            Self::Panicked { task_id_str, budget_arm, .. } => (task_id_str, budget_arm),
+            Self::ProgramCompleted(_) => return None,
+        };
+        arm.clone().map(|arm| (task_id_str.clone(), arm))
+    }
 }
 
 struct ParallelAgentSpawned {

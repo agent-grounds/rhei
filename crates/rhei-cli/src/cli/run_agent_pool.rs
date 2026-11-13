@@ -45,6 +45,7 @@ fn run_agent_worker_pool(
         rx,
         sink: sink.clone(),
         owner: current_run_owner(),
+        workspace_root: workspace_root.to_path_buf(),
     };
     let mut free_slots: BTreeSet<rhei_tui::Slot> = (0..frontend_parallel).collect();
     let mut next_extra_slot = frontend_parallel;
@@ -197,6 +198,7 @@ fn run_agent_worker_pool(
                 task_id_str,
                 state_name,
                 slot,
+                budget_arm,
             }) => {
                 active_worker_count = active_worker_count.saturating_sub(1);
                 release_parallel_worker(
@@ -207,6 +209,9 @@ fn run_agent_worker_pool(
                     &mut active_invocation_counts,
                     &mut active_state_counts,
                 );
+                // Its start is recorded and it wrote no record, so it is charged the reserve
+                // as `unmeasurable` here, whether or not the run goes on. §FS-rhei-budgets.6.2.1
+                budget_settle_visit(workspace_root, &task_id_str, budget_arm.as_deref(), sink);
                 let err = miette!(
                     help = internal_error_help(),
                     "agent thread panicked"
@@ -299,6 +304,9 @@ fn run_agent_worker_pool(
                 // must go out before the refill takes the slot back.
                 // §FS-rhei-run-tui.1.7
                 drop(release);
+                // It started, so it owes its record or the reserve; no edge was applied, so a
+                // travel unit it holds goes back, as on the sequential path. §FS-rhei-budgets.6.2.1
+                budget_settle_visit(workspace_root, &task_id_str, budget_arm.as_deref(), sink);
                 *progress.agents_spawned += 1;
                 run_warn!(
                     "{}",
@@ -306,7 +314,8 @@ fn run_agent_worker_pool(
                 );
             }
             Ok(outcome) => {
-                handle_parallel_agent_exit(
+                let (ended_task, ended_arm) = (task_id_str.clone(), budget_arm.clone());
+                let handled = handle_parallel_agent_exit(
                     ParallelAgentExit {
                         task_id_str,
                         state_name,
@@ -331,7 +340,13 @@ fn run_agent_worker_pool(
                     sink,
                     &active_invocation_counts,
                     progress,
-                )?;
+                );
+                // The exit settles the arm on every way it returns normally; one that stops the
+                // run with an error must still not leave it outstanding. §FS-rhei-budgets.6.2.1
+                if handled.is_err() {
+                    budget_settle_visit(workspace_root, &ended_task, ended_arm.as_deref(), sink);
+                }
+                handled?;
             }
             Err(err) => {
                 progress.spawn_refusals.completion_error(
@@ -341,6 +356,9 @@ fn run_agent_worker_pool(
                 // no verdict left to wait for. Out before the refill, as
                 // above. §FS-rhei-run-tui.1.7
                 drop(release);
+                // Its own exit, so it settles here whether or not the run goes on: a start with
+                // no record is charged the reserve as `unmeasurable`. §FS-rhei-budgets.6.2.1
+                budget_settle_visit(workspace_root, &task_id_str, budget_arm.as_deref(), sink);
                 if accounting_recorded {
                     let reloaded = load_run_plan(input)?;
                     if let Err(rollup_err) =
@@ -419,12 +437,18 @@ fn run_agent_worker_pool(
 /// There the run is stopped, its groups are ended, and every worker is joined
 /// before the pool hands its error on. Without that, `rhei run` could exit
 /// between a reap and its record. §FS-rhei-run.3.2 §FS-rhei-run.3.7.6
+///
+/// A message nobody read is an arm's exit all the same, so the drop settles
+/// the arm it names rather than leave its reservation outstanding for a run
+/// that has gone. §FS-rhei-budgets.6.2.1
 struct PoolWorkers {
     handles: Vec<std::thread::JoinHandle<()>>,
     rx: std::sync::mpsc::Receiver<ParallelAgentThreadMessage>,
     sink: Arc<dyn rhei_tui::EventSink>,
     /// The run whose groups these workers lead.
     owner: u64,
+    /// Where the account an unread arm settles against is found.
+    workspace_root: PathBuf,
 }
 
 impl Drop for PoolWorkers {
@@ -449,6 +473,26 @@ impl Drop for PoolWorkers {
                 let text = format!("  error for task {task_id_str}: {}", panicked());
                 emit_run_message(&self.sink, rhei_tui::MessageLevel::Error, text);
             }
+            settle_unread_arm(&self.workspace_root, message, &self.sink);
         }
+    }
+}
+
+/// End the arm a worker's message names, where nothing else reads the message.
+///
+/// The message goes first: a completion's slot release is emitted as it drops,
+/// and the settle's account is the visit's last record, as at every other exit
+/// (§FS-rhei-run-json.2.1). The arm then settles from its own record alone, so
+/// a sibling dropped unread because the pool stopped early is charged what it
+/// ran rather than left outstanding. §FS-rhei-budgets.6.2.1
+fn settle_unread_arm(
+    workspace_root: &Path,
+    message: ParallelAgentThreadMessage,
+    sink: &Arc<dyn rhei_tui::EventSink>,
+) {
+    let ended = message.ended_arm();
+    drop(message);
+    if let Some((task_id_str, arm)) = ended {
+        budget_settle_visit(workspace_root, &task_id_str, Some(&arm), sink);
     }
 }

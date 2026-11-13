@@ -36,6 +36,7 @@ include!("cli/offered_command.rs");
 include!("cli/plan_input_guidance.rs");
 include!("cli/help_strings.rs");
 include!("cli/help_target.rs");
+include!("cli/rendering_attribution.rs");
 include!("cli/rhei_home.rs");
 
 mod templates {

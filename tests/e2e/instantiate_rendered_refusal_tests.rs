@@ -11,8 +11,6 @@ use super::instantiate_rendered_refusal_support::*;
 /// output is `../panta/forge-metadata`, and a dry run that names a file it never
 /// wrote. §FS-rhei-errors.4.1 §FS-rhei-library.7.5
 #[test]
-#[ignore = "red until #658: the member dry run names ../panta/forge-metadata/index.rhei.md, \
-            never the template's; implement removes this"]
 fn instantiate_rendered_member_dry_run_names_the_template_file() {
     let layout = Layout::member("rendered-member-dry-run");
     layout.forge_metadata(STATES_LINE_INDEX, TASK);
@@ -30,8 +28,6 @@ fn instantiate_rendered_member_dry_run_names_the_template_file() {
 /// No project above: the default output is `./forge-metadata`, and the help
 /// offers a `rhei validate` with nothing to run it on. §FS-rhei-errors.4.1
 #[test]
-#[ignore = "red until #658: the standalone dry run names forge-metadata/index.rhei.md and offers \
-            rhei validate <plan>; implement removes this"]
 fn instantiate_rendered_standalone_dry_run_names_the_template_file() {
     let layout = Layout::standalone("rendered-standalone-dry-run");
     layout.forge_metadata(STATES_LINE_INDEX, TASK);
@@ -49,8 +45,6 @@ fn instantiate_rendered_standalone_dry_run_names_the_template_file() {
 /// A real run renders in place and removes what it rendered, so the file the
 /// refusal names is gone by the time anyone looks. §FS-rhei-errors.4.1
 #[test]
-#[ignore = "red until #658: the real run names the removed forge-metadata/index.rhei.md as if \
-            it existed; implement removes this"]
 fn instantiate_rendered_standalone_real_run_names_the_template_not_the_removed_output() {
     let layout = Layout::standalone("rendered-standalone-real");
     layout.forge_metadata(STATES_LINE_INDEX, TASK);
@@ -69,8 +63,6 @@ fn instantiate_rendered_standalone_real_run_names_the_template_not_the_removed_o
 /// does not parse, in a member's real run, which renders into hidden staging.
 /// §FS-rhei-errors.4.1
 #[test]
-#[ignore = "red until #658: a staged member's fragment is named at \
-            ../panta/forge-metadata/tasks/01-task.md, never the template's; implement removes this"]
 fn instantiate_rendered_member_real_run_names_the_template_task_fragment() {
     let layout = Layout::member("rendered-member-fragment");
     layout.forge_metadata("# Rhei: Forge metadata\n", STATES_LINE_TASK);
@@ -93,8 +85,6 @@ fn instantiate_rendered_member_real_run_names_the_template_task_fragment() {
 /// it, but editing it fixes nothing the next instantiation reads, so the refusal
 /// still names the template file. §FS-rhei-errors.4.1 §FS-rhei-errors.1.2.1
 #[test]
-#[ignore = "red until #658: a kept rendering is named without the template file it came from; \
-            implement removes this"]
 fn instantiate_rendered_kept_refusal_names_the_template_file_too() {
     let layout = Layout::standalone("rendered-kept");
     layout.forge_metadata(STATES_LINE_INDEX, TASK);
@@ -111,8 +101,6 @@ fn instantiate_rendered_kept_refusal_names_the_template_file_too() {
 /// the refusal names the template and the file within it, never that directory.
 /// The bad line arrives through a value, which the help may name. §FS-rhei-errors.4.1
 #[test]
-#[ignore = "red until #658: a built-in's refusal names out/index.rhei.md, never \
-            analyze-and-dispatch; implement removes this"]
 fn instantiate_rendered_builtin_names_the_template_never_its_extraction() {
     let layout = Layout::standalone("rendered-builtin");
     let args = [
@@ -142,8 +130,6 @@ fn instantiate_rendered_builtin_names_the_template_never_its_extraction() {
 /// so that template's file is named, never a path under the project template.
 /// §FS-rhei-errors.4.1 §FS-rhei-templates.6.4
 #[test]
-#[ignore = "red until #658: a project template's member is named at \
-            proj/forge-metadata/index.rhei.md, never its template's; implement removes this"]
 fn instantiate_rendered_project_member_names_the_included_template_file() {
     let layout = Layout::standalone("rendered-project-member");
     layout.forge_metadata(STATES_LINE_INDEX, TASK);
@@ -171,8 +157,6 @@ fn instantiate_rendered_project_member_names_the_included_template_file() {
 /// `host/tasks/002-task.md` has no counterpart in `host`: the refusal names no
 /// template file that does not exist, and marks the rendering. §FS-rhei-errors.4.1
 #[test]
-#[ignore = "red until #658: an included fragment is named at host/tasks/002-task.md, unmarked; \
-            implement removes this"]
 fn instantiate_rendered_included_fragment_names_no_file_that_does_not_exist() {
     let layout = Layout::standalone("rendered-included-fragment");
     layout.forge_metadata("# Rhei: Forge metadata\n", STATES_LINE_TASK);
@@ -199,8 +183,6 @@ fn instantiate_rendered_included_fragment_names_no_file_that_does_not_exist() {
 /// line 4, so the location never presents line 4 as the template file's: it says
 /// it is the rendering, or it gives line 8. §FS-rhei-errors.4.1
 #[test]
-#[ignore = "red until #658: the template file is not named at all, so its line cannot be \
-            told from the rendering's; implement removes this"]
 fn instantiate_rendered_line_is_not_presented_as_the_template_line() {
     let layout = Layout::standalone("rendered-line-shift");
     let shifted = concat!(

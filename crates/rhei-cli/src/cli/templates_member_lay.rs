@@ -98,6 +98,23 @@
         )
         .inspect_err(|_| discard(&target_dir))?;
 
+        // From here a refusal located in what was rendered names the template file
+        // it came from, and what became of the rendering. §FS-rhei-errors.4.1
+        let fate = if lay.dry_run || (prospective_member && !lay.keep_on_error) {
+            RenderingFate::Proposed
+        } else if lay.keep_on_error {
+            RenderingFate::Kept
+        } else {
+            RenderingFate::Removed
+        };
+        let _rendering = enter_rendering(RenderingAttribution::new(
+            &target_dir,
+            lay.template_dir,
+            lay.template_ref,
+            lay.builtin,
+            fate,
+        ));
+
         // A budget identity belongs to a run and never to a template, whether
         // the template is placed or laid standalone. §FS-rhei-library.5
         refuse_rendered_identity(&lay.manifest.name, &target_dir)

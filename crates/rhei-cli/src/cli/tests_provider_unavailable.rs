@@ -104,6 +104,18 @@ mod provider_unavailable {
         assert_eq!(cancelled.signal, "Retry cancelled");
     }
 
+    /// The incident spelling, whose provider is only pi's own model reference,
+    /// is recognized and keyed as the respelling is. §FS-rhei-agents.2.5
+    #[test]
+    #[ignore = "red until #664: the pi reference spelling is not recognized; implement removes this"]
+    fn the_pi_reference_spelling_is_recognized_under_the_respellings_identity() {
+        let incident = stdout(&gave_up(SIGNAL, SIGNAL));
+        let reference = resolved("pi:openai-codex/gpt-6.1-sol");
+        let verdict = classify(&reference, &incident).expect("the reporter's spelling");
+        let spelled = resolved("pi:openai-codex:openai-codex/gpt-6.1-sol");
+        assert_eq!(Some(verdict.identity), classify(&spelled, &incident).map(|v| v.identity));
+    }
+
     /// A session one assistant turn of which ended without error was answered:
     /// still recognized, and marked so the ending is charged. §FS-rhei-agents.3.2.3
     #[test]
@@ -155,8 +167,9 @@ mod provider_unavailable {
 
         let codex = super::provider_limits::codex_openai();
         assert_eq!(classify(&codex, &incident), None, "another family");
-        let unkeyed = resolved("pi:openai-codex/gpt-6.1-sol");
-        assert_eq!(classify(&unkeyed, &incident), None, "no resolved provider");
+        // `pi:openai-codex/gpt-6.1-sol` now keys a wait; a bare model keys none.
+        let unkeyed = resolved("pi:gpt-6.1-sol");
+        assert_eq!(classify(&unkeyed, &incident), None, "no provider to key the wait");
         let at = observed();
         assert_eq!(classify_provider_unavailable(&pi(), status(1), false, false, &incident, at), None);
         assert_eq!(classify_provider_unavailable(&pi(), status(0), true, false, &incident, at), None);

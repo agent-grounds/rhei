@@ -29,6 +29,7 @@ resolved provider **outside the set**, including one differing only in case: a
 profile written `"provider": "Anthropic"` does not park. And a state that
 resolves an agent but **no provider at all** — a bare `agent:` with no model
 profile and no `<provider>` in its target ([§FS-rhei-agents.1.4](rhei-agents.spec.md#14-resolution-order)). Recognition
-keys on the resolved provider, so there is nothing to match and no execution
-identity to key a wait on, and the invocation is routed as the agent failure it
-appears to be. Program states resolve no agent and never park.
+keys on the resolved provider, so there is nothing to match, and the
+invocation is routed as the agent failure it appears to be; a provider derived
+from a `pi` model to key an outage wait is not a resolved provider here
+([§FS-rhei-agents.2.3](rhei-agents.spec.md#23-recognized-provider-refusals)). Program states resolve no agent and never park.

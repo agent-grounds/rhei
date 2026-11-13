@@ -158,11 +158,10 @@ minute up to an hour. `--until-idle` exits `3` with `idle_blocker:
 provider_unavailable` and the next attempt time. Six such endings per visit are
 free ([§FS-rhei-agents.3.2.3](rhei-agents.spec.md#323-attempt-budget)); a longer outage halts the visit as a spent budget
 does, and `rhei retry` grants it more attempts. The wait is keyed on the
-resolved provider, so the target or model profile must name one:
-`pi:openai-codex/<model>` names it only inside pi's model id and is charged as
-before ([§FS-rhei-run.3.3](rhei-run.spec.md#33-provider-limit-parking)). Spell it `pi:openai-codex:openai-codex/gpt-6.1-sol`,
-because the provider segment keys the wait and the model segment keeps pi's own
-`provider/model` reference.
+provider: `pi:openai-codex/gpt-6.1-sol` waits on `openai-codex`, the provider
+of pi's own model reference, while a bare model with no `/` such as
+`pi:gpt-6.1-sol` names no provider and is charged as before
+([§FS-rhei-agents.2.5](rhei-agents.spec.md#25-recognized-provider-unavailability)).
 
 Ticket ids in command output are project-qualified — `<rhei-id>.<task-id>`, e.g. `plan.1` for a single-file `plan.rhei.md` — and `rhei list` accepts the same `--rhei <id>` narrowing as `run`, `next`, and `reset` ([§FS-rhei-panta.6](rhei-panta.spec.md#6-project-scope-and-command-behavior)).
 

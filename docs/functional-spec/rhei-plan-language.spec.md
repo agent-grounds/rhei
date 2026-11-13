@@ -1207,6 +1207,14 @@ links stable when tasks move between files or when task files are nested under
 For workspace-relative validation, implementations must join the relative
 target to the workspace root and then normalize `.` and `..` path segments. If
 the normalized path escapes the workspace root, the link is invalid.
+Containment is judged before existence: an escaping link is refused whether or
+not a file exists where it lands, and the refusal says the link leaves the
+workspace root, naming that root, rather than that a file is missing. A target
+that leaves the root and comes back (`../<workspace>/docs/x.md`) normalizes
+inside it and is checked like any other link. Containment is a Directory
+Workspace rule only: a Single-File Plan's links may reach above the plan file's
+directory. In a Panta project each link is held to the rule of the rhei that
+owns it ([§AR-rhei-panta.5](../architecture/rhei-panta.spec.md#5-execution-root-and-per-rhei-runtime)).
 
 ```markdown
 ## Overview

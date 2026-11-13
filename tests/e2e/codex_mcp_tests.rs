@@ -3,7 +3,28 @@
 
 use super::codex_mcp_support::*;
 use super::*;
-use serde_json::json;
+use serde_json::{json, Value};
+
+#[test]
+fn codex_mcp_documented_profile_uses_native_configuration() {
+    let source = include_str!("../../docs/functional-spec/rhei-agents.spec.md");
+    let example = source
+        .split_once("```json\n")
+        .expect("settings example")
+        .1
+        .split_once("\n```")
+        .expect("end of settings example")
+        .0;
+    let settings: Value = serde_json::from_str(example).expect("documented settings JSON");
+    let profile = settings["agents"]["codex"].as_object().expect("documented Codex profile");
+    let case = run_case(
+        "documented-profile",
+        json!({"agents": {"codex": profile}, "mcp_servers": {"lookup": command_server()}}),
+        "    mcp_servers: [lookup]\n",
+        "codex",
+    );
+    assert_command_attached(&case);
+}
 
 #[test]
 fn codex_mcp_required_command_uses_native_configuration() {

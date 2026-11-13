@@ -30,7 +30,7 @@ fn the_issues_repro_resets_ingest_and_its_dependents_and_keeps_venue_byte_for_by
          \x20 Task paper.3: completed → pending   (prior: paper.2)\n\
          \x20 Task paper.4: completed → pending   (prior: paper.2)\n\
          Kept 1 task(s) as they stand, with their results and logs: paper.1\n\
-         Would remove per-ticket runtime artifacts (results, ledgers).\n\
+         Would remove per-ticket runtime artifacts (results, exports, ledgers).\n\
          \n\
          Dry run — nothing was changed.\n"
     );

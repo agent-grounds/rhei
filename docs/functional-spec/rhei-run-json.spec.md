@@ -143,7 +143,8 @@ changes neither `outcome` nor `exit_code`. It is an addition under
 
 `provider_unavailable` is emitted for the recognized ending of
 [§FS-rhei-agents.2.5](rhei-agents.spec.md#25-recognized-provider-unavailability). When the ending wrote a wait it is emitted in place of
-`task_outputs_missing`, `provider` is the resolved provider, and
+`task_outputs_missing`, `provider` is the provider that keys the wait
+([§FS-rhei-agents.2.5](rhei-agents.spec.md#25-recognized-provider-unavailability)), and
 `next_attempt_at` is the backoff deadline of [§FS-rhei-run.3.3](rhei-run.spec.md#33-provider-limit-parking). When the charge
 spent the visit's last attempt no wait is written and both fields are absent,
 and `task_outputs_missing` precedes it as on any exhausted visit, so the report

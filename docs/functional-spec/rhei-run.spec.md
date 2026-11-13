@@ -857,7 +857,10 @@ not a recognition condition, and a record naming any other entry reads exactly
 the same way ([§FS-rhei-agents.2.3](rhei-agents.spec.md#23-recognized-provider-refusals)).
 
 The execution identity is the pair of resolved agent registry id and resolved
-provider. Model, mode, and task are deliberately not part of it: the signal
+provider. For a `pi` invocation that resolves no provider, the
+identity's provider is the one [§FS-rhei-agents.2.5](rhei-agents.spec.md#25-recognized-provider-unavailability) derives from its model, so a wait
+written under `pi:openai-codex/<model>` holds `pi:openai-codex:<model>` and the
+reverse. Model, mode, and task are deliberately not part of it: the signal
 describes a provider session, not one model and not one ticket. The agent
 registry id stays in because no transport exposes an account identifier, and
 the registry id is the narrowest thing Rhei can observe that tracks one — a

@@ -387,6 +387,7 @@ mod tests {
     include!("cli/tests_cli_target_overrides.rs");
     include!("cli/tests_provider_limits.rs");
     include!("cli/tests_provider_unavailable.rs");
+    include!("cli/tests_provider_wait_identity.rs");
     include!("cli/tests_wait_deadlines.rs");
     include!("cli/tests_wait_deadline_reading.rs");
     include!("cli/tests_codex_provider_local.rs");

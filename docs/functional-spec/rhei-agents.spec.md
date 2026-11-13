@@ -1213,7 +1213,10 @@ Rhei recognizes a provider refusal in addition to a normal process result.
 Recognition requires all of the following:
 
 - the resolved provider is one of `openai` or `anthropic`, matched exactly and
-  case-sensitively. **The resolved agent registry id is not tested**;
+  case-sensitively. **The resolved agent registry id is not tested**. Only the
+  provider the invocation resolves is tested, never one derived from a `pi`
+  model to key a wait ([§FS-rhei-agents.2.5](rhei-agents.spec.md#25-recognized-provider-unavailability)), so `pi:openai/gpt-5` is not
+  recognized and `pi:openai:gpt-5` is;
 - the invocation exited non-zero and was neither timed out nor interrupted;
 - after stripping terminal-control decoration and trimming surrounding
   whitespace from each captured logical stdout and stderr line, exactly one line
@@ -1300,12 +1303,20 @@ Recognition requires all of the following:
 
 - the resolved family is `pi`. The agent registry id is not tested, so a custom
   entry with `family: pi` is recognized;
-- the resolved provider is present, because it keys the wait ([§FS-rhei-run.3.3](rhei-run.spec.md#33-provider-limit-parking)).
-  A target or model profile that resolves none is not recognized: in
-  `pi:openai-codex/gpt-6.1-sol` the provider is only inside pi's model id.
-  `pi:openai-codex:openai-codex/gpt-6.1-sol` is recognized, because its
-  provider segment keys the wait and its model segment keeps pi's own
-  `provider/model` reference;
+- some provider keys the wait ([§FS-rhei-run.3.3](rhei-run.spec.md#33-provider-limit-parking)). It is the provider the
+  invocation resolves ([§FS-rhei-agents.1.4](rhei-agents.spec.md#14-resolution-order)). When the invocation resolves no provider,
+  it is the text before the first `/` of the model rhei hands the agent (the
+  model-flag value of [§FS-rhei-agents.1.1.2](rhei-agents.spec.md#112-agents)), provided both that text and the rest
+  are non-empty; it is taken verbatim and case-sensitively, and everything after
+  that first `/`, further slashes included, stays the model. So
+  `pi:openai-codex/gpt-6.1-sol` is recognized and waits on `openai-codex`, the
+  same wait as `pi:openai-codex:openai-codex/gpt-6.1-sol`, and
+  `pi:openrouter/vendor/model` waits on `openrouter`. A provider the invocation
+  resolves wins over the model's prefix: `pi:openai:openai-codex/x` waits on
+  `openai`. The derived provider keys the wait and nothing else: the model, the
+  resolved provider, and everything read from them — pricing, `RHEI_PROVIDER`,
+  `{model.provider}`, snapshots, accounting — are as they would be without it,
+  and refusal recognition never tests it ([§FS-rhei-agents.2.3](rhei-agents.spec.md#23-recognized-provider-refusals));
 - the invocation exited `0` and was neither timed out nor interrupted;
 - a required output is missing ([§FS-rhei-agents.3.2.1](rhei-agents.spec.md#321-runtime-semantics) step 4);
 - among the stdout JSON events, the last `auto_retry_end` has `success: false`
@@ -1326,7 +1337,8 @@ cap of six ([§FS-rhei-agents.3.2.3](rhei-agents.spec.md#323-attempt-budget)) bo
 Not recognized, and charged as today: `stopReason: "error"` with no
 `auto_retry_end` (pi's auto-retry off, or a first error it does not retry); an
 `auto_retry_end` with `success: true` or an `attempt` below `maxAttempts`; the
-same stream from any other family; a target with no resolved provider; a
+same stream from any other family; an invocation that resolves no provider
+and whose model has no `/` or an empty half, such as `pi:gpt-6.1-sol`; a
 timed-out or interrupted session; and a session whose required outputs are all
 on disk, which moves exactly as it does today. Stderr and non-JSON stdout
 contribute nothing.

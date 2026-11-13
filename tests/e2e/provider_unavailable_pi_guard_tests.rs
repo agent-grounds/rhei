@@ -55,15 +55,16 @@ fn the_same_stream_from_another_family_stays_charged() {
     assert_all_tasks_in_state(&fixture.root, &fixture.machine, "working");
 }
 
-/// A target that resolves no provider has nothing to key the wait on, so the
-/// reporter's own spelling stays charged. §FS-rhei-agents.2.5
+/// A pi target with no provider segment and a bare model, with no `/`, has
+/// nothing to key the wait on, so it stays charged. §FS-rhei-agents.2.5
 #[test]
-fn a_target_without_a_resolved_provider_stays_charged() {
-    let outage = Outage { target: TARGET_WITHOUT_PROVIDER, ..Outage::pi(gave_up()) };
+fn a_pi_target_with_no_provider_to_key_stays_charged() {
+    let outage = Outage { target: TARGET_WITH_NO_PROVIDER_TO_KEY, ..Outage::pi(gave_up()) };
     let fixture = outage.fixture("pi-charged-no-provider");
     let pass = run_once(&fixture, "no-provider");
     let argv = fs::read_to_string(fixture.root.join("runtime/argv.txt")).unwrap();
     assert!(argv.contains("--mode json"), "rhei runs pi in json mode: {argv}");
+    assert!(argv.contains("--model gpt-6.1-sol"), "pi is handed the bare model: {argv}");
     assert_charged_as_today(&fixture, &pass, "exited");
     assert_all_tasks_in_state(&fixture.root, &fixture.machine, "working");
 }

@@ -21,8 +21,12 @@ pub(super) const TASK: &str = "workspace.1";
 /// has the identity it is keyed on (§FS-rhei-run.3.3).
 pub(super) const TARGET: &str = "pi-local:openai-codex:gpt-6.1-sol";
 
-/// The reporter's spelling: the provider lives only inside pi's model id.
+/// The reporter's spelling: the provider lives only inside pi's model id, so
+/// the wait is keyed on the provider of that reference. §FS-rhei-agents.2.5
 pub(super) const TARGET_WITHOUT_PROVIDER: &str = "pi-local:openai-codex/gpt-6.1-sol";
+
+/// A bare model: no provider segment and no `/`, so nothing keys a wait.
+pub(super) const TARGET_WITH_NO_PROVIDER_TO_KEY: &str = "pi-local:gpt-6.1-sol";
 
 /// Two tickets, so a concurrent state fills two slots of the worker pool.
 pub(super) const TWO_TASKS: &[(&str, &str)] = &[
@@ -181,6 +185,7 @@ raise SystemExit(0)
                 "family": self.family,
                 "command": command,
                 "stdin_prompt": true,
+                "model_flag": "--model",
                 "timeout": "30s"
             }}})
             .to_string(),

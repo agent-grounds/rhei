@@ -69,6 +69,17 @@ that succeeded leaves no binary where the harness looks, the harness reports the
 path it checked and the build it ran to produce it, because a message naming
 only the path sends a reader hunting in a checkout that built correctly.
 
+What the harness spawns is a binary no later or concurrent freshness build can
+remove or replace underneath a running test, not the profile directory's own
+`rhei`. Cargo replaces that path by unlinking it and linking the new build in its
+place, and the suite is never alone with it: another harness process, a test
+that re-runs its own binary, or an outside `cargo build` can each relink it
+mid-run, and a spawn that lands between the unlink and the link fails with "No
+such file or directory" in a test that did nothing wrong. So once the check has
+passed, the harness takes its own copy of that verified binary, kept under the
+same target directory and still named `rhei` for the platform, and every
+subprocess use in that harness process runs the copy.
+
 **`lint`** runs on Linux only. It runs `grund config validate` and
 `grund check .`, then the repository `.pre-commit-config.yaml` against all
 files with the cargo hooks skipped — `test` has just run them on three

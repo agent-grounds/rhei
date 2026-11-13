@@ -299,12 +299,36 @@ fn run_on_cli_stack() {
 
     // Empty and `0` are `clap_complete`'s own way of turning dynamic completion
     // off, so a run carrying either is an ordinary one. §FS-rhei-templates.1.3
-    if std::env::var_os("COMPLETE")
+    let completion_shell = std::env::var_os("COMPLETE");
+    if completion_shell
+        .as_ref()
         .is_some_and(|shell| !matches!(shell.to_string_lossy().as_ref(), "" | "0"))
     {
         mark_serving_shell_completion();
     }
-    CompleteEnv::with_factory(cli_command).bin(invoked_bin_name()).complete();
+    match CompleteEnv::with_factory(cli_command).bin(invoked_bin_name()).try_complete(
+        std::env::args_os(),
+        std::env::current_dir().ok().as_deref(),
+    ) {
+        Ok(true) => std::process::exit(0),
+        Ok(false) => {}
+        Err(err) => {
+            // The library exposes unknown shells as an Io error with no distinct kind or source.
+            // Match its refusal, not a second shell parser. §FS-rhei-completions.5.1
+            if err.kind() == ErrorKind::Io
+                && err.render().to_string().starts_with("error: unknown shell `")
+            {
+                if let Some(shell) = completion_shell {
+                    eprintln!(
+                        "{err}\n  COMPLETE={shell:?} requested shell completion.\n  \
+                         help: unset COMPLETE and retry the original command."
+                    );
+                    std::process::exit(err.exit_code());
+                }
+            }
+            err.exit();
+        }
+    }
 
     let cli = match Cli::try_parse() {
         Ok(cli) => cli,

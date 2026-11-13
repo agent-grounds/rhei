@@ -26,11 +26,27 @@ fn plan_spawn_attempt(
     identity: Option<&str>,
     number: LogNumber,
 ) -> SpawnPlan {
-    let suffix = log_suffix(identity, number.value());
-    let record_path = spawn_record_path(runtime_dir, task_id, state_name, suffix.as_deref());
     let moves = ticket_move_count(task_root, runtime_dir, task_id);
     let previous = current_visit_record(runtime_dir, task_id, state_name, identity, number, moves)
         .filter(|record| record.moves == moves);
+    plan_following(runtime_dir, task_id, state_name, identity, number, moves, previous)
+}
+
+/// The plan of the spawn that follows `previous`, the last attempt of visit
+/// `moves`, or of the visit's first spawn where there is none: what the records
+/// say, and what a killed attempt's record, written or predicted, makes them
+/// say. §FS-rhei-agents.8.1 §FS-rhei-agents.8.1.1
+fn plan_following(
+    runtime_dir: &Path,
+    task_id: &str,
+    state_name: &str,
+    identity: Option<&str>,
+    number: LogNumber,
+    moves: u64,
+    previous: Option<SpawnRecord>,
+) -> SpawnPlan {
+    let suffix = log_suffix(identity, number.value());
+    let record_path = spawn_record_path(runtime_dir, task_id, state_name, suffix.as_deref());
     let attempt = previous.as_ref().map(|record| record.attempt + 1).unwrap_or(1);
     let charged = previous.as_ref().map(|record| record.charged).unwrap_or(0);
     SpawnPlan {
@@ -87,7 +103,11 @@ impl SpawnPlan {
     /// the log of a spawn killed before it could record itself, or whose
     /// completion record could not be written. It is kept, and
     /// neither the attempt nor the entry moves forward because it exists.
-    // §FS-rhei-agents.8.1
+    ///
+    /// A spawn site asks [`NamedSpawn::plan`] instead, which first asks whether
+    /// a killed run accounts for the file; this is that refusal's otherwise case.
+    // §FS-rhei-agents.8.1 §FS-rhei-agents.8.1.1
+    #[cfg(test)]
     fn unaccounted_log_refusal(&self, task_id: &str) -> Option<String> {
         self.log.exists().then(|| unaccounted_log_message(&self.log, task_id, self.reset.as_ref()))
     }
@@ -113,9 +133,13 @@ fn unaccounted_log_message(log: &Path, task_id: &str, reset: Option<&ResetOffer>
 /// name is taken by a file no record accounts for. Both are refusals the
 /// caller prints before anything is composed, staged, or paid for.
 ///
+/// This is the reading, which writes nothing: where the name is taken by an
+/// attempt killed together with its run, it predicts the record a spawn site
+/// would write and plans past it, as [`SpawnSite::plan`] does. §FS-rhei-evidence.11.1
+///
 /// `reset` stays on the plan, so the race-free half of the refusal, when the log
 /// is opened, offers the same command as this half. §FS-rhei-reset.5.1
-// §FS-rhei-agents.8.1 §FS-rhei-programs.5.1
+// §FS-rhei-agents.8.1 §FS-rhei-programs.5.1 §FS-rhei-agents.8.1.1
 #[allow(clippy::too_many_arguments)]
 fn plan_named_spawn(
     machine: &rhei_validator::StateMachine,
@@ -127,16 +151,17 @@ fn plan_named_spawn(
     identity: Option<&str>,
     reset: &ResetOffer,
 ) -> Result<(SpawnPlan, LogNumber), String> {
-    let number =
-        resolve_log_number(machine, state_name, visit_count, task_root, runtime_dir, task_id)?;
-    let plan = SpawnPlan {
-        reset: Some(reset.clone()),
-        ..plan_spawn_attempt(runtime_dir, task_root, task_id, state_name, identity, number)
+    let named = NamedSpawn {
+        machine,
+        task_root,
+        runtime_dir,
+        task_id,
+        state_name,
+        visit_count,
+        identity,
+        reset,
     };
-    match plan.unaccounted_log_refusal(task_id) {
-        Some(refusal) => Err(refusal),
-        None => Ok((plan, number)),
-    }
+    named.plan(None).map_err(|refusal| refusal.message(task_id, Some(reset), &[]))
 }
 
 /// The roots a run's spawn sites plan a ticket's next spawn under: where its
@@ -309,7 +334,10 @@ impl<'a> SpawnSiteRoots<'a> {
                 identity,
                 &self.machines.reset,
             );
-            planned.is_ok_and(|(plan, _)| plan.budget_spent(budget).is_some())
+            // A poll visit its kills have spent halts as one its budget has. §FS-rhei-agents.3.2.3
+            planned.is_ok_and(|(plan, _)| {
+                plan.budget_spent(budget).is_some() || plan.kills_spent(budget).is_some()
+            })
         };
         match agents {
             // A program records under its ticket's own root. §FS-rhei-programs.5.1

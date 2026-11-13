@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 pub mod process_tree;
+pub mod worker_liveness;
 
 /// The platform's own shell, holding one command line.
 ///

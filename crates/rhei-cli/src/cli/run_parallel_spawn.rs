@@ -73,15 +73,14 @@ fn spawn_parallel_agent_work_item(
     // §FS-rhei-agents.3.2.3 §FS-rhei-agents.8.1
     let identity = resolved_agent_log_identity(&item.resolved);
     let (task_id, state) = (item.task_id_str.as_str(), item.current_state.as_str());
-    let planned = plan_named_spawn(
-        machine,
+    let site = SpawnSite { machine, task, loaded: &loaded, settings, reset: &machines.reset };
+    let planned = site.plan(
         &task_workspace_root,
         &agent_runtime_dir,
-        task_id,
         state,
         visit_count,
         identity.as_deref(),
-        &machines.reset,
+        item.resolved.agent.id(),
     );
     let (mut plan, log_number) = match spawn_refusals.observe(
         task_id, state, identity.as_deref(), planned, sink,

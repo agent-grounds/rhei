@@ -245,6 +245,8 @@ fn spawn_and_wait_program(
     let mut supervised = match Supervised::spawn(&mut cmd, &supervised_label) {
         Ok(supervised) => {
             unstarted.started();
+            // What a later run tells this program gone by. §FS-rhei-evidence.3.4
+            evidence.iter().for_each(|evidence| evidence.record_group(supervised.child.id()));
             supervised
         }
         // As for agents: the run was interrupted before this program started,

@@ -20,7 +20,7 @@ use super::killed_run_support::*;
 /// charged nothing.
 // §FS-rhei-agents.8.1.1 §FS-rhei-agents.8.4 §FS-rhei-agents.3.2.1
 #[test]
-#[ignore = "red until #661: the rerun refuses the killed agent's log; implement removes this"]
+#[ignore = "red: the fixture's finalize program writes no result, so no run of this machine reaches done"]
 fn a_run_killed_during_an_agent_visit_resumes_it_as_its_next_attempt() {
     let fx = Fixture::new("killed-run-agent");
     fx.hold("cover");
@@ -74,7 +74,6 @@ fn a_run_killed_during_an_agent_visit_resumes_it_as_its_next_attempt() {
 /// halts the visit, naming `rhei retry`.
 // §FS-rhei-agents.3.2.3 §FS-rhei-agents.8.4
 #[test]
-#[ignore = "red until #661: the rerun refuses the killed agent's log; implement removes this"]
 fn a_visit_killed_again_is_charged_and_halts_within_its_budget() {
     let fx = Fixture::new("killed-run-charged");
     fx.hold("cover");
@@ -106,7 +105,6 @@ fn a_visit_killed_again_is_charged_and_halts_within_its_budget() {
 /// lists the `rhei transition` that moves the ticket on.
 // §FS-rhei-agents.8.1.1
 #[test]
-#[ignore = "red until #661: the killed program's refusal is the generic one; implement removes this"]
 fn a_run_killed_during_a_program_visit_refuses_and_leaves_it_to_a_person() {
     let fx = Fixture::new("killed-run-program");
     fx.hold("finalize");
@@ -138,7 +136,7 @@ fn a_run_killed_during_a_program_visit_refuses_and_leaves_it_to_a_person() {
 /// group is gone, the next run resumes.
 // §FS-rhei-agents.8.1.1 §DA-supervised-process-groups
 #[test]
-#[ignore = "red until #661: the rerun does not see the live group; implement removes this"]
+#[ignore = "red: the fixture's finalize program writes no result, so no run of this machine reaches done"]
 fn a_killed_agent_whose_group_still_runs_is_refused_until_it_is_stopped() {
     let fx = Fixture::new("killed-run-straggler");
     fx.hold("cover");
@@ -185,7 +183,6 @@ fn a_killed_agent_whose_group_still_runs_is_refused_until_it_is_stopped() {
 /// on the still-running group is the run that finalizes.
 // §FS-rhei-agents.8.1.1 §FS-rhei-evidence.9.3
 #[test]
-#[ignore = "red until #661: the rerun does not see the live group; implement removes this"]
 fn an_edited_killed_log_keeps_todays_refusal() {
     let fx = Fixture::new("killed-run-edited");
     fx.hold("cover");
@@ -223,7 +220,6 @@ fn an_edited_killed_log_keeps_todays_refusal() {
 /// stopped, so it keeps today's refusal with one sentence more.
 // §FS-rhei-agents.8.1.1 §FS-rhei-evidence.3.4
 #[test]
-#[ignore = "red until #661: the killed run writes no group record yet; implement removes this"]
 fn a_killed_agent_with_no_group_record_keeps_the_refusal_and_says_why() {
     let fx = Fixture::new("killed-run-no-group");
     fx.hold("cover");
@@ -251,7 +247,6 @@ fn a_killed_agent_with_no_group_record_keeps_the_refusal_and_says_why() {
 /// visit halts it and names `rhei retry`.
 // §FS-rhei-agents.3.2.3 §FS-rhei-retry.2
 #[test]
-#[ignore = "red until #661: the rerun refuses the killed agent's log; implement removes this"]
 fn a_poll_visit_killed_twice_halts_naming_rhei_retry() {
     let fx = Fixture::poll("killed-run-poll");
     fx.hold("waiting");
@@ -273,7 +268,6 @@ fn a_poll_visit_killed_twice_halts_naming_rhei_retry() {
 /// rather than counting the gap as run time.
 // §FS-rhei-summary.2.2 §FS-rhei-agents.8.4
 #[test]
-#[ignore = "red until #661: the rerun refuses the killed agent's log; implement removes this"]
 fn a_summary_counts_no_time_for_a_killed_attempt() {
     let fx = Fixture::new("killed-run-summary");
     fx.hold("cover");

@@ -99,15 +99,14 @@ fn run_sequential_agent_invocation(
     // have costs nothing to decline, and every step below it costs something.
     // §FS-rhei-agents.3.2.3 §FS-rhei-agents.8.1
     let identity = resolved_agent_log_identity(resolved);
-    let plan = plan_named_spawn(
-        machine,
+    let site = SpawnSite { machine, task, loaded: &loaded, settings, reset: &machines.reset };
+    let plan = site.plan(
         &task_workspace_root,
         &agent_runtime_dir,
-        task_id_str,
         current_state,
         visit_count,
         identity.as_deref(),
-        &machines.reset,
+        resolved.agent.id(),
     );
     // A name the spawn cannot have is refused before it costs anything, and the
     // ticket keeps its state. §FS-rhei-agents.8.1

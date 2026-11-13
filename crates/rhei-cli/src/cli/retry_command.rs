@@ -1,6 +1,7 @@
 // Operator recovery in place, without travel or account capacity. §FS-rhei-retry
 
-/// Refuse worker, poll and terminal recovery before any runtime write. §FS-rhei-retry.2
+/// Refuse worker and terminal recovery before any runtime write; a poll state is
+/// refused once its records show no visit its kills halted. §FS-rhei-retry.2
 fn retry_state_preflight(worker: bool, state: &rhei_validator::StateDef) -> MietteResult<()> {
     if worker {
         // §FS-rhei-errors.1.2
@@ -10,11 +11,37 @@ fn retry_state_preflight(worker: bool, state: &rhei_validator::StateDef) -> Miet
         // §FS-rhei-errors.1.2
         return Err(miette!(help = "an authorized human operator must reopen the finished task through rhei transition --force at an interactive terminal with fresh typed confirmation and a reason before retry can apply. An agent may not perform that ceremony.", "cannot retry a terminal state"));
     }
-    if state.poll.is_some() {
-        // §FS-rhei-errors.6
-        return Err(miette!(help = format!("use the poll state's declared outgoing transition when polling is exhausted; {} shows the available edges. retry cannot refill poll attempts.", help_command_or_bare("states")), "cannot retry a poll state; polling has its own exhaustion rule"));
-    }
     Ok(())
+}
+
+/// The refusal of a poll state none of whose visits its kills halted.
+/// §FS-rhei-retry.2 §FS-rhei-errors.6
+fn poll_retry_refusal() -> miette::Report {
+    miette!(help = format!("use the poll state's declared outgoing transition when polling is exhausted; {} shows the available edges. retry cannot refill poll attempts.", help_command_or_bare("states")), "cannot retry a poll state; polling has its own exhaustion rule")
+}
+
+/// Grant a poll visit its kills halted one configured budget: each granted
+/// attempt allows one more kill. Re-checked under the record lock, as a charge
+/// and a grant are. §FS-rhei-retry.2 §FS-rhei-agents.3.2.3
+fn grant_kill_retry_record(
+    path: &Path,
+    task: &str,
+    state: &str,
+    moves: u64,
+    grant: AttemptGrant,
+) -> MietteResult<SpawnRecord> {
+    update_spawn_record(path, |stored| {
+        let current = stored.filter(|record| {
+            record.task == task && record.state == state && record.moves == moves
+        });
+        let Some(mut record) = current.filter(SpawnRecord::kills_spent) else {
+            return Err(poll_retry_refusal());
+        };
+        record.grants.push(grant);
+        Ok(Some(record))
+    })?
+    // §FS-rhei-errors.6
+    .ok_or_else(|| miette!(help = INTERNAL_DIAGNOSTIC_HELP, "spawn record disappeared during retry"))
 }
 
 /// Validate the exact current visit, including grants already consumed or still
@@ -123,10 +150,9 @@ fn retry_command_with_worker(
     retry_state_preflight(false, definition)?;
     let root = execution_workspace_root(input);
     let settings = load_merged_settings(&root)?;
-    let AttemptBudget::Visit(configured) = resolve_attempt_budget(Some(definition), &settings)
-    else {
-        unreachable!("poll refused")
-    };
+    // A poll visit is refilled only once its kills halted it. §FS-rhei-retry.2
+    let poll = definition.poll.is_some();
+    let configured = configured_attempts(Some(definition), &settings);
     // §FS-rhei-retry.2: match the next fresh run, whose agents are initial members;
     // programs always use their owning root. Dormant duplicates cannot grant capacity.
     let runtime = if definition.program.is_some() {
@@ -145,8 +171,14 @@ fn retry_command_with_worker(
     )?;
     let exhausted = records
         .iter()
-        .filter(|(_, record, _)| record.charged >= record.allowance(configured))
+        .filter(|(_, record, _)| match poll {
+            true => record.kills_spent(),
+            false => record.charged >= record.allowance(configured),
+        })
         .collect::<Vec<_>>();
+    if exhausted.is_empty() && poll {
+        return Err(poll_retry_refusal());
+    }
     if exhausted.is_empty() {
         let record = records.first().map(|(_, record, _)| record);
         retry_record_preflight(
@@ -170,20 +202,23 @@ fn retry_command_with_worker(
         return Err(miette!(help = OS_ACCOUNT_HELP, "cannot identify invoking OS account"));
     }
     for (path, previous, identity) in exhausted {
-        let record = grant_retry_record(
-            path,
-            &task_id,
-            &state,
-            previous.moves,
-            AttemptGrant {
-                at: chrono::Utc::now().to_rfc3339(),
-                os_user: os_user.trim().into(),
-                attempts: configured,
-            },
-        )?;
+        let grant = AttemptGrant {
+            at: chrono::Utc::now().to_rfc3339(),
+            os_user: os_user.trim().into(),
+            attempts: configured,
+        };
+        let record = match poll {
+            true => grant_kill_retry_record(path, &task_id, &state, previous.moves, grant)?,
+            false => grant_retry_record(path, &task_id, &state, previous.moves, grant)?,
+        };
         // §FS-rhei-retry.3: name only the invocations actually granted.
         let label = identity.as_ref().map(|id| format!(" ({id})")).unwrap_or_default();
-        let mut message = format!("Task {task_id} '{state}'{label}: granted {configured} more attempts to this visit ({} in total); the next `rhei run` spawns it as attempt {}.", record.allowance(configured), record.attempt + 1);
+        let total = match poll {
+            // A poll visit's grants allow kills, not attempts. §FS-rhei-agents.3.2.3
+            true => format!("{} kills together with its run in total", record.allowance(FREE_KILLS_PER_VISIT)),
+            false => format!("{} in total", record.allowance(configured)),
+        };
+        let mut message = format!("Task {task_id} '{state}'{label}: granted {configured} more attempts to this visit ({total}); the next `rhei run` spawns it as attempt {}.", record.attempt + 1);
         if execute_on_of(machine, &state).is_some() {
             let count = supervision_checkpoints(loaded.rhei.metadata.as_ref(), &task.id).len();
             message.push_str(&format!(

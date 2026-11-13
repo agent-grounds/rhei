@@ -168,6 +168,8 @@ include!("cli/retry_command.rs");
 include!("cli/visit_halt_recovery.rs");
 include!("cli/manual_supervision_release.rs");
 include!("cli/agent_spawn_plan.rs");
+include!("cli/killed_attempt.rs");
+include!("cli/killed_attempt_spawn.rs");
 include!("cli/run_helpers.rs");
 include!("cli/run_completion_condition.rs");
 include!("cli/run_visit_pairing.rs");
@@ -410,6 +412,7 @@ mod tests {
     include!("cli/tests_worker_edit_regions.rs");
     include!("cli/tests_worker_restore_boundaries.rs");
     include!("cli/tests_entry_log_numbers.rs");
+    include!("cli/tests_killed_attempt.rs");
     include!("cli/tests_session_reports.rs");
     include!("cli/tests_session_report_streams.rs");
     include!("cli/tests_program_exit_routes.rs");

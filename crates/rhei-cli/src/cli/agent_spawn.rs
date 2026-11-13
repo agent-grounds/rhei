@@ -266,6 +266,7 @@ fn spawn_and_wait_agent(
     let mut supervised = match spawned {
         Ok(supervised) => {
             unstarted.started();
+            evidence.iter().for_each(|evidence| evidence.record_group(supervised.child.id()));
             supervised
         }
         // Interrupted between the scheduler's check and the spawn. Nothing

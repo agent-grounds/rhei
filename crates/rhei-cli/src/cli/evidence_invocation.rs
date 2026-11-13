@@ -3,6 +3,9 @@
 
 const EVIDENCE_INVOCATION_SCHEMA: &str = "rhei.evidence.invocation.v1";
 
+/// What a worker can be found by after its run dies. §FS-rhei-evidence.3.4
+const EVIDENCE_GROUP_SCHEMA: &str = "rhei.evidence.group.v1";
+
 /// One process's evidence, from its published start record to its end.
 struct EvidenceInvocation {
     run: Arc<EvidenceRun>,
@@ -266,6 +269,33 @@ impl EvidenceInvocation {
             run.routed_exits().remove(&task_id);
         }
         Ok(EvidenceInvocation { run, kind, id_field, id, task_id, start_path })
+    }
+
+    /// Write the group record beside the start record, exclusively, right after
+    /// the spawn: on Unix the leader's pid, which is its group's id; on Windows
+    /// the pid and its creation time. It is what a later run tells this worker
+    /// gone by, so a failed write warns and refuses nothing: the worker already
+    /// runs. §FS-rhei-evidence.3.4 §FS-rhei-evidence.11.2
+    fn record_group(&self, pid: u32) {
+        let mut record = serde_json::json!({
+            "schema": EVIDENCE_GROUP_SCHEMA,
+            "invocation_id": self.id,
+        });
+        #[cfg(unix)]
+        {
+            record["process_group"] = serde_json::json!(pid);
+        }
+        #[cfg(windows)]
+        {
+            record["pid"] = serde_json::json!(pid);
+            record["created_at"] =
+                serde_json::json!(rhei_core::platform::worker_liveness::process_created_at(pid));
+        }
+        let name = self.start_path.file_name().and_then(|name| name.to_str()).unwrap_or_default();
+        let path = self.start_path.with_file_name(name.replace(".start.json", ".group.json"));
+        if let Err(err) = write_evidence_exclusively(&path, &record) {
+            diag_warn!("evidence: could not write the group record {}: {err}", path.display());
+        }
     }
 
     /// The spawn never started: remove the start record, as its log is

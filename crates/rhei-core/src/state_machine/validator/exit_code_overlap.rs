@@ -12,6 +12,7 @@ enum ExitCodeSet {
 
 impl ExitCodeSet {
     /// The set `rule` matches, or `None` when it declares no (recognized) `exit_code`.
+    /// Mirrors the router's `transition_matches_exit_code`; change both together.
     fn of(rule: &TransitionRule) -> Option<Self> {
         match rule.exit_code.as_ref()? {
             serde_yaml::Value::Number(number) => number.as_i64().map(|code| Self::Codes(vec![code])),

@@ -79,7 +79,7 @@ previous release; nothing here is written by hand.*
 
 - [0.6.3](changelog/0.6.3.md) - 2026-10-26: 6 pull requests.
 - [0.6.2](changelog/0.6.2.md) - 2026-10-19: 5 pull requests.
-- [0.6.1](changelog/0.6.1.md) - 2026-10-12: 14 pull requests.
+- [0.6.1](changelog/0.6.1.md) - 2026-10-12: 28 pull requests.
 - [0.6.0](changelog/0.6.0.md) - 2026-10-03: 51 pull requests.
 - [0.5.1](changelog/0.5.1.md) - 2026-09-28: - Let an `agents.<id>` profile name the built-in family it belongs to.
 - [0.5.0](changelog/0.5.0.md) - 2026-09-14: - **Price books now accept and preserve the extension metadata their published v1 schema permits.** Additional document and entry properties retain their JSON values in every participating run-owned copy without affecting price selection, validation, coverage, or calculated amounts.

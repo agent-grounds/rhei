@@ -83,6 +83,7 @@ def prepare_release(changelog: Path, version: str, release_date: str) -> None:
         raise ChangelogError(
             f"the previous release tag {previous_tag} does not exist; fetch the tags (git fetch --tags)"
         )
+    history.require_ancestor(tagged, previous_tag)
     pull_requests = _notes_since(history, _Forge(history.cwd), tagged)
     if not pull_requests:
         # A person started this release, so it does not hold; it refuses. §FS-rhei-distribution.5.3
@@ -194,6 +195,8 @@ def release_due(changelog: Path, tag: str, output: Path) -> None:
     """
     history = _History(changelog)
     tagged = history.commit(tag)
+    # Validate before even the docs/CI shortcut or its output. §FS-rhei-distribution.5.3
+    history.require_ancestor(tagged, tag)
     due = False
     if not history.code_changed_since(tagged):
         print(f"::notice::Only docs/CI changes since {tag}; skipping.")
@@ -224,6 +227,17 @@ class _History:
         if result is None:
             raise ChangelogError("`git` is not on PATH")
         return result.stdout.strip() if result.returncode == 0 else None
+
+    def require_ancestor(self, commit: str, tag: str) -> None:
+        """Refuse an off-history release tag before using its range. §FS-rhei-distribution.5.1"""
+        args = ("merge-base", "--is-ancestor", commit, "HEAD")
+        result = _spawn(self.cwd, "git", *args)
+        if result is None:
+            raise ChangelogError("`git` is not on PATH")
+        if result.returncode == 1:
+            raise ChangelogError(f"the previous release tag {tag} is not an ancestor of HEAD; refusing release notes")
+        if result.returncode != 0:
+            raise ChangelogError(f"git {' '.join(args)} failed: {result.stderr.strip()}")
 
     def code_changed_since(self, commit: str) -> list[str]:
         """The paths outside docs and CI that differ between `commit` and `HEAD`."""

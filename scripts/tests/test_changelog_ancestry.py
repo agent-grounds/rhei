@@ -87,18 +87,15 @@ class AncestryTests(ScriptTestCase):
                 else:
                     self.assertEqual(self.step_output.read_bytes(), b"existing=value\n")
 
-    @unittest.skip("red until #680: prepare refuses an off-history tag before forge reads or writes; implement removes this")
     def test_prepare_refuses_an_off_history_tag_without_writes_or_forge_reads(self):
         repo, _ = self.history(rewritten=True)
         self.assert_refusal(repo, "prepare")
 
-    @unittest.skip("red until #680: due refuses an off-history tag without output; implement removes this")
     def test_due_refuses_an_off_history_tag_without_output_or_forge_reads(self):
         """The scheduled release shares the range prerequisite. §FS-rhei-distribution.5.3"""
         repo, _ = self.history(rewritten=True)
         self.assert_refusal(repo, "due")
 
-    @unittest.skip("red until #680: due validates ancestry before the identical-tree shortcut; implement removes this")
     def test_due_refuses_an_off_history_tag_even_with_identical_endpoint_trees(self):
         """No path difference does not validate the range. §FS-rhei-distribution.5.3"""
         repo, _ = self.history(rewritten=True, identical=True)
@@ -126,7 +123,6 @@ class HistoricalNotesTests(unittest.TestCase):
     ORIGINAL = [488, 486, 485, 482, 481, 478, 477, 473, 472, 468, 469, 467, 463, 461]
     MISSING = [440, 441, 442, 443, 444, 445, 446, 449, 452, 453, 456, 457, 458, 459]
 
-    @unittest.skip("red until #680: backfill exactly the 14 omitted 0.6.1 PRs; implement removes this")
     def test_0_6_1_archive_retains_originals_and_restores_exact_missing_set_once(self):
         text = (REPO_ROOT / "docs/changelog/0.6.1.md").read_text(encoding="utf-8")
         numbers = [int(n) for n in re.findall(r"\(PR #(\d+)\)", text)]
@@ -138,7 +134,6 @@ class HistoricalNotesTests(unittest.TestCase):
                 rf"^- \[.+\]\(https://github.com/agent-grounds/rhei/pull/{number}\) \(PR #{number}\)$", text, re.M
             ), f"PR #{number} must retain a linked title")
 
-    @unittest.skip("red until #680: correct the historical 0.6.1 archive count to 28; implement removes this")
     def test_0_6_1_archive_index_reports_28_pull_requests(self):
         text = (REPO_ROOT / "docs/changelog.md").read_text(encoding="utf-8")
         line = next(line for line in text.splitlines() if line.startswith("- [0.6.1]"))

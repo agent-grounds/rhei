@@ -212,7 +212,6 @@ const LINUX_ARGUMENT_CAP: u64 = 131_072;
 /// stdin but keeps the separator fails here too.
 // §FS-rhei-agents.2.2.2 §FS-rhei-agents.2
 #[test]
-#[ignore = "red until #659: the built-in pi passes the prompt in argv and fails to spawn; implement removes this"]
 fn a_brief_past_every_platform_limit_starts_the_builtin_pi_on_stdin() {
     let dir = unique_temp_dir("oversized-prompt-builtin-pi");
     let bin = dir.join("bin");

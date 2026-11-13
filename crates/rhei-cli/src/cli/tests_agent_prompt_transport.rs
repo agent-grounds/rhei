@@ -235,7 +235,6 @@ mod agent_prompt_transport_tests {
     }
 
     #[test]
-    #[ignore = "red until #659: the built-in pi still has stdin_prompt false; implement removes this"]
     fn supported_agents_keep_expected_prompt_transports() {
         let agents = built_in_agents();
         // `-p` stays declared and stops carrying the prompt: it is what puts
@@ -288,7 +287,6 @@ mod agent_prompt_transport_tests {
     /// bare `-p`, and ends with no separator, which pi refuses.
     /// §FS-rhei-agents.2 §FS-rhei-agents.2.2.2
     #[test]
-    #[ignore = "red until #659: the built-in pi puts the prompt in argv; implement removes this"]
     fn builtin_pi_pipes_its_prompt_under_a_bare_p_and_ends_with_no_separator() {
         let argv = composed(&resolved(builtin("pi"), "pi", None), &skill_tooling(), &[]);
 
@@ -310,7 +308,6 @@ mod agent_prompt_transport_tests {
     /// The family decides, so a wrapper of pi inherits the stdin transport and
     /// is spared the separator too. §FS-rhei-agents.2.2.2
     #[test]
-    #[ignore = "red until #659: a family pi wrapper gets the prompt in argv; implement removes this"]
     fn a_pi_family_wrapper_pipes_its_prompt_with_no_separator() {
         let wrapper = pi_family("pi-wrap", serde_json::json!({"family": "pi", "command": ["wrapper"]}));
         let argv = composed(&resolved(wrapper, "pi-wrap", None), &ResolvedTooling::default(), &[]);
@@ -323,7 +320,6 @@ mod agent_prompt_transport_tests {
     /// built-in wholesale and turns on `stdin_prompt`. Its family is still its
     /// own id, `pi`, so it gets no separator and starts. §FS-rhei-agents.2.2.2
     #[test]
-    #[ignore = "red until #659: a same-id pi entry with stdin_prompt still ends in `--`; implement removes this"]
     fn a_same_id_pi_entry_with_stdin_prompt_ends_with_no_separator() {
         let entry = CustomAgentProfile {
             command: vec!["pi".to_string()],

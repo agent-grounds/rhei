@@ -381,7 +381,7 @@ fn size_explains_spawn_failure(err: &std::io::Error, command_line_bytes: usize) 
 struct SpawnFailureGuidance {
     /// Appended to the message. Empty unless the size is what explains it.
     detail: String,
-    help: &'static str,
+    help: String,
 }
 
 /// Help for a spawn that failed for any reason the command line's size does not
@@ -398,9 +398,20 @@ fn spawn_not_started_help() -> &'static str {
 /// failed: a settings entry for a built-in id replaces that profile wholesale
 /// (§FS-rhei-agents.1.3), so that advice would paste back as a different
 /// failure, which §FS-rhei-errors.1.2 rules out.
-fn oversized_prompt_help() -> &'static str {
-    "use an agent that delivers the prompt on stdin ('claude-code', 'codex'), or register \
-     a custom agent with \"stdin_prompt\": true"
+///
+/// The list is the built-ins that declare `stdin_prompt`, in id order, so it
+/// cannot fall out of step with the catalogue. §FS-rhei-errors.7
+fn oversized_prompt_help() -> String {
+    let stdin_agents: Vec<String> = built_in_agents()
+        .into_iter()
+        .filter(|(_, profile)| profile.stdin_prompt)
+        .map(|(id, _)| format!("'{id}'"))
+        .collect();
+    format!(
+        "use an agent that delivers the prompt on stdin ({}), or register a custom agent \
+         with \"stdin_prompt\": true",
+        stdin_agents.join(", ")
+    )
 }
 
 /// What the size of what rhei composed says about a spawn that failed.
@@ -492,7 +503,7 @@ fn spawn_failure_guidance(
 ) -> SpawnFailureGuidance {
     match size_verdict(err, prompt_in_argv, prompt_bytes, command_line_bytes) {
         SizeVerdict::Unexplained => {
-            SpawnFailureGuidance { detail: String::new(), help: spawn_not_started_help() }
+            SpawnFailureGuidance { detail: String::new(), help: spawn_not_started_help().to_string() }
         }
         // Taking the prompt off this line would leave it just as long, so the
         // measurement is stated and the remedy stays the one it had.
@@ -502,7 +513,7 @@ fn spawn_failure_guidance(
                 "\nthe composed command line is {command_line_bytes} bytes, past this \
                  platform's {COMMAND_LINE_LIMIT_BYTES}-byte limit"
             ),
-            help: spawn_not_started_help(),
+            help: spawn_not_started_help().to_string(),
         },
         // The user cannot see the composed prompt, so the byte count and the
         // platform's limit are what turn "too long" into a decision about which

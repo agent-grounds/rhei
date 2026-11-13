@@ -427,7 +427,6 @@ mod error_guidance_tests {
         /// `stdin_prompt`, so it cannot fall out of step with them again:
         /// agent-grounds/rhei#659 left `pi` off it. §FS-rhei-errors.7
         #[test]
-        #[ignore = "red until #659: the help's stdin list is hand-written and lacks 'pi'; implement removes this"]
         fn the_oversized_prompt_help_names_every_builtin_that_reads_stdin() {
             let help = oversized_prompt_help().to_string();
             for id in ["claude-code", "codex", "pi"] {

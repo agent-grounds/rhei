@@ -284,6 +284,7 @@ mod registry_location_tests;
 #[cfg(unix)]
 mod release_write_then_report_tests;
 mod released_supervisor_attention_tests;
+mod remove_pattern_tests;
 mod remove_resolution_tests;
 mod remove_retirement_tests;
 mod remove_tests;

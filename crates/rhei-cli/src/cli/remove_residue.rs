@@ -59,7 +59,7 @@ fn runtime_evidence(
                 }
             }
             // A placeholder before the id: the path is the ticket's only where its id
-            // stands where `{task_id}` does. §FS-rhei-reset.2.1
+            // stands where `{task_id}` does and no longer id could. §FS-rhei-reset.2.1
             ScopedTarget::Pattern(pattern) => {
                 let paths = match pattern.entries() {
                     Ok(paths) => paths,
@@ -71,8 +71,7 @@ fn runtime_evidence(
                     }
                 };
                 for path in paths {
-                    let longer = others.iter().filter(|other| other.len() > id.len());
-                    if longer.into_iter().any(|other| pattern.for_id(other).matches(&path)) {
+                    if !pattern.owns(&path, others.iter().map(String::as_str)) {
                         assessment.unsafe_path(format!(
                             "{} may belong to another ticket",
                             relative_to(root, &path)

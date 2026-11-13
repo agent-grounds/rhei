@@ -213,11 +213,30 @@ leaves `runtime/` itself, and every other ticket's files in it, where they are. 
 reset never removes a path in which the ticket id does not stand where `{task_id}`
 stands in the declared path.
 
+A placeholder reaches files of every naming, not only the declared path's own:
+under `runtime/{state}/{task_id}-{visit_count}.md`, `{state}` reaches
+`runtime/results/` and `runtime/supervise/`, and `{visit_count}` takes `docs`, so
+`x.build`'s path matches `x.build-docs`'s result and brief,
+`runtime/results/x.build-docs.md` and `runtime/supervise/x.build-docs.md`. A path
+a component pattern matches is therefore the ticket's only where **no longer
+project id could stand where `{task_id}` stands** in it: in the component that
+holds `{task_id}`, no project id longer than the ticket's, qualified or
+rhei-local, may begin where the text before it reads as the declared text before
+`{task_id}` and run over the place the ticket id stands. Such a path is no
+shorter ticket's, whatever the rest of its name reads as, so `--task x.build`
+leaves both of those files.
+
+Below its first placeholder a pattern enters only real directories and never
+descends through a symbolic link, so it cannot lead a reset out of the execution
+root; a link it matches as its last component is removed as a link, and what the
+link points at is left alone.
+
 This list is the one both narrowings remove, `--rhei` and `--task`
 ([§FS-rhei-reset.2.5](rhei-reset.spec.md#25-ticket-scope---task)). A file matched by prefix — a log, a spawn record, a report, a
-snapshot session, a capture, or a `{task_id}` artifact's literal prefix or
-component pattern — belongs to the **longest** ticket id in the project whose
-prefix or pattern it matches, and goes only when that ticket is in scope. A `{task_id}-{state}` path leaves `x.build-` as the
+snapshot session, a capture, or a `{task_id}` artifact's literal prefix —
+belongs to the **longest** ticket id in the project whose prefix it matches, and
+goes only when that ticket is in scope; a file a component pattern matches goes
+only when the ticket it is owned by under the rule above is in scope. A `{task_id}-{state}` path leaves `x.build-` as the
 prefix, which `x.build-docs-review.md` matches too; that file is
 `x.build-docs`'s, so `--task x.build` leaves it.
 

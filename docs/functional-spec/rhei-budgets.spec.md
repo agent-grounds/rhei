@@ -1066,6 +1066,29 @@ A `spend` receipt settles money and nothing else. It releases no travel unit
 and no invocation unit and changes neither count in either direction, so every
 paragraph above this one is as true after a settle as before it.
 
+#### 6.2.1. A fanout settles arm by arm
+
+A fanout's arms are separate invocations, each admitted on a reservation of its
+own [§FS-rhei-budgets.4.2](rhei-budgets.spec.md#42-invocations), so the table above is read once per arm. Each arm
+settles **at its own exit, from its own accounting record, against its own
+reservation**. The arm that finishes first is charged what its record says, and
+nothing else is settled then: a sibling still running is charged neither the
+reserve as `unmeasurable` nor the first arm's amount, which is another
+invocation's cost. An arm that ends with no record is still charged the reserve
+as `unmeasurable` at its own exit, as the third row says.
+
+What an admission records about one arm is that arm's too. A start is recorded
+for the arm whose process is being created, and confirmed once *that* process
+returns, not when a sibling's does. The descriptor of [§FS-rhei-budgets.7.1](rhei-budgets.spec.md#71-how-the-descriptor-reaches-a-nested-run) that an
+arm hands its descendants names that arm's reservation, not the first arm's.
+
+The visit's one travel unit [§FS-rhei-budgets.4.1](rhei-budgets.spec.md#41-travel) is the only thing its arms share. It is
+held on the first arm's reservation for as long as any arm of the visit is still
+running. The edge the last arm applies converts that unit, and the unit goes back
+only where no edge was applied, once no arm of the visit is still running. An arm
+that finishes first therefore gives back nothing a sibling still needs, and the
+applied edge is never charged a fresh unit in place of the one admission held.
+
 ### 6.3. What never debits
 
 `rhei validate` and `rhei run --dry-run` ([§FS-rhei-run.4](rhei-run.spec.md#4-dry-run)) resolve and report

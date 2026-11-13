@@ -50,6 +50,8 @@ mod budget_delegated_support;
 mod budget_edge_support;
 mod budget_empty_journal_tests;
 mod budget_failed_append_tests;
+mod budget_fan_out_settle_tests;
+mod budget_fan_out_support;
 mod budget_halt_attention_tests;
 mod budget_halt_bounds_section_tests;
 mod budget_halt_moved_attention_tests;

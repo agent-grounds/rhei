@@ -663,7 +663,9 @@ invocation's working directory, never scratch or the new output
 ([§FS-rhei-errors.4](rhei-errors.spec.md#4-paths-in-errors)). The diagnostic distinguishes the sibling from the
 instantiated output. It may say the instantiated output itself validated only
 after that validation has actually completed; a sibling parse failure alone
-does not establish that claim.
+does not establish that claim. A refusal of the instantiated output's own
+rendered files names the template files they were rendered from
+([§FS-rhei-errors.4.1](rhei-errors.spec.md#41-a-refused-rendering-names-the-template-file)).
 
 For a template that declares `includes:`, step 5 is followed by one union per
 entry, in list order, as

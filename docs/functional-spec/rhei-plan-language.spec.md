@@ -1259,6 +1259,13 @@ Workspace, they resolve relative to the workspace root, meaning the directory
 containing `index.rhei.md`, even when the link appears in a nested file under
 `tasks/`.
 
+A link refused because its target does not exist names the base it was
+resolved against and the path it tried, not only the target as written: in a
+Directory Workspace it says that links resolve against the workspace root and
+names that root, and in a Single-File Plan it names the plan file's directory.
+A link written relative to a nested task file is the one that looks right on
+disk and is refused, so the refusal is where the rule is taught.
+
 External URLs (`http://`, `https://`, `mailto:`), and fragment-only anchors (`#section`) are not checked. When a link contains a fragment (`file.md#section`), only the file portion is verified.
 
 A link inside a fenced code block ([§FS-rhei-plan-language.2.1](rhei-plan-language.spec.md#21-fenced-code-blocks)) or inside an inline

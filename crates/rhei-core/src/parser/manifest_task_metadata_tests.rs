@@ -13,12 +13,15 @@ fn assert_metadata_refused(panta: bool) {
     let header = if panta { "# Panta: Project" } else { "# Rhei: WS" };
     let mut accepted = Vec::new();
     for field in FIELDS {
-        for (prefix, expected_line) in [
-            ("\n### Task 1: Book\n".to_string(), 4),
-            (format!("\n{FRONTMATTER}## Notes\n\nSome notes.\n\n### Task 1: Book\n"), 15),
-            ("\n".to_string(), 3),
+        for (input, expected_line) in [
+            (format!("{header}\n\n### Task 1: Book\n{field}\n"), 4),
+            (
+                format!("{header}\n\n{FRONTMATTER}## Notes\n\nSome notes.\n\n### Task 1: Book\n{field}\n"),
+                15,
+            ),
+            (format!("{header}\n\n{field}\n"), 3),
+            (format!("### Task 1: Book\n{field}\n\n{header}\n"), 2),
         ] {
-            let input = format!("{header}\n{prefix}{field}\n");
             let result = if panta {
                 parse_panta_manifest(&input).map(|_| ())
             } else {
@@ -46,13 +49,11 @@ fn assert_metadata_refused(panta: bool) {
 }
 
 #[test]
-#[ignore = "red until #696: workspace index accepts task metadata; implement removes this"]
 fn workspace_index_refuses_recognized_task_metadata() {
     assert_metadata_refused(false);
 }
 
 #[test]
-#[ignore = "red until #696: Panta manifest accepts task metadata; implement removes this"]
 fn panta_manifest_refuses_recognized_task_metadata() {
     assert_metadata_refused(true);
 }
@@ -62,20 +63,27 @@ fn panta_manifest_refuses_recognized_task_metadata() {
 /// §FS-rhei-plan-language.2.1
 #[test]
 fn manifest_prose_and_quoted_task_metadata_remain_content() {
+    let preamble = "Introductory prose.\n\n### Task 1: Only a heading\n\n\
+                    ```markdown\n**State:** pending\n```\n\n\
+                    ~~~markdown\n**Assignee:** alice\n~~~\n\n";
     let content = "## Notes\n\n### Step 1: Explain\n\n### Task 1: Only a heading\n\n\
                    **Audience:** authors\n\n\
                    ```markdown\n### Task 1: Book\n**State:** pending\n**Prior:** Task 2\n```\n\n\
                    ~~~markdown\n### Task 1: Book\n**Assignee:** alice\n~~~\n";
-    let workspace = parse_workspace_index(&format!("# Rhei: WS\n{FRONTMATTER}{content}"))
-        .expect("workspace examples are content");
-    let panta = parse_panta_manifest(&format!("# Panta: Project\n{FRONTMATTER}{content}"))
-        .expect("Panta examples are content");
-    assert!(workspace.metadata.is_some());
-    assert_eq!(workspace.metadata, panta.metadata);
-    assert_eq!(workspace.content_sections, panta.content_sections);
-    assert_eq!(workspace.content_sections.len(), 1);
-    assert_eq!(
-        workspace.content_sections[0].content,
-        content.strip_prefix("## Notes\n\n").unwrap().trim_end()
-    );
+    for prefix in ["", preamble] {
+        let workspace =
+            parse_workspace_index(&format!("{prefix}# Rhei: WS\n{FRONTMATTER}{content}"))
+                .expect("workspace examples are content");
+        let panta =
+            parse_panta_manifest(&format!("{prefix}# Panta: Project\n{FRONTMATTER}{content}"))
+                .expect("Panta examples are content");
+        assert!(workspace.metadata.is_some());
+        assert_eq!(workspace.metadata, panta.metadata);
+        assert_eq!(workspace.content_sections, panta.content_sections);
+        assert_eq!(workspace.content_sections.len(), 1);
+        assert_eq!(
+            workspace.content_sections[0].content,
+            content.strip_prefix("## Notes\n\n").unwrap().trim_end()
+        );
+    }
 }

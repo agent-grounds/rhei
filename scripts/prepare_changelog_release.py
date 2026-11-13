@@ -207,7 +207,7 @@ def release_due(changelog: Path, tag: str, output: Path) -> None:
         else:
             # The version advance after every release is code outside any pull request.
             print(f"::notice::No pull request that changed code merged since {tag}; skipping.")
-    with output.open("a", encoding="utf-8") as handle:
+    with output.open("a", encoding="utf-8", newline="\n") as handle:
         handle.write(f"ok={'true' if due else 'false'}\n")
 
 

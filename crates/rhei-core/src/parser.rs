@@ -17,7 +17,6 @@ mod task_file_metadata;
 mod task_heading_above_tasks;
 mod workspace;
 
-pub use plan::parse;
 pub use recovery::parse_collect;
 pub(crate) use task_file_metadata::metadata_task_id;
 pub use workspace::{
@@ -28,8 +27,16 @@ pub use workspace::{
     PantaManifest, WorkspaceIndex, WorkspaceTaskFile,
 };
 
-use crate::ast::{Metadata, Structure, DEFAULT_MAX_LEVELS, DEFAULT_NODE_KIND, MAX_ALLOWED_LEVELS};
+use crate::ast::{
+    Metadata, Rhei, Structure, DEFAULT_MAX_LEVELS, DEFAULT_NODE_KIND, MAX_ALLOWED_LEVELS,
+};
 use serde_yaml::Value as YamlValue;
+
+/// Parse a plan, reporting its first error. Collection alone suppresses errors
+/// dependent on already-reported headings. §FS-rhei-errors.1.7
+pub fn parse(input: &str) -> Result<Rhei> {
+    plan::parse_recovering(input, &[])
+}
 
 /// Parser error with a message, an optional line number, and — once the error
 /// has crossed a file boundary — the file the line belongs to. Misplaced task

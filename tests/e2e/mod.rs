@@ -207,6 +207,7 @@ mod live_member_admission_tests;
 mod live_member_lock_tests;
 mod live_member_program_tests;
 mod loop_budget_refusal_tests;
+mod manifest_task_metadata_tests;
 mod mcp_config_file_tests;
 mod mcp_preflight_tests;
 mod mcp_surface_tests;

@@ -159,7 +159,7 @@ To prevent Git merge conflicts when multiple agents or humans work in parallel a
 
 A Directory Workspace consists of:
 
-1. **`index.rhei.md`**: The root configuration. Contains the `Rhei Title`, optional frontmatter, and any `Content Sections`. It does **not** contain a `## Tasks` section.
+1. **`index.rhei.md`**: The root configuration. Contains the `Rhei Title`, optional frontmatter, and any `Content Sections`. It contains no `## Tasks` section, authored tasks, or task metadata.
 2. **`tasks/` directory**: A folder containing workspace task `.md` files.
 3. **Workspace Task Files**: Files within `tasks/` that contain one or more
    node definitions (`### <kind> <id>:`), optionally preceded by a
@@ -167,6 +167,18 @@ A Directory Workspace consists of:
    `metadata.tasks.<id>` entries of the tasks that file defines ([§FS-rhei-plan-language.1.4](rhei-plan-language.spec.md#14-directory-workspace-metadata)). They do
    not require the `# Rhei:` header, and `index.rhei.md` remains the
    workspace's only *writable* metadata document.
+
+Outside YAML frontmatter and fenced code blocks
+([§FS-rhei-plan-language.2.1](rhei-plan-language.spec.md#21-fenced-code-blocks)), a
+recognized task metadata line (the task fields in
+[§FS-rhei-plan-language.2](rhei-plan-language.spec.md#2-grammar-ebnf), including
+`**State:**`, `**Prior:**`, and `**Assignee:**`) is a parse error in the index,
+whether before the first content section or inside one. Every command loading
+the workspace must refuse it, naming `index.rhei.md`, the metadata line's
+original source number (including frontmatter lines), and the remedy: move the
+task into a task file under `tasks/`. Such a line must never be discarded or
+absorbed into content. A prose subheading alone, even one shaped like a task
+heading, and a bold label outside the task metadata vocabulary remain prose.
 
 Task-file discovery is recursive and deterministic. Implementations must load
 non-hidden files matching `tasks/**/*.md`, where neither the file name nor any
@@ -335,7 +347,7 @@ A Panta Project consists of:
 
 1. **`index.panta.md`**: the project manifest — `# Panta: <title>`, optional
    frontmatter, and any `Content Sections`. It contains no `## Tasks`
-   section and no authored nodes.
+   section, authored nodes, or task metadata.
 2. **Rhei entries**: the rheis live directly in the project directory, beside the
    manifest. Each entry is a direct-child Single-File Plan (`*.rhei.md`) or a
    direct-child Directory Workspace subdirectory. Discovery scans only the
@@ -349,6 +361,14 @@ A Panta Project consists of:
    `basin`; its contents are authored as workspace task files. The synthetic
    basin has no authored `index.rhei.md`, runs under the project default
    machine ([§FS-rhei-plan-language.1.3](rhei-plan-language.spec.md#13-state-machine-resolution) clause 2), and stores per-ticket runtime artifacts relative to `basin/`.
+
+The manifest enforces the same task metadata boundary as a workspace index
+([§FS-rhei-plan-language.1.2](rhei-plan-language.spec.md#12-directory-workspace-agent-teams-high-concurrency)):
+recognized task metadata outside YAML frontmatter and fenced examples is a
+parse error, before or within content sections. The diagnostic names
+`index.panta.md` and the original offending metadata line and directs the author
+to a rhei's task files or to `basin/` task files, rather than to a project-level
+`tasks/` directory. Prose subheadings and other bold prose labels remain allowed.
 
 Each rhei's id is derived from its location in the project directory: the
 filename stem for a Single-File Plan (`auth.rhei.md` -> `auth`) or the directory

@@ -20,8 +20,13 @@ and accounting records ([§FS-rhei-cost-accounting.3](rhei-cost-accounting.spec.
 per-node record of where a plan's nodes came from that decision 5 of
 [§DA-composition-by-union](../decisions/architectural/composition-by-union.md#da-composition-by-union-composition-is-graph-union-over-names-as-their-authors-wrote-them) refuses, so it does not reopen that decision.
 
-Evidence decides nothing. No admission, attempt, retry, completion or budget
-check reads it. The spawn record stays the authority for attempt numbering and
+Evidence decides nothing, with one exception. No admission, attempt, retry,
+completion or budget check reads it, except where a planned log name is taken
+and no spawn record accounts for it: there the conditions of
+[§FS-rhei-evidence.11](rhei-evidence.spec.md#11-a-killed-attempts-log) read the killed run's start record, group record and
+manifest, and only a spawn site acts on what it reads, by writing the spawn
+record. From then on the spawn record is the authority for that attempt as for
+every other. The spawn record stays the authority for attempt numbering and
 proof of work, and the accounting record stays the authority for spend.
 
 ## 1. The Store
@@ -30,6 +35,7 @@ proof of work, and the accounting record stays the authority for spend.
 runtime/evidence/                      in the run's root, beside run.json
   runs/<run-id>/<key>.start.json       one per process, written as it starts
   runs/<run-id>/<key>.end.json         one per process, written after it exits
+  runs/<run-id>/<key>.group.json       one per process, written right after it starts
   runs/<run-id>/manifest.json          written once, when the run ends
   objects/sha256/<hex>                 retained prompts, messages and configurations
   events/<uuid>.json                   one per narrowed reset
@@ -118,8 +124,10 @@ The callback's stdin carries the firing id, so it is neither stored nor hashed.
 
 ## 3. The Start Record
 
-`rhei.evidence.invocation.v1` with `phase: "start"`. It is prepared before the
-subprocess starts and published once it has started.
+`rhei.evidence.invocation.v1` with `phase: "start"`. It is prepared and
+published before the subprocess starts, so that a write that fails starts
+nothing ([§FS-rhei-evidence.3.3](rhei-evidence.spec.md#33-publication-and-refusal)), and the group record that only the spawn can
+fill in is a record of its own ([§FS-rhei-evidence.3.4](rhei-evidence.spec.md#34-the-group-record)).
 
 ### 3.1. Fields
 
@@ -168,6 +176,22 @@ values, which reach it through a config file whose `env` is reduced to names
   ([§FS-rhei-agents.8.1](rhei-agents.spec.md#81-log-file-naming)), so the next attempt can take the same key.
 - A start record that cannot be written refuses the spawn, the way a log that
   cannot be created does. No worker runs unrecorded.
+
+### 3.4. The Group Record
+
+`rhei.evidence.group.v1`, at `runs/<run-id>/<key>.group.json`, written
+exclusively right after the spawn, for an agent and for a program. It holds the
+invocation's id and what the worker can be found by: on Unix `process_group`,
+the leader's pid, which is its group's id ([§FS-rhei-run.3.2](rhei-run.spec.md#32-interruption-and-process-ownership)); on Windows `pid`
+and `created_at`, that process's creation time. It cannot be part of the start
+record, which is published before the spawn and never rewritten
+([§FS-rhei-evidence.1.1](rhei-evidence.spec.md#11-nothing-is-rewritten)).
+
+A group record that cannot be written is a warning, never a refusal: the worker
+is already running, and the only cost is that a later kill of that attempt is
+refused as an unaccounted log ([§FS-rhei-agents.8.1.1](rhei-agents.spec.md#811-an-agent-killed-with-its-run)). Its one reader is that
+recovery, which is how a run tells whether a worker its killed predecessor
+started is gone.
 
 ## 4. The End Record
 
@@ -364,7 +388,8 @@ which is canonical.
 - `invocations`: each process's `kind`, its id (`invocation_id` or
   `callback_id`), its `key`, and whether it `completed`;
 - `files`: `{path, sha256}` for every file the run's records name — the records
-  themselves, the logs and the stored objects;
+  themselves, group records ([§FS-rhei-evidence.3.4](rhei-evidence.spec.md#34-the-group-record)) included, the logs and the
+  stored objects;
 - `accounting`: `{path, sha256}` for each invocation's accounting record, where
   it has one. In a Panta project those live in the owning rhei's accounting
   root ([§FS-rhei-cost-accounting.2](rhei-cost-accounting.spec.md#2-runtime-files)), and their paths are relative to the run's
@@ -389,7 +414,11 @@ workspace, once it holds the run lock, finalizes it: `status: incomplete`,
 `finalized_by` the new run's id, each process with a start record and no end
 record listed with `completed: false`, and each log recorded as found at that
 moment, located by the start record's `log_path`. No end record is invented for a process that has none. That
-finalization is the recovery event.
+finalization is the recovery event. For an agent it is what lets the next spawn
+account for the killed attempt's log and resume its visit, once its group is
+gone; for a program it is what lets the refusal say the program may have
+finished ([§FS-rhei-agents.8.1.1](rhei-agents.spec.md#811-an-agent-killed-with-its-run)). Neither reads a log's bytes for meaning: the
+hash recorded here is what ties the log to the attempt.
 
 ### 9.4. The Manifest and the Checkpoint
 
@@ -407,7 +436,7 @@ on id, and neither embeds the other.
 | `rhei retry` | untouched; it rewrites only spawn records | nothing; the granted attempt's start record carries the grant |
 | `rhei recover` | untouched | nothing; its audit pair in the ledger is the record |
 | a run interrupted by Ctrl+C or `rhei stop` | — | end records with `ending: interrupted`, and the manifest with the run's status |
-| a run killed outright | start records with no end record | the next `rhei run` finalizes it ([§FS-rhei-evidence.9.3](rhei-evidence.spec.md#93-a-run-killed-outright)) |
+| a run killed outright | start records with no end record | the next `rhei run` finalizes it ([§FS-rhei-evidence.9.3](rhei-evidence.spec.md#93-a-run-killed-outright)), and an agent visit it cut off resumes from it ([§FS-rhei-evidence.11](rhei-evidence.spec.md#11-a-killed-attempts-log)) |
 | `rhei snapshot gc` | untouched | nothing; `rhei verify` reports a pruned generation as not cached |
 | `rhei remove` | untouched | nothing |
 | `rhei archive` | untouched | nothing in the workspace; only `--output` ([§FS-rhei-archive.3.4](rhei-archive.spec.md#34-rhei-writes-only---output)) |
@@ -427,3 +456,48 @@ list, never from timestamps.
 
 A log moved away by hand, the other remedy for a refused log, is later reported
 as missing: the reset is the remedy that records why the log went.
+
+## 11. A Killed Attempt's Log
+
+The one place evidence is read to decide something
+([§FS-rhei-agents.8.1.1](rhei-agents.spec.md#811-an-agent-killed-with-its-run)): a planned log name is taken, no spawn record accounts
+for it, and the records of a run killed outright may.
+
+### 11.1. The Conditions
+
+A start record accounts for the taken log as a killed attempt when all six hold:
+
+1. its run has a manifest with `status: incomplete`, whichever run finalized it
+   ([§FS-rhei-evidence.9.3](rhei-evidence.spec.md#93-a-run-killed-outright));
+2. it has no end record;
+3. it says `kind: agent`;
+4. its `task_id` and `state` are the spawn's; its `log_path`, resolved against
+   the run's root, names the planned log, the two compared in canonical form;
+   and the `move-<m>` and `attempt-<a>` of its `invocation_id`
+   ([§FS-rhei-evidence.2.1](rhei-evidence.spec.md#21-agents-and-programs)) are the spawn's move count and attempt;
+5. the planned log's sha256 equals the hash that manifest recorded for it. An
+   agent's output reaches its log only through the run's pipes, so once the run
+   is dead nothing writes it, and the hash taken at finalization is its final
+   content;
+6. its group record ([§FS-rhei-evidence.3.4](rhei-evidence.spec.md#34-the-group-record)) exists and the group is gone
+   ([§FS-rhei-evidence.11.2](rhei-evidence.spec.md#112-gone)).
+
+The readings that write nothing — a run's budget check and halt verdict, `rhei
+next`, `rhei list`, claim revalidation and `--dry-run` — apply the same
+conditions. Only a run holding the ticket's run lock finalizes a killed run, and
+`rhei run` finalizes before it plans its first spawn, so the run that left the
+records cannot still be alive; until some run has finalized it, those readings
+predict the refusal. An interruption never reaches these conditions: it writes
+its own spawn record ([§FS-rhei-run.3.2](rhei-run.spec.md#32-interruption-and-process-ownership)).
+
+### 11.2. Gone
+
+Read from the group record, never guessed. On Unix the group is gone only when
+signalling it with signal `0` fails with `ESRCH`; `EPERM`, an unreaped zombie
+still in the group, and any other error mean it is not. On Windows the agent is
+gone when opening its pid finds no process, or one whose creation time differs
+from `created_at`, because a pid is reused only after its process has exited;
+"access denied", and any other failure to open or query it, mean it is not. A
+reused group id or pid can therefore cost a refusal, never cause a resume. On
+Windows only the agent itself is checked, not what it started: that is the reach
+termination has there today ([§REQ-cross-platform](../requirements/cross-platform.md#req-cross-platform-one-tool-on-linux-macos-and-windows)).

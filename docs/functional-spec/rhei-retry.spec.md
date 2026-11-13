@@ -52,7 +52,9 @@ either no grant or the whole grant, never half a record or a lost grant.
 Refuse non-zero, without writing anything, when:
 
 - Attempts remain under the effective budget: grants cannot be stockpiled.
-- The state is polling or terminal.
+- The state is terminal, or polling and its visit was not halted by its kills.
+  A poll visit halted by its kills ([§FS-rhei-agents.3.2.3](rhei-agents.spec.md#323-attempt-budget)) is granted like any
+  other: there each granted attempt allows one more kill.
 - There is no spawn record for this current visit (an older visit is not one).
 - `RHEI_TASK_ID` is set: a spawned worker cannot refill its own bound.
 
@@ -84,7 +86,8 @@ clauses, using the configured budget and singular/plural checkpoint spelling:
 
 - Ordinary: `To give this visit {budget} more attempts, run: rhei retry {id}.`
 - Supervising: `Its subtree is still held with {N} unread checkpoint(s). To give this visit {budget} more attempts and keep the hold, run: rhei retry {id} (its self-loop would release the subtree instead).`
-- Poll: unchanged; the ordinary visit-budget advice does not apply.
+- Poll: unchanged; the ordinary visit-budget advice does not apply. A poll
+  visit halted by its kills ([§FS-rhei-agents.3.2.3](rhei-agents.spec.md#323-attempt-budget)) takes the ordinary clause.
 
 ## 4. Related Recovery Commands
 

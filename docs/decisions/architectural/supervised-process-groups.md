@@ -244,3 +244,9 @@ fixing the orphan.
   cgroup or a Job Object can hold a process that walks out of its container.
   Containment that a subprocess cannot leave is the cgroup/Job Object decision
   above, deferred.
+- **A supervisor killed outright** leaves its groups behind, and this decision
+  still neither adopts nor reaps them. The next `rhei run` resumes a killed agent
+  visit only once the group recorded for it is empty, and while it is not, the
+  run refuses and lists what is left for the operator to stop; a killed program
+  visit waits for a person. Resuming beside a live group would start the second
+  agent this decision exists to prevent ([§FS-rhei-agents.8.1.1](../../functional-spec/rhei-agents.spec.md#811-an-agent-killed-with-its-run)).

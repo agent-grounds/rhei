@@ -36,6 +36,7 @@ pub use panta::{
     load_panta_project_with_member, panta_member, panta_project_dir, rhei_id_for_path,
     rhei_plan_file, PantaProject, PANTA_INDEX_FILE,
 };
+pub use qualify::is_cross_rhei_reference;
 pub use task_metadata::{merge_authored_task_metadata, AuthoredTaskMetadata};
 
 use std::collections::HashMap;

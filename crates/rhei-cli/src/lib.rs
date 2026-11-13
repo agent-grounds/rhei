@@ -92,6 +92,7 @@ mod templates {
 
 include!("cli/skills_builtin.rs");
 include!("cli/states_render.rs");
+include!("cli/loose_rhei_pick.rs");
 include!("cli/loaded_document_role.rs");
 include!("cli/ticket_file_layout.rs");
 include!("cli/loop_budget.rs");
@@ -370,6 +371,7 @@ mod tests {
     include!("cli/tests_task_tooling_resolution.rs");
     include!("cli/tests_task_tooling_surfaces.rs");
     include!("cli/tests_show_target.rs");
+    include!("cli/tests_loose_rhei_pick.rs");
     include!("cli/tests_cancellation_roles.rs");
     include!("cli/tests_complete_result_input.rs");
     include!("cli/tests_member_execution_context.rs");

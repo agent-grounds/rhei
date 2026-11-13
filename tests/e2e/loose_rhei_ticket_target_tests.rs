@@ -9,7 +9,6 @@ use super::*;
 
 /// `rhei show italy.1` prints italy's ticket. §FS-rhei-panta.6.7
 #[test]
-#[ignore = "red until #676: a qualified id picks its loose rhei; implement removes this"]
 fn show_picks_the_loose_rhei_its_id_names() {
     let loose = Loose::new("loose-show");
     let result = loose.rhei(&["show", "italy.1"]);
@@ -19,7 +18,6 @@ fn show_picks_the_loose_rhei_its_id_names() {
 
 /// `rhei release italy.1` hands italy's ticket back. §FS-rhei-panta.6.7
 #[test]
-#[ignore = "red until #676: a qualified id picks its loose rhei; implement removes this"]
 fn release_picks_the_loose_rhei_its_id_names() {
     let loose = Loose::new("loose-release");
     let result = loose.rhei(&["release", "italy.1"]);
@@ -30,7 +28,6 @@ fn release_picks_the_loose_rhei_its_id_names() {
 
 /// `rhei complete italy.1` finishes italy's ticket. §FS-rhei-complete.2.1
 #[test]
-#[ignore = "red until #676: a qualified id picks its loose rhei; implement removes this"]
 fn complete_picks_the_loose_rhei_its_id_names() {
     let loose = Loose::new("loose-complete");
     let result = loose.rhei(&["complete", "italy.1", "--result", "booked"]);
@@ -41,7 +38,6 @@ fn complete_picks_the_loose_rhei_its_id_names() {
 
 /// `rhei transition italy.2` moves italy's ticket. §FS-rhei-usage.2.2.1
 #[test]
-#[ignore = "red until #676: a qualified id picks its loose rhei; implement removes this"]
 fn transition_picks_the_loose_rhei_its_id_names() {
     let loose = Loose::new("loose-transition");
     let result = loose.rhei(&["transition", "italy.2", "--from", "draft", "--to", "pending"]);
@@ -53,7 +49,6 @@ fn transition_picks_the_loose_rhei_its_id_names() {
 /// `rhei remove italy.2 --dry-run` reads italy's ticket and writes nothing.
 /// §FS-rhei-usage.2.2.1
 #[test]
-#[ignore = "red until #676: a qualified id picks its loose rhei; implement removes this"]
 fn remove_dry_run_picks_the_loose_rhei_its_id_names() {
     let loose = Loose::new("loose-remove");
     let result = loose.rhei(&["remove", "italy.2", "--dry-run"]);
@@ -65,7 +60,6 @@ fn remove_dry_run_picks_the_loose_rhei_its_id_names() {
 /// `rhei retry italy.1` reaches italy's ticket, which has no visit to refill:
 /// its refusal is the ticket's, not the walk's. §FS-rhei-usage.2.2.1
 #[test]
-#[ignore = "red until #676: a qualified id picks its loose rhei; implement removes this"]
 fn retry_reaches_the_loose_rhei_its_id_names() {
     let loose = Loose::new("loose-retry");
     let result = loose.rhei(&["retry", "italy.1"]);
@@ -76,7 +70,6 @@ fn retry_reaches_the_loose_rhei_its_id_names() {
 /// A ticket given through `--task` with no plan picks the same way.
 /// §FS-rhei-complete.2.1
 #[test]
-#[ignore = "red until #676: a qualified id picks its loose rhei; implement removes this"]
 fn task_flag_without_a_plan_picks_like_the_positional() {
     let loose = Loose::new("loose-task-flag");
     let result = loose.rhei(&["show", "--task", "italy.1"]);
@@ -87,7 +80,6 @@ fn task_flag_without_a_plan_picks_like_the_positional() {
 /// `--under italy` and `--under italy.1` write into italy.rhei.md.
 /// §FS-rhei-new.1.3 §FS-rhei-new.1.1
 #[test]
-#[ignore = "red until #676: --under picks its loose rhei; implement removes this"]
 fn new_under_picks_the_loose_rhei_it_names() {
     let loose = Loose::new("loose-new-under");
     let ticket = loose.rhei(&["new", "Book the ferry", "--under", "italy"]);
@@ -103,7 +95,6 @@ fn new_under_picks_the_loose_rhei_it_names() {
 /// `rhei next --task italy.1` claims italy's ticket: the "claim it" step of the
 /// same gesture. §FS-rhei-next.2.1
 #[test]
-#[ignore = "red until #676: next --task picks its loose rhei; implement removes this"]
 fn next_task_picks_the_loose_rhei_its_id_names() {
     let loose = Loose::new("loose-next-task");
     let result = loose.rhei(&["next", "--task", "italy.2"]);
@@ -116,7 +107,6 @@ fn next_task_picks_the_loose_rhei_its_id_names() {
 /// `RHEI_TASK_ID` the way a program state of a single-file plan has it.
 /// §FS-rhei-note.1
 #[test]
-#[ignore = "red until #676: note's writing task picks its loose rhei; implement removes this"]
 fn note_picks_the_loose_rhei_of_its_writing_task() {
     let loose = Loose::new("loose-note");
     let flag = loose.rhei(&["note", "--task", "italy.1", "The 9:10 is sold out"]);
@@ -130,7 +120,6 @@ fn note_picks_the_loose_rhei_of_its_writing_task() {
 /// `--rhei` still only narrows after the plan resolves: it agrees with the
 /// picked rhei, and names an unknown one otherwise. §FS-rhei-panta.6.7
 #[test]
-#[ignore = "red until #676: a qualified id picks its loose rhei; implement removes this"]
 fn rhei_flag_narrows_after_the_pick() {
     let loose = Loose::new("loose-rhei-flag");
     let wrong = loose.rhei(&["release", "italy.1", "--rhei", "rome"]);
@@ -144,7 +133,6 @@ fn rhei_flag_narrows_after_the_pick() {
 /// invalid stem — is a non-match, not an error that aborts the pick.
 /// §FS-rhei-panta.6.7
 #[test]
-#[ignore = "red until #676: an underivable id is a non-match; implement removes this"]
 fn an_entry_with_no_usable_id_does_not_abort_the_pick() {
     let loose = Loose::new("loose-underivable")
         .with("basin.rhei.md", "# Rhei: Basin\n\n## Tasks\n")
@@ -156,7 +144,6 @@ fn an_entry_with_no_usable_id_does_not_abort_the_pick() {
 /// Loose plans in a subdirectory of a project: the invocation directory wins,
 /// as rule 4 already makes it win for a lone plan. §FS-rhei-panta.6.7
 #[test]
-#[ignore = "red until #676: a qualified id picks its loose rhei; implement removes this"]
 fn loose_plans_below_a_project_win_over_its_rheis() {
     let loose = Loose::new("loose-below-project");
     let project = loose.dir.parent().expect("the loose directory has a parent").to_path_buf();

@@ -48,7 +48,10 @@ fn new_command(options: &NewOptions) -> MietteResult<()> {
     // A member rhei widens to the project it belongs to, exactly as every
     // other command resolves its target: only there do `--under basin` and a
     // cross-rhei `**Prior:**` resolve. §FS-rhei-new.1.1 §FS-rhei-new.2.1
-    let resolved = resolve_plan_target(options.project.clone())?;
+
+    // With `--project` omitted, `--under` may pick its loose rhei. §FS-rhei-new.1.3
+    let resolved =
+        resolve_ticket_plan_target(options.project.clone(), new_ticket_pick(options).as_ref())?;
     // Prose on stdout, and `--json` promises one object there. §FS-rhei-new.5.4
     if !options.json {
         report_new_widened(&resolved);

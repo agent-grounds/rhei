@@ -139,6 +139,7 @@ mod migrate_export_prior_tests {
             task_sources: HashMap::new(),
             task_roots: HashMap::new(),
             content_section_roots: Vec::new(),
+            workspace_roots: Default::default(),
             rhei_ids: Vec::new(),
             rhei_roots: HashMap::new(),
             rhei_titles: HashMap::new(),

@@ -13,7 +13,7 @@
 
 // §AR-rhei-panta §FS-rhei-panta
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use crate::ast::{ContentSection, Rhei};
@@ -45,6 +45,10 @@ pub struct PantaProject {
     /// Link-validation base directory for each merged content section, in
     /// `rhei.content_sections` order. §AR-rhei-panta.5
     pub content_section_roots: Vec<PathBuf>,
+    /// The rhei roots above that belong to a Directory Workspace rhei, whose
+    /// links must stay inside them; a Single-File rhei's root is absent.
+    /// §FS-rhei-plan-language.3.6 §AR-rhei-panta.5
+    pub workspace_roots: HashSet<PathBuf>,
     /// Rhei ids in presentation order; `basin` is always last when present.
     pub rhei_ids: Vec<String>,
     /// Execution root of each rhei, keyed by rhei id — the `states.yaml` there
@@ -314,7 +318,13 @@ fn load_panta_project_with(
     let mut merged_metadata = manifest.metadata.clone();
     let mut content_sections = manifest.content_sections.clone();
     let mut content_section_roots = vec![dir.to_path_buf(); content_sections.len()];
+    let mut workspace_roots = HashSet::new();
     for (rhei_id, mut rhei, sources, root, entry) in rheis {
+        // §FS-rhei-plan-language.3.6: containment follows the rhei's kind, read
+        // from its entry, so each link is held to its owning rhei's rule.
+        if workspace_dir(&entry).is_some() {
+            workspace_roots.insert(root.clone());
+        }
         // Machine ownership survives the merge, and the root is what carries
         // it: resolution reads the `states.yaml` there. §FS-rhei-plan-language.1.3
         rhei_roots.insert(rhei_id.clone(), root.clone());
@@ -370,6 +380,7 @@ fn load_panta_project_with(
         task_sources,
         task_roots,
         content_section_roots,
+        workspace_roots,
         rhei_ids,
         rhei_roots,
         rhei_titles,

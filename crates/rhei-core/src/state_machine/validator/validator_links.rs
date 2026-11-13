@@ -114,34 +114,33 @@ fn is_non_file_link(target: &str) -> bool {
 }
 
 /// Validate that relative markdown links in all content fields point to
-/// existing files, resolved against `base_path`.
-fn validate_markdown_links(rhei: &Rhei, base_path: &Path, report: &mut ValidationReport) {
+/// existing files, resolved against `base` and, for a Directory Workspace,
+/// kept inside it. §FS-rhei-plan-language.3.6
+fn validate_markdown_links(rhei: &Rhei, base: LinkBase<'_>, report: &mut ValidationReport) {
     let links = collect_all_links(rhei);
 
     for (location, display, target) in &links {
-        validate_one_markdown_link(location, display, target, base_path, report);
+        validate_one_markdown_link(location, display, target, base, report);
     }
 }
 
+/// Validate a merged Panta graph's links, each against the root of the rhei
+/// that owns it and under that rhei's rule. §AR-rhei-panta.5 §FS-rhei-plan-language.3.6
 fn validate_markdown_links_with_task_bases(
     rhei: &Rhei,
-    default_base: &Path,
-    task_bases: &HashMap<String, PathBuf>,
-    section_bases: &[PathBuf],
+    bases: &LinkBases<'_>,
     report: &mut ValidationReport,
 ) {
     for (index, section) in rhei.content_sections.iter().enumerate() {
         for (display, target) in extract_markdown_links(&section.content) {
             let location = format!("section '{}'", section.title);
-            let base = section_bases.get(index).map(PathBuf::as_path).unwrap_or(default_base);
-            validate_one_markdown_link(&location, &display, &target, base, report);
+            validate_one_markdown_link(&location, &display, &target, bases.for_section(index), report);
         }
     }
 
     for_each_node(rhei, |task| {
         let label = format!("{} {}", title_case_kind(&task.kind), task.id);
-        let task_id = task.id.to_string();
-        let base = task_bases.get(&task_id).map(PathBuf::as_path).unwrap_or(default_base);
+        let base = bases.for_task(&task.id.to_string());
         for (display, target) in extract_markdown_links(&task.content) {
             validate_one_markdown_link(&label, &display, &target, base, report);
         }
@@ -152,7 +151,7 @@ fn validate_one_markdown_link(
     location: &str,
     display: &str,
     target: &str,
-    base_path: &Path,
+    base: LinkBase<'_>,
     report: &mut ValidationReport,
 ) {
     if is_non_file_link(target) {
@@ -165,7 +164,22 @@ fn validate_one_markdown_link(
         return; // pure fragment link, already handled above
     }
 
-    let resolved = base_path.join(file_part);
+    // §FS-rhei-plan-language.3.6: a workspace link is held inside the root before
+    // its existence is checked, so the verdict cannot depend on what sits outside.
+    if base.contains && !Path::new(file_part).is_absolute() {
+        if let Some(root) = link_leaves_workspace_root(base.dir, Path::new(file_part)) {
+            report.errors.push(format!(
+                "{} contains a link [{}]({}) that leaves the workspace root '{}'",
+                location,
+                display,
+                target,
+                root.display()
+            ));
+            return;
+        }
+    }
+
+    let resolved = base.dir.join(file_part);
     if !resolved.exists() {
         report.errors.push(format!(
             "{} contains a link [{}]({}) but '{}' does not exist",

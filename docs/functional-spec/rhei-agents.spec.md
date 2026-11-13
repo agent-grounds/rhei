@@ -2622,11 +2622,20 @@ Which number `{n}` is depends on the state:
 - A `poll:` state is uncounted like any other: its poll self-loop writes no
   ledger line, so its re-spawns are attempts within one entry, not entries.
 - Every other state is **uncounted**, and uses its entry number: how many times
-  the ticket has arrived in that state, read from the transition ledger, plus
-  one when the ticket was placed there initially — its first ledger line leaves
-  that state, or it has no ledger line yet. It is counted over the same
+  the ticket has arrived in that state, recorded or not, so that no stay takes
+  an earlier stay's name (agent-grounds/rhei#309). An initial placement and a
+  `**State:**` line edited by hand ([§FS-rhei-authoring.7](rhei-authoring.spec.md#7-advancing-task-states-with-rhei-transition)) are arrivals the
+  ledger does not record, so the count is every ledger line that lands in the
+  state plus each **unrecorded arrival** the ledger reveals: a line that leaves
+  the state while the ticket's line before it — none, for its first line — does
+  not land there; and the current stay, when the ticket's last line does not
+  land in the state, or it has no ledger line yet. It is counted over the same
   two `runtime/state-transitions.log` files the move count of [§FS-rhei-agents.8.4](rhei-agents.spec.md#84-spawn-records) reads, and
-  the two counts are summed. A forced transition's metadata row and its
+  the two counts are summed. Their seam reveals nothing: "the line before" is
+  in the same ledger, the run root's first line has one before it when the
+  owning root's ledger holds a line of the ticket, and the current stay is
+  unrecorded only when neither ledger's last line of the ticket lands in the
+  state. A forced transition's metadata row and its
   movement row count as one arrival; a metadata row the reader does not know
   counts as nothing; a missing ledger means entry 1, and an unreadable one is a
   diagnostic. A restart that has not moved the ticket stays on the same entry.
@@ -2656,7 +2665,19 @@ attempt nor the entry ever moves forward because a file exists.
 **A log is never overwritten.** The spawn creates its log exclusively. If a
 file is already at the name it is about to use and no spawn record accounts for
 it, the spawn is refused: the file is kept byte for byte, the worker does not
-run, and the run prints
+run, and the run prints one of two refusals. When the spawn record at that
+name names the file at a `moves` earlier than the current one, the file is an
+earlier stay's log, whose name this stay took because the ledger lacks an
+arrival:
+
+```text
+refusing to spawn: <path> belongs to an earlier stay in '<state>' (spawn record at moves <m>), but the ledger records no arrival in '<state>' before that stay, so this stay took the same entry number
+```
+
+and the remedy line points at the ledger, not at a reset: a `**State:**` line
+edited by hand writes no arrival and `rhei transition` does; move that log and
+the record, both named, aside and run again. Otherwise — no record at the
+name, or one that names another file — the run prints
 
 ```text
 refusing to spawn: <path> exists and no spawn record accounts for it

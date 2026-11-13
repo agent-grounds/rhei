@@ -65,7 +65,6 @@ fn names_dir(sentence: &str, dir: &Path) -> bool {
 /// path it tried under it), not only `'notes.md' does not exist`.
 /// §FS-rhei-plan-language.3.6
 #[test]
-#[ignore = "red until #668: missing-link refusal names no base or resolved path; implement removes this"]
 fn a_missing_task_link_in_a_workspace_names_the_workspace_root_it_resolved_against() {
     let (_dir, ws, run) = nested_link_workspace("link-base-nested", "notes.md");
     let said = flattened_output(&run);
@@ -105,7 +104,6 @@ fn the_reports_escaping_link_stays_refused_naming_the_root() {
 /// A Single-File Plan's missing link names the plan file's directory it was
 /// resolved against. §FS-rhei-plan-language.3.6
 #[test]
-#[ignore = "red until #668: missing-link refusal names no base or resolved path; implement removes this"]
 fn a_missing_link_in_a_single_file_plan_names_the_plan_directory() {
     let dir = unique_temp_dir("link-base-single-file");
     let plans = dir.join("plans");

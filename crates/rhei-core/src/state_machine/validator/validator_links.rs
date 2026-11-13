@@ -181,9 +181,25 @@ fn validate_one_markdown_link(
 
     let resolved = base.dir.join(file_part);
     if !resolved.exists() {
+        // §FS-rhei-plan-language.3.6: name the base and the path tried, so a link written
+        // relative to its own nested file is not refused while the file sits beside it.
+        let base_dir = absolute_link_base(base.dir);
+        let tried = base_dir.join(file_part);
+        let rule = if base.contains {
+            format!(
+                "links resolve against the workspace root '{}', not the file they appear in",
+                base_dir.display()
+            )
+        } else {
+            format!("links resolve against the plan file's directory '{}'", base_dir.display())
+        };
         report.errors.push(format!(
-            "{} contains a link [{}]({}) but '{}' does not exist",
-            location, display, target, file_part
+            "{} contains a link [{}]({}) but '{}' does not exist: {}",
+            location,
+            display,
+            target,
+            tried.display(),
+            rule
         ));
     }
 }

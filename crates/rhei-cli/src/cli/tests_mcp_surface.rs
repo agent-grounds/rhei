@@ -250,7 +250,8 @@ mod mcp_surface {
             let argv = command(&agent, &ResolvedTooling::default(), dir.path(), &[]);
             assert!(!argv.iter().any(|arg| arg == "--strict-mcp-config"), "{family}: {argv:?}");
             let expected = match family {
-                "codex" => vec!["--json", "--"],
+                // Stdin, closed with `-- -`: agent-grounds/rhei#670 §FS-rhei-agents.2.2.2
+                "codex" => vec!["--json", "--", "-"],
                 "gemini" => vec!["--prompt", "fixture prompt"],
                 "cursor" => vec!["--print", "fixture prompt"],
                 "kilocode" => vec!["--auto", "fixture prompt"],

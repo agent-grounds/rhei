@@ -162,7 +162,7 @@ fn effort_unsupported_profile_and_omission_preserve_existing_argv() {
         assert_success(&result);
         assert_eq!(
             record_args(&dir, "work", "model"),
-            ["--fixed", "value", "--permission", "write", "--json", "--model", "model", "--",],
+            ["--fixed", "value", "--permission", "write", "--json", "--model", "model", "--", "-"],
             "{label} must not filter or insert arguments; same-id override is wholesale"
         );
     }

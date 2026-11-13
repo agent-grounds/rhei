@@ -212,8 +212,6 @@ fn assert_every_review_read_its_prompt(outcome: &InheritingRun, subcommand: &str
 /// spawned `… fork <id> --`, forks, exits 0 unasked, writes no result and halts.
 /// §FS-rhei-agents.2.2.2 §FS-rhei-snapshots.9.3.4
 #[test]
-#[ignore = "red until #670: a codex fork reached through the resume slot ends `fork <id> --` and \
-            review's prompt never arrives; implement removes this"]
 fn a_codex_fork_through_the_resume_slot_reads_the_inheriting_states_prompt() {
     let outcome = run_inheriting_plan("snapshot-codex-fork-prompt", "fork");
 

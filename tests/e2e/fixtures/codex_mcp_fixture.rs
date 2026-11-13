@@ -23,8 +23,9 @@ fn apply(into: &mut toml::Value, path: &[&str], value: toml::Value) {
 
 fn configuration(args: &[String]) -> Result<toml::Value, String> {
     let end = args.iter().position(|arg| arg == "--").ok_or("missing stdin separator")?;
-    if end + 1 != args.len() {
-        return Err("configuration or prompt text after stdin separator".into());
+    // As codex: the one PROMPT after the separator is `-`, read from stdin. §FS-rhei-agents.2.2.2
+    if args[end + 1..] != ["-"] {
+        return Err("expected exactly the stdin PROMPT `-` after the separator".into());
     }
     let mut config = toml::Value::Table(Default::default());
     let mut i = 1;

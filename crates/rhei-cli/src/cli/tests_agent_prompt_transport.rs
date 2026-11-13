@@ -356,13 +356,14 @@ mod agent_prompt_transport_tests {
         assert!(!argv.iter().any(|arg| arg == "--"), "no separator: {argv:?}");
     }
 
-    /// The exception is the `pi` family's alone: every other stdin profile still
-    /// closes its command line with `--`. §FS-rhei-agents.2.2
+    /// Dropping the separator is the `pi` family's alone: every other stdin
+    /// profile still closes its options with `--`, and codex then names stdin
+    /// as its prompt with `-`. §FS-rhei-agents.2.2 §FS-rhei-agents.2.2.2
     #[test]
-    fn builtin_claude_code_and_codex_still_end_at_the_separator() {
-        for id in ["claude-code", "codex"] {
+    fn builtin_claude_code_and_codex_still_close_their_options_at_the_separator() {
+        for (id, end) in [("claude-code", &["--"][..]), ("codex", &["--", "-"][..])] {
             let argv = composed(&resolved(builtin(id), id, None), &skill_tooling(), &[]);
-            assert_eq!(argv.last().map(String::as_str), Some("--"), "{id}: {argv:?}");
+            assert_eq!(&argv[argv.len().saturating_sub(end.len())..], end, "{id}: {argv:?}");
         }
     }
 
@@ -387,7 +388,6 @@ mod agent_prompt_transport_tests {
     /// exits 0 without reading stdin, so a codex line closes its options with
     /// `--` and then names stdin as the prompt with `-`. §FS-rhei-agents.2.2.2
     #[test]
-    #[ignore = "red until #670: the built-in codex still ends at a bare `--`; implement removes this"]
     fn builtin_codex_ends_a_stdin_line_with_the_separator_then_a_dash() {
         let argv = composed(&resolved(builtin("codex"), "codex", None), &skill_tooling(), &[]);
 
@@ -398,7 +398,6 @@ mod agent_prompt_transport_tests {
     /// The family decides, so a codex wrapper and a same-id `agents.codex` entry
     /// end as the built-in does. §FS-rhei-agents.2.2.2 §FS-rhei-agents.1.1.2
     #[test]
-    #[ignore = "red until #670: codex-family entries still end at a bare `--`; implement removes this"]
     fn a_codex_family_wrapper_and_a_same_id_codex_entry_end_with_the_separator_then_a_dash() {
         let wrapper =
             laid_over_built_ins("cdx", serde_json::json!({"family": "codex", "command": ["wrap"]}));
@@ -415,7 +414,6 @@ mod agent_prompt_transport_tests {
     /// of the separator, and the stdin marker is the last argument.
     /// §FS-rhei-agents.2.2.2 §FS-rhei-snapshots.10.1 §FS-rhei-snapshots.9.3.4
     #[test]
-    #[ignore = "red until #670: a codex fork line still ends `fork <id> --`, so codex reads no prompt; implement removes this"]
     fn a_codex_fork_keeps_every_option_before_the_separator_and_ends_with_a_dash() {
         let tooling = ResolvedTooling {
             mcp_servers: vec![ResolvedMcpEntry {

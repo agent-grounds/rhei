@@ -29,10 +29,7 @@ fn runtime_evidence(
         }
         Ok(_) => {}
     }
-    let mut targets = scoped_runtime_targets(&runtime, id, machine);
-    // A ticket's export home is named by its exact id. §FS-rhei-plan-language.3.12
-    targets.push(ScopedTarget::Exact(runtime.join("exports").join(id)));
-    for target in targets {
+    for target in scoped_runtime_targets(&runtime, id, machine) {
         match target {
             ScopedTarget::Exact(path) => classify_owned_path(root, &path, id, assessment),
             ScopedTarget::Prefixed { dir, prefix } => {

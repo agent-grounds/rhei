@@ -98,7 +98,8 @@ fn report_reset_preview(decision: &ResetDecision) {
     }
     report_state_moves(&decision.authored, "Would move");
     if decision.runtime_targets.is_empty() {
-        println!("Would remove per-ticket runtime artifacts (results, ledgers).");
+        // §FS-rhei-reset.2.1: the preview includes ticket-owned export directories.
+        println!("Would remove per-ticket runtime artifacts (results, exports, ledgers).");
     } else {
         println!("Would delete, with every result and ledger inside:");
         for dir in &decision.runtime_targets {
@@ -236,6 +237,7 @@ fn remove_scoped_runtime_artifacts(
 }
 
 /// Every runtime path keyed by `task_id` under one execution root's `runtime/`.
+/// §FS-rhei-reset.2.1
 fn scoped_runtime_targets(
     runtime: &Path,
     task_id: &str,
@@ -245,6 +247,8 @@ fn scoped_runtime_targets(
     let mut targets = vec![
         // §FS-rhei-complete.4: the completion result file.
         ScopedTarget::Exact(runtime.join("results").join(format!("{task_id}.md"))),
+        // §FS-rhei-reset.2.1: exact export homes are independent of machine artifact contracts.
+        ScopedTarget::Exact(runtime.join("exports").join(task_id)),
         // §FS-rhei-agents.9 / §FS-rhei-programs.5: `task-<id>-<state>[-…].log`.
         ScopedTarget::Prefixed { dir: runtime.join("logs"), prefix: format!("task-{task_id}-") },
         // The record of every spawn those logs came from. §FS-rhei-agents.8.4

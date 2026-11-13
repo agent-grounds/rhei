@@ -29,6 +29,9 @@ pub(super) const CLAUDE_COST: u64 = 3_000_000;
 /// An arm whose profile declares no family, so it has no accounting extractor
 /// and its invocation writes **no record at all**. §FS-rhei-cost-accounting.3.2
 pub(super) const UNRECORDED: &str = "plain[yolo]:anthropic:claude-opus-5-5";
+/// An arm whose command does not exist, so its spawn fails after admission has
+/// recorded its start: an arm that ends with a start and no record.
+pub(super) const BROKEN: &str = "broken[yolo]:anthropic:claude-opus-5-5";
 /// The flat worst case every neural start reserves. §FS-rhei-budgets.6.2
 pub(super) const RESERVE: u64 = 20_000_000;
 
@@ -117,24 +120,45 @@ pub(super) struct FanOut {
 }
 
 pub(super) fn fan_out(prefix: &str, targets: [&'static str; 2], slow: &str) -> FanOut {
+    fan_out_world(prefix, targets, slow, false)
+}
+
+/// [`fan_out`] whose state requires an MCP server that cannot start, so every
+/// arm is admitted and then stopped at the tooling gate before any start is
+/// recorded, and the state's `mcp_unavailable` edge moves the ticket to
+/// `blocked`. §FS-rhei-agents.6.1
+pub(super) fn fan_out_without_tooling(prefix: &str, targets: [&'static str; 2]) -> FanOut {
+    fan_out_world(prefix, targets, "none", true)
+}
+
+fn fan_out_world(prefix: &str, targets: [&'static str; 2], slow: &str, gated: bool) -> FanOut {
     let dir = unique_temp_dir(prefix);
     let plan = write_fixture_file(&dir, "plan.rhei.md", PLAN);
-    let machine = write_fixture_file(&dir, "states.yaml", &machine(targets));
+    let machine = write_fixture_file(&dir, "states.yaml", &machine(targets, gated));
     let prices = write_fixture_file(&dir, "prices.json", PRICES);
     write_fixture_file(&dir, "slow-arm", slow);
     let command = fixture_command(&write_python_agent(&dir, "fan-out-agent.py", AGENT));
+    // Inside the fixture, so it is missing on every platform.
+    let missing = serde_json::json!([dir.join("no-such-agent").display().to_string()]);
+    let servers = if gated {
+        r#""mcp_servers": { "lookup": { "command": ["rhei-e2e-no-such-mcp-server"] } },"#
+    } else {
+        ""
+    };
     write_machine_settings(
         &dir,
         &format!(
             r#"{{
-  "defaults": {{ "agent_timeout": "60s" }},
+  "defaults": {{ "agent_timeout": "60s" }},{servers}
   "agents": {{
     "cdx": {{ "command": {command}, "stdin_prompt": true, "intervene_stdin": false,
              "family": "codex", "modes": {{ "xhigh": [] }} }},
     "cld": {{ "command": {command}, "stdin_prompt": true, "intervene_stdin": false,
              "family": "claude-code", "modes": {{ "yolo": [] }} }},
     "plain": {{ "command": {command}, "stdin_prompt": true, "intervene_stdin": false,
-               "modes": {{ "yolo": [] }} }}
+               "modes": {{ "yolo": [] }} }},
+    "broken": {{ "command": {missing}, "stdin_prompt": true, "intervene_stdin": false,
+                "modes": {{ "yolo": [] }} }}
   }}
 }}"#
         ),
@@ -142,7 +166,16 @@ pub(super) fn fan_out(prefix: &str, targets: [&'static str; 2], slow: &str) -> F
     FanOut { dir, plan, machine, prices, targets }
 }
 
-fn machine(targets: [&str; 2]) -> String {
+fn machine(targets: [&str; 2], gated: bool) -> String {
+    let (servers, blocked, route) = if gated {
+        (
+            "\n    mcp_servers: [lookup]",
+            "\n  blocked:\n    gating: true",
+            "\n  - { from: review, to: blocked, mcp_unavailable: [lookup] }\n  - { from: blocked, to: review }",
+        )
+    } else {
+        ("", "", "")
+    };
     format!(
         r#"name: budget-fan-out
 version: 1
@@ -153,15 +186,15 @@ states:
     all_targets:
       - {}
       - {}
-    agent_timeout: 60s
+    agent_timeout: 60s{servers}
     outputs:
       - name: review
         path: out/{{target.slug}}.md
   done:
     description: Both reviews are in
-    final: true
+    final: true{blocked}
 transitions:
-  - {{ from: review, to: done, description: Reviewed }}
+  - {{ from: review, to: done, description: Reviewed }}{route}
 "#,
         targets[0], targets[1]
     )
@@ -179,6 +212,22 @@ impl FanOut {
         let result = run_at("run", &self.plan, &self.machine, Some(SPEND_DAY), &args);
         assert_success(&result);
         result
+    }
+
+    /// `rhei run --parallel 2 --continue-on-error`, the run a failing arm needs
+    /// so that its sibling still runs; the run may end non-zero.
+    pub fn run_continuing_on_error(&self) -> CliRun {
+        let prices = self.prices.display().to_string();
+        let args = [
+            "--no-tui",
+            "--no-callbacks",
+            "--prices",
+            &prices,
+            "--parallel",
+            "2",
+            "--continue-on-error",
+        ];
+        run_at("run", &self.plan, &self.machine, Some(SPEND_DAY), &args)
     }
 
     /// The reservation each arm was admitted on, by agent id. Admission follows

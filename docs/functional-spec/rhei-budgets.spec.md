@@ -1077,6 +1077,13 @@ reserve as `unmeasurable` nor the first arm's amount, which is another
 invocation's cost. An arm that ends with no record is still charged the reserve
 as `unmeasurable` at its own exit, as the third row says.
 
+An arm that fails ends there, and that is its exit. An arm whose spawn fails,
+or whose worker panics, has a start and no record, so it is charged the reserve
+as `unmeasurable` there. An arm stopped after admission and before its start,
+such as one whose required tooling is unavailable, has no start record, so its
+reservation goes back there. None of them is left outstanding for a run that
+has gone, where nothing would settle it.
+
 What an admission records about one arm is that arm's too. A start is recorded
 for the arm whose process is being created, and confirmed once *that* process
 returns, not when a sibling's does. The descriptor of [§FS-rhei-budgets.7.1](rhei-budgets.spec.md#71-how-the-descriptor-reaches-a-nested-run) that an

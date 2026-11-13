@@ -227,8 +227,15 @@ mod tests {
         assert_eq!(process_liveness(pid, created + 1), WorkerLiveness::Gone, "a reused pid");
         child.kill().expect("kill");
         child.wait().expect("reap");
-        // The `Child` holds the process open until it is dropped.
+        // The `Child` holds the process open until it is dropped; a handle another
+        // process holds (conhost, a scanner) is released on its own time, so wait.
         drop(child);
-        assert_eq!(process_liveness(pid, created), WorkerLiveness::Gone);
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+        let mut liveness = process_liveness(pid, created);
+        while liveness != WorkerLiveness::Gone && std::time::Instant::now() < deadline {
+            std::thread::sleep(std::time::Duration::from_millis(100));
+            liveness = process_liveness(pid, created);
+        }
+        assert_eq!(liveness, WorkerLiveness::Gone);
     }
 }

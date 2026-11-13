@@ -20,10 +20,17 @@ use rhei_core::budget::{halt_text, AppliedEdge, Contract, Dimension, Remedy, Spe
 /// instant when the window does —
 /// because nothing an operator does is needed for a wait, and sending them to a
 /// settings file for one is the wrong instruction even though it would work.
-/// §FS-rhei-budgets.8
+/// Unavailable ancestry also explains how to repair inherited context.
+/// §FS-rhei-budgets.8 §FS-rhei-run.3.4
 fn budget_halt_text(refusal: &BudgetError, bounds: &CountBounds, journal: &Journal) -> String {
     let Some(spent) = refusal.exhaustion.as_deref() else {
-        return format!("error: {}", budget_refusal_text(refusal));
+        let mut text = format!("error: {}", budget_refusal_text(refusal));
+        if refusal.reason_code == "ancestor_unavailable" {
+            text.push_str("\nCorrect RHEI_BUDGET_PARENT_RESERVATION to name the active ancestor; \
+                for a run outside that ancestor's context, unset RHEI_BUDGET_PARENT_RESERVATION \
+                before retrying.");
+        }
+        return text;
     };
     let bound = bounds.halt_bound(spent);
     let remedy = budget_halt_remedy(spent, bounds, journal);

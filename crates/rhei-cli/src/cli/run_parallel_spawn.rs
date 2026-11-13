@@ -126,19 +126,22 @@ fn spawn_parallel_agent_work_item(
         return Ok(ParallelAgentSpawnOutcome::Skipped);
     }
     // The same bound at the same point as the sequential path. §FS-rhei-run.3.4
-    let Some(budget_arm) = admit_parallel_agent_spawn(
-        item,
+    let admitted = budget_admit_spawn(
         input,
         &loaded,
         workspace_root,
         machine,
         settings,
         task,
-        opts,
+        &item.task_id_str,
+        &item.current_state,
+        &opts.price_book().currency,
         budget_run,
-        sink,
-    )?
-    else {
+    )?;
+    // Initial fills, refills and fanout retain evidence per invocation. §FS-rhei-run.3.4
+    let Some(budget_arm) = spawn_refusals.admission(
+        task_id, state, identity.as_deref(), visit_count, admitted, sink,
+    ) else {
         return Ok(ParallelAgentSpawnOutcome::Skipped);
     };
     // Named by every receipt this arm writes. §FS-rhei-budgets.6.2.1

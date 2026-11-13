@@ -103,7 +103,10 @@ cargo run -p rhei-cli -- show examples/release-automation.rhei.md --task 1 --jso
 
 Both name the plan because this page is run from the repository root. The
 everyday shape is shorter: from inside a project the positional may be the bare
-ticket id, as `rhei show <ticket-id>`, which prints the same body. See
+ticket id, as `rhei show <ticket-id>`, which prints the same body. Beside several
+loose plans and no `index.panta.md`, a qualified id such as `italy.1` picks its
+plan, `italy.rhei.md`, without naming it
+([§FS-rhei-panta.6.7](functional-spec/rhei-panta.spec.md#67-a-ticket-picks-its-rhei-among-loose-plans)). See
 [§FS-rhei-show](functional-spec/rhei-show.spec.md#fs-rhei-show-rhei-show).
 
 Leave one fact for whoever works next. `note` takes no plan positional: the

@@ -226,20 +226,23 @@ fn dispatch(cli: Cli) -> MietteResult<()> {
             // path: it answers an id-shaped argument with "this argument takes a
             // plan or project, not a ticket id". §FS-rhei-show.5
             let (input, task) = split_show_ticket_target(input, task)?;
-            let target = resolve_plan_target(input)?;
+            // §FS-rhei-panta.6.7: the ticket may pick its rhei among loose plans.
+            let target = resolve_ticket_plan_target(input, Some(&TicketPick::ticket("show", &task)))?;
             show_command(target.path(), &target.scope_with(&[]), &task, json)
         }
         // No plan positional: the store is not plan markdown, so the project is
         // resolved from the working directory and nothing else. §FS-rhei-note.1
+        // Its writing task may pick its rhei among loose plans. §FS-rhei-panta.6.7
         Commands::Note { options } => {
-            let target = resolve_plan_target(None)?;
+            let target = resolve_ticket_plan_target(None, note_ticket_pick(&options).as_ref())?;
             note_command(target.path(), &target.scope_with(&[]), &options)
         }
         Commands::Recover { execution_root } => recover_command(&execution_root),
         // §FS-rhei-retry.1: use the same ticket-or-plan resolution as transition.
         Commands::Retry { input, task, state_machine } => {
             let (input, task) = split_transition_ticket_target(input, task)?;
-            let target = resolve_plan_target(input)?;
+            // §FS-rhei-panta.6.7
+            let target = resolve_ticket_plan_target(input, Some(&TicketPick::ticket("retry", &task)))?;
             retry_command(target.path(), &target.scope_with(&[]), state_machine.or(before_subcommand).as_deref(), &task)
         }
         Commands::Transition {
@@ -256,7 +259,9 @@ fn dispatch(cli: Cli) -> MietteResult<()> {
             state_machine,
         } => {
             let (input, task) = split_transition_ticket_target(input, task)?;
-            let target = resolve_plan_target(input)?;
+            // §FS-rhei-panta.6.7
+            let pick = TicketPick::ticket("transition", &task);
+            let target = resolve_ticket_plan_target(input, Some(&pick))?;
             // §FS-rhei-transition-cmd.2: reject before the forced-recovery ceremony.
             if force && release_subtree {
                 // §FS-rhei-errors.6
@@ -377,7 +382,9 @@ fn dispatch(cli: Cli) -> MietteResult<()> {
             state_machine.is_some(),
         ),
         Commands::Next { input, task, json, no_callbacks, peek, rhei, state_machine } => {
-            let target = resolve_plan_target(input)?;
+            // `--task` may pick its rhei among loose plans. §FS-rhei-next.2.1 §FS-rhei-panta.6.7
+            let pick = task.as_deref().map(|task| TicketPick::of(TicketPickBy::NextTask, task));
+            let target = resolve_ticket_plan_target(input, pick.as_ref())?;
             next_command(
                 target.path(),
                 state_machine.or(before_subcommand).as_deref(),
@@ -400,7 +407,9 @@ fn dispatch(cli: Cli) -> MietteResult<()> {
             // resolution and cannot mutate either. §FS-rhei-complete.4
             let result = resolve_complete_result(result, result_file.as_deref())?;
             let (input, task) = split_complete_ticket_target(input, task)?;
-            let target = resolve_plan_target(input)?;
+            // §FS-rhei-panta.6.7
+            let pick = TicketPick::ticket("complete", &task);
+            let target = resolve_ticket_plan_target(input, Some(&pick))?;
             complete_command(
                 target.path(),
                 &target.scope_with(&[]),
@@ -412,7 +421,9 @@ fn dispatch(cli: Cli) -> MietteResult<()> {
         }
         Commands::Release { input, task, all, rhei, dry_run, state_machine } => {
             let (input, task) = split_ticket_target(input, task)?;
-            let target = resolve_plan_target(input)?;
+            // §FS-rhei-panta.6.7
+            let pick = task.as_deref().map(|task| TicketPick::ticket("release", task));
+            let target = resolve_ticket_plan_target(input, pick.as_ref())?;
             release_command(
                 target.path(),
                 state_machine.or(before_subcommand).as_deref(),

@@ -16,7 +16,6 @@ fn refusal(loose: &Loose, args: &[&str]) -> String {
 /// lists the candidates, and offers the qualified and the plan form.
 /// §FS-rhei-panta.6.7
 #[test]
-#[ignore = "red until #676: an unmatched prefix gets its own refusal; implement removes this"]
 fn an_unmatched_prefix_names_the_id_and_both_forms() {
     let loose = Loose::new("loose-refuse-venice");
     let said = refusal(&loose, &["release", "venice.1"]);
@@ -32,7 +31,6 @@ fn an_unmatched_prefix_names_the_id_and_both_forms() {
 /// `review.1` may be subtask 1 of a ticket `review`, so the error must not
 /// claim the prefix names a rhei. §FS-rhei-panta.6.7
 #[test]
-#[ignore = "red until #676: an unmatched prefix gets its own refusal; implement removes this"]
 fn an_unmatched_prefix_is_not_called_a_rhei() {
     let loose = Loose::new("loose-refuse-review");
     let said = refusal(&loose, &["show", "review.1"]);
@@ -43,7 +41,6 @@ fn an_unmatched_prefix_is_not_called_a_rhei() {
 /// An entry with no usable id is still listed among the candidates.
 /// §FS-rhei-panta.6.7
 #[test]
-#[ignore = "red until #676: an unmatched prefix gets its own refusal; implement removes this"]
 fn an_unmatched_prefix_still_lists_entries_with_no_usable_id() {
     let loose = Loose::new("loose-refuse-underivable")
         .with("basin.rhei.md", "# Rhei: Basin\n\n## Tasks\n")
@@ -56,7 +53,6 @@ fn an_unmatched_prefix_still_lists_entries_with_no_usable_id() {
 /// Two entries with one id: the error says the id names two rheis and names
 /// both entries. §FS-rhei-panta.6.7
 #[test]
-#[ignore = "red until #676: a shared id gets its own refusal; implement removes this"]
 fn a_prefix_two_rheis_share_names_both() {
     let loose =
         Loose::new("loose-refuse-duplicate").with("italy/index.rhei.md", "# Rhei: Italy two\n");
@@ -68,7 +64,6 @@ fn a_prefix_two_rheis_share_names_both() {
 /// A bare number keeps today's refusal, and a ticket command's help adds that
 /// the ticket may be named by its rhei. §FS-rhei-panta.6.7
 #[test]
-#[ignore = "red until #676: the ticket commands' help names the qualified form; implement removes this"]
 fn a_bare_number_is_told_to_name_the_rhei() {
     let loose = Loose::new("loose-refuse-bare");
     let said = refusal(&loose, &["release", "1"]);

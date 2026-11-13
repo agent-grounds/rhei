@@ -25,6 +25,9 @@ struct HelpTarget {
     /// Whether stderr is a detached run's `runtime/run.log`, which is read later
     /// and from anywhere, so a relative path would mean nothing there.
     detached: bool,
+    /// The ticket the command was given, which may pick its rhei among loose
+    /// plans exactly as the command's own resolution does. §FS-rhei-panta.6.7
+    ticket: Option<TicketPick>,
     /// What an omitted target discovers. Looked for once, and only by a help that
     /// prints it, so a command that succeeds never walks the tree for it.
     discovered: std::sync::OnceLock<Option<PathBuf>>,
@@ -37,6 +40,7 @@ impl HelpTarget {
             takes_target,
             machine,
             detached: is_headless_child(),
+            ticket: None,
             discovered: std::sync::OnceLock::new(),
         }
     }
@@ -105,7 +109,7 @@ impl HelpTarget {
             | Commands::Completions { .. } => (None, None, false),
         };
         let machine = machine.cloned().or_else(|| before_subcommand.map(Path::to_path_buf));
-        Self::new(typed, takes_target, machine)
+        Self { ticket: ticket_pick_of(command), ..Self::new(typed, takes_target, machine) }
     }
 
     /// The target as typed; otherwise what the command discovers, or for one with
@@ -124,7 +128,7 @@ impl HelpTarget {
     }
 
     fn discovered(&self) -> Option<PathBuf> {
-        self.discovered.get_or_init(discover_help_target_silently).clone()
+        self.discovered.get_or_init(|| discover_help_target_silently(self.ticket.as_ref())).clone()
     }
 
     /// `path` as one shell word. A detached run prints it absolute, and not resolved
@@ -153,10 +157,10 @@ impl HelpTarget {
 /// `resolve_plan_path` asks the root-access layer why a directory could not be
 /// listed, and that layer can warn on stderr, so such a directory stops here. A
 /// failure inside it is only a `Report` nobody prints. §FS-rhei-errors.1.2.1
-fn discover_help_target_silently() -> Option<PathBuf> {
+fn discover_help_target_silently(ticket: Option<&TicketPick>) -> Option<PathBuf> {
     let cwd = std::env::current_dir().ok()?;
     workspace::discover_rhei_entries(&cwd).ok()?;
-    resolve_plan_path(None).ok()
+    resolve_plan_path(None, ticket).ok()
 }
 
 thread_local! {

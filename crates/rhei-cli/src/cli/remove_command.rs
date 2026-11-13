@@ -22,7 +22,8 @@ fn remove_command(
             "name the ticket to remove: `rhei remove <ticket-id>` (or `--task <ticket-id>`)"
         ));
     };
-    let target = resolve_plan_target(plan)?;
+    // §FS-rhei-panta.6.7: the ticket may pick its rhei among loose plans.
+    let target = resolve_ticket_plan_target(plan, Some(&TicketPick::ticket("remove", &ticket)))?;
     // Absolute, so a bare `plan.rhei.md` still has a directory to write beside.
     let input_buf = normalize_workspace_input(target.path());
     let input_buf = std::path::absolute(&input_buf).unwrap_or(input_buf);

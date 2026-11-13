@@ -189,7 +189,7 @@ pub(super) fn qualify_local_id(id: &TaskId, rhei_id: &str) -> TaskId {
 /// author, so it stays as written and validation explains it. Prefixing it with
 /// the citing rhei instead would report an id that appears in no file.
 // §AR-rhei-panta.3: a dotted, name-led prior is kept as authored.
-pub(super) fn is_cross_rhei_reference(id: &TaskId) -> bool {
+pub fn is_cross_rhei_reference(id: &TaskId) -> bool {
     id.segments.len() > 1 && matches!(id.segments.first(), Some(TaskIdSegment::Named(_)))
 }
 

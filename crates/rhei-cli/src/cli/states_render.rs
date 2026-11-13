@@ -509,7 +509,16 @@ fn looks_like_task_id(value: &Path) -> bool {
 /// nearest project (`index.panta.md`) or workspace rhei (`index.rhei.md`); a
 /// lone rhei resolves in the current directory only. §FS-rhei-panta.6
 fn resolve_plan_target(input: Option<PathBuf>) -> MietteResult<PlanTarget> {
-    let resolved = resolve_plan_path(input)?;
+    resolve_ticket_plan_target(input, None)
+}
+
+/// [`resolve_plan_target`] for a command given a ticket, which may pick its
+/// rhei among several loose plans. §FS-rhei-panta.6.7
+fn resolve_ticket_plan_target(
+    input: Option<PathBuf>,
+    ticket: Option<&TicketPick>,
+) -> MietteResult<PlanTarget> {
+    let resolved = resolve_plan_path(input, ticket)?;
     // A rhei inside a project is loaded through the project and narrowed to
     // itself, so cross-rhei priors resolve. §FS-rhei-panta.6
     match workspace::panta_member(&resolved) {
@@ -518,7 +527,7 @@ fn resolve_plan_target(input: Option<PathBuf>) -> MietteResult<PlanTarget> {
     }
 }
 
-fn resolve_plan_path(input: Option<PathBuf>) -> MietteResult<PathBuf> {
+fn resolve_plan_path(input: Option<PathBuf>, ticket: Option<&TicketPick>) -> MietteResult<PathBuf> {
     if let Some(input) = input {
         // The positional slot takes a plan, but it sits where a ticket id
         // looks like it belongs — and commands that select a ticket take it
@@ -581,23 +590,8 @@ fn resolve_plan_path(input: Option<PathBuf>) -> MietteResult<PathBuf> {
             match plans.len() {
                 0 => {}
                 1 => return Ok(plans.remove(0)),
-                _ => {
-                    let names: Vec<String> = plans
-                        .iter()
-                        .filter_map(|path| path.file_name())
-                        .map(|name| name.to_string_lossy().into_owned())
-                        .collect();
-                    return Err(miette!(
-help = "run `rhei init --here` to make the directory a project, or pass one of the rheis above.",
-
-                        "{} holds {} rheis ({}) but no `index.panta.md`, so there is no \
-                         single plan to pick. Pass one explicitly, or run `rhei init` to \
-                         make the directory a project (writes index.panta.md)",
-                        current.display(),
-                        names.len(),
-                        names.join(", ")
-                    ));
-                }
+                // Several: the ticket may settle it, here and only here. §FS-rhei-panta.6.7
+                _ => return pick_loose_rhei(current, plans, ticket),
             }
         }
         dir = current.parent();

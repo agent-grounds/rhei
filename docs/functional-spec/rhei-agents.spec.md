@@ -209,7 +209,7 @@ agent's `command`, flags, and modes are declared.
 | `command` | string array | Yes, unless `family` | Base command and fixed arguments |
 | `prompt_flag` | string | No | Flag that carries the prompt (e.g., `--prompt`, `-p`) — or, with `stdin_prompt`, the flag that puts the agent in non-interactive mode, emitted with no value. Omit when the agent needs neither. |
 | `model_flag` | string | No | Flag to pass the concrete provider model name. Omit if the agent doesn't support model selection. |
-| `stdin_prompt` | boolean | No | When `true`, the prompt is piped to stdin instead of being passed as the `prompt_flag` value, `prompt_flag` is still emitted if present, a `--` is appended last unless the resolved family takes none ([§FS-rhei-agents.2.2.2](rhei-agents.spec.md#222-the-pi-family-gets-no-separator)), and stdin is closed unless `intervene_stdin` is also true. Default: `false`. |
+| `stdin_prompt` | boolean | No | When `true`, the prompt is piped to stdin instead of being passed as the `prompt_flag` value, `prompt_flag` is still emitted if present, the command line ends as the resolved family ends it — `--` for most, `-- -` for codex, nothing for pi ([§FS-rhei-agents.2.2.2](rhei-agents.spec.md#222-how-a-stdin-command-line-ends)), and stdin is closed unless `intervene_stdin` is also true. Default: `false`. |
 | `intervene_stdin` | boolean | No | When `true`, `rhei run --dashboard` keeps the child stdin pipe open after the initial prompt so live dashboard interventions can be written to it. Use only for agents that start work without waiting for stdin EOF. Default: `false`. |
 | `timeout` | string | No | Default timeout for this agent (e.g., `30m`). Overridden by state-level `agent_timeout`. |
 | `mcp_flag` | string | No | Flag used to attach one MCP server per occurrence. `rhei run` emits the flag once per resolved server with a launch spec as its value. The Codex native adapter uses configuration overrides instead ([§FS-rhei-agents.1.1.2.1](rhei-agents.spec.md#1121-native-codex-mcp-attachment)). Mutually exclusive with `mcp_config_flag`. |
@@ -333,7 +333,7 @@ launch arguments it requires, and whether an invocation record is written at all
 [§FS-rhei-cost-accounting.3.2](rhei-cost-accounting.spec.md#32-extraction-status)),
 the stream-json stdin transport below, which session-report stream a log is
 ([§FS-rhei-session-reports.6.2](rhei-session-reports.spec.md#62-claude-code-stream)),
-and whether a stdin prompt is closed with `--` ([§FS-rhei-agents.2.2.2](rhei-agents.spec.md#222-the-pi-family-gets-no-separator)).
+and how a stdin command line ends ([§FS-rhei-agents.2.2.2](rhei-agents.spec.md#222-how-a-stdin-command-line-ends)).
 A profile that declares no `family` resolves to itself, so every built-in and
 every existing custom profile takes the arm it takes today.
 
@@ -952,11 +952,11 @@ historically the agent's default.
 | Agent ID | Binary | Prompt Delivery | Model Flag | MCP Wiring | Skill Wiring | `yolo` Mode Flags |
 |----------|--------|-----------------|------------|------------|--------------|-------------------|
 | `claude-code` | `claude` | stdin, under a bare `-p`, with `--output-format stream-json --verbose`; with `intervene_stdin`, stream-json stdin as well | `--model <m>` | Always `--strict-mcp-config`; `--mcp-config <path>`, a file shaped as [§FS-rhei-mcp-config-file](rhei-mcp-config-file.spec.md#fs-rhei-mcp-config-file-the-mcp-config-file-an-agent-is-handed) gives, only for a nonempty available selection | `--skill <id>` | `--permission-mode bypassPermissions` |
-| `codex` | `codex exec` | `--` (stdin) | `--model <m>` | Native `-c key=value` overrides from resolved definitions ([§FS-rhei-agents.1.1.2.1](rhei-agents.spec.md#1121-native-codex-mcp-attachment)) | unsupported | `--sandbox danger-full-access --skip-git-repo-check -c approval_policy="never"` |
+| `codex` | `codex exec` | stdin, closed with `-- -` ([§FS-rhei-agents.2.2.2](rhei-agents.spec.md#222-how-a-stdin-command-line-ends)) | `--model <m>` | Native `-c key=value` overrides from resolved definitions ([§FS-rhei-agents.1.1.2.1](rhei-agents.spec.md#1121-native-codex-mcp-attachment)) | unsupported | `--sandbox danger-full-access --skip-git-repo-check -c approval_policy="never"` |
 | `gemini` | `gemini` | `--prompt <prompt>` | `--model <m>` | unsupported | unsupported | `--approval-mode yolo` |
 | `cursor` | `cursor-agent` | `--print <prompt>` | `--model <m>` | unsupported | unsupported | `--force` |
 | `kilocode` | `kilo` | positional via `--auto <prompt>` | `--model <m>` | unsupported | unsupported | `--yolo` |
-| `pi` | `pi` | stdin, under a bare `-p`; no separator ([§FS-rhei-agents.2.2.2](rhei-agents.spec.md#222-the-pi-family-gets-no-separator)) | `--model <m>` | unsupported | `--skill <path>` | (no modes — pi has no permission layer; isolate at the sandbox/container level) |
+| `pi` | `pi` | stdin, under a bare `-p`; no separator ([§FS-rhei-agents.2.2.2](rhei-agents.spec.md#222-how-a-stdin-command-line-ends)) | `--model <m>` | unsupported | `--skill <path>` | (no modes — pi has no permission layer; isolate at the sandbox/container level) |
 
 **The built-in `codex` profile declares a second mode, `workspace`,** after
 `yolo`: `--sandbox workspace-write --skip-git-repo-check -c
@@ -1088,13 +1088,15 @@ agent, the resolved mode's flags are appended right after the base
   <model_flag> <model>?
   <snapshot strategy flags...>
   <strict MCP option?> <mcp flags...> <skill flags...>
-  --?
+  <the family's stdin ending?>
 ```
 
 The prompt value is present only when `stdin_prompt` is `false`; the flag itself
-is emitted either way. The `--` is emitted only when `stdin_prompt` is `true`
-and the resolved family takes a separator ([§FS-rhei-agents.2.2.2](rhei-agents.spec.md#222-the-pi-family-gets-no-separator)), and it is
-then the **last** argument rhei composes. Past a separator an argument is
+is emitted either way. The stdin ending is emitted only when `stdin_prompt` is
+`true`, and it is the one the resolved family takes ([§FS-rhei-agents.2.2.2](rhei-agents.spec.md#222-how-a-stdin-command-line-ends)):
+`--` for most families, `-- -` for codex, nothing for pi. The `--` is then the
+**last** *option* rhei composes. Only codex's `-` follows it, and that `-` is the
+prompt's own positional — codex's stdin marker — not an option. Past a separator an argument is
 positional text rather than a flag, so everything rhei has to say to the agent —
 the snapshot strategy flags
 ([§FS-rhei-snapshots.10.1](rhei-snapshots.spec.md#101-spawn-time-preload)), the
@@ -1184,15 +1186,50 @@ launch with sufficient grants must record a refusal, make no commit, and leave
 the outside repository's HEAD unchanged. Tests of that refusal own the outside
 repository too, so a failing guard cannot write into a developer's repository.
 
-#### 2.2.2. The `pi` Family Gets No Separator
+#### 2.2.2. How a stdin command line ends
+
+A profile that sets `stdin_prompt` ends its command line, after its last tooling
+flag, the way its resolved family ([§FS-rhei-agents.1.1.2](rhei-agents.spec.md#112-agents)) ends one:
+
+| Resolved family | Ending |
+|-----------------|--------|
+| `codex` | `--`, then `-` |
+| `pi` | nothing |
+| every other family | `--` |
+
+This is the one place the rule is stated; the `codex` and `pi` rows of [§FS-rhei-agents.2](rhei-agents.spec.md#2-known-agent-profiles),
+the flag order of [§FS-rhei-agents.2.2](rhei-agents.spec.md#22-modes), and the `stdin_prompt` field of [§FS-rhei-agents.1.1.2](rhei-agents.spec.md#112-agents) cite it. The
+family decides, as it does for `--strict-mcp-config`, so a built-in, a `family:`
+wrapper of it, and a same-id entry that replaces it all end alike. A custom entry
+that runs the same binary but declares no `family` stands on its own and ends at
+`--`. A profile that writes `"stdin_prompt": false` carries its prompt on the
+line and gets no ending at all.
+
+**The `codex` family ends `-- -`, because codex reads a piped prompt only when
+its PROMPT is `-`.** `codex exec`, `codex exec resume <SESSION_ID>` and
+`codex exec fork <SESSION_ID>` each take an optional positional PROMPT, and each
+documents `-` as "read the prompt from stdin". With no PROMPT, `exec` and
+`resume` read piped stdin anyway, but `fork` does not: it forks the session,
+starts no turn, sends no request, and exits 0 (codex-cli 0.159.3, 0.163.0 and
+0.167.1). A state that inherited a session through that fork would start with
+the right history and no instructions, and then be judged on outputs it was never asked
+to write ([§FS-rhei-snapshots.9.3.4](rhei-snapshots.spec.md#934-codex)). The `--` still closes everything rhei says to codex: the mode
+and model flags, the snapshot strategy's `resume <id>` or `fork <id>`, the
+native MCP overrides ([§FS-rhei-agents.1.1.2.1](rhei-agents.spec.md#1121-native-codex-mcp-attachment)) and the writable-root `--add-dir` pairs all
+precede it. The `-` is the only argument after it, and nothing follows the `-`.
+
+Every codex-family stdin spawn ends this way, a fresh `exec` as much as one that
+inherits a session. One family has one ending in argv and in evidence records,
+whether or not the state inherits, and a `fork` or `resume` a profile writes
+into its own `command` or a mode reads its prompt too. A wrapper that appends a
+positional of its own after rhei's `--` hands codex two prompts, which codex
+refuses with a usage error and exit 2 rather than running unasked.
 
 **The `pi` family gets no `--`, because pi has none.** pi reads `--` as an
 option it does not know, reports `Unknown option: --`, and exits 1 before it
-starts a session. So a profile whose resolved family is `pi`
-([§FS-rhei-agents.1.1.2](rhei-agents.spec.md#112-agents)) and that sets `stdin_prompt` ends at its last tooling
-flag: the prompt is piped to stdin under a bare `-p`, and nothing follows. This
-is the one place the rule is stated; the `pi` row of [§FS-rhei-agents.2](rhei-agents.spec.md#2-known-agent-profiles) and the
-`stdin_prompt` field of [§FS-rhei-agents.1.1.2](rhei-agents.spec.md#112-agents) cite it.
+starts a session. So a pi-family profile that sets `stdin_prompt` ends at its
+last tooling flag: the prompt is piped to stdin under a bare `-p`, and nothing
+follows.
 
 Without a separator nothing rhei composes for pi is misread. Every flag the
 profile emits — `--mode`, `--thinking`, `--model`, `--session-dir`, `--fork`,
@@ -1200,12 +1237,11 @@ profile emits — `--mode`, `--thinking`, `--model`, `--session-dir`, `--fork`,
 prompt only when it starts with neither `-` nor `@`, and after a bare `-p` rhei
 puts one of those flags or nothing; and the prompt is not on the line.
 
-The family decides, as it does for `--strict-mcp-config`, so the built-in `pi`,
-a `family: pi` wrapper, and a same-id `agents.pi` entry with `"stdin_prompt":
-true` all start pi. A pi-family entry that writes `"stdin_prompt": false`
-carries the prompt as `-p <prompt>` and gets no separator either way. A custom
-entry that runs pi but declares no `family` stands on its own and keeps the
-`--`. Every other family keeps the separator where [§FS-rhei-agents.2.2](rhei-agents.spec.md#22-modes) puts it.
+So the built-in `pi`, a `family: pi` wrapper, and a same-id `agents.pi` entry
+with `"stdin_prompt": true` all start pi. A pi-family entry that writes
+`"stdin_prompt": false` carries the prompt as `-p <prompt>` and gets no
+separator either way. A custom entry that runs pi but declares no `family`
+keeps the `--`.
 
 ### 2.3. Recognized Provider Refusals
 

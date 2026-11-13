@@ -32,7 +32,7 @@ The positional slot is a *ticket or plan*, on the shared rule every
 single-ticket command follows ([§FS-rhei-usage.2](rhei-usage.spec.md#2-coordination-through-the-state-machine)): an argument naming an
 existing path is the plan, an id-shaped argument naming no path is the ticket.
 Omitted, the plan resolves to the nearest enclosing project, workspace, or lone
-plan ([§FS-rhei-panta.6](rhei-panta.spec.md#6-project-scope-and-command-behavior)).
+plan, or to the loose plan a qualified ticket id names ([§FS-rhei-panta.6.7](rhei-panta.spec.md#67-a-ticket-picks-its-rhei-among-loose-plans)).
 
 `rhei release auth.1` and `rhei complete auth.1` are the same gesture aimed at
 different outcomes — hand the ticket back, or finish it — so they take their

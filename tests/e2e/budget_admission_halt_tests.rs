@@ -7,7 +7,6 @@ use super::budget_delegated_support::assert_remedy_names_machine_file;
 const MISSING: &str = "no such reservation";
 
 #[test]
-#[ignore = "red until #671: serial admission refusal must explain the final halt; implement removes this"]
 fn issue671_serial_ancestor_refusal_explains_final_halt() {
     let fixture = Fixture::new(1, 10);
     let out = fixture.run(true);
@@ -17,7 +16,6 @@ fn issue671_serial_ancestor_refusal_explains_final_halt() {
 }
 
 #[test]
-#[ignore = "red until #671: pool admission refusals must explain the final halt; implement removes this"]
 fn issue671_pool_ancestor_refusal_covers_refill_and_initial_fill() {
     let fixture = Fixture::new(2, 10);
     // prepare finishes in the pool; the just-ready write state reaches the
@@ -46,7 +44,6 @@ fn issue671_pool_ancestor_refusal_covers_refill_and_initial_fill() {
 }
 
 #[test]
-#[ignore = "red until #671: exhausted admission must retain limiter facts in the final halt; implement removes this"]
 fn issue671_pool_exhausted_admission_keeps_limiter_diagnosis() {
     // The program's one applied edge spends the whole travel allowance; the
     // first neural admission is refused before a worker can start.

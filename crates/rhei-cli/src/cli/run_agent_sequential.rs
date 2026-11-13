@@ -155,7 +155,7 @@ fn run_sequential_agent_invocation(
     // The fourth bound over this spawn, checked before anything is composed or
     // staged, so one it cannot pay for costs nothing to decline; per resolved
     // invocation, which is the residual. §FS-rhei-run.3.4 §FS-rhei-budgets.6.1 §FS-rhei-budgets.4.2
-    match budget_admit_spawn(
+    let admitted = budget_admit_spawn(
         input,
         &loaded,
         workspace_root,
@@ -166,34 +166,16 @@ fn run_sequential_agent_invocation(
         current_state,
         &opts.price_book().currency,
         budget_run,
-    )? {
-        // Both counts on screen before any of this visit's capacity is spent.
-        // §FS-rhei-budgets.9
-        BudgetAdmission::Admitted { bounds, note, arm } => {
-            // Every receipt of this visit names the arm it was admitted on.
-            // §FS-rhei-budgets.6.2.1
-            plan.budget_arm = arm;
-            sink.emit(RunEvent::BudgetSnapshot { bounds });
-            // Nothing is wrong, so it is a note and not a warning.
-            // §FS-rhei-budgets.7.2
-            if let Some(note) = note {
-                sink.emit(RunEvent::Message { level: rhei_tui::MessageLevel::Info, text: note });
-            }
-        }
-        BudgetAdmission::NotAccounted => {}
-        BudgetAdmission::Refused { halt, event, bounds } => {
-            // Refusal still reports the current bounds without a spawn. §FS-rhei-budgets.9
-            if !bounds.is_empty() {
-                sink.emit(RunEvent::BudgetSnapshot { bounds });
-            }
-            run_error!("{halt}");
-            if let Some(event) = event {
-                sink.emit(*event);
-            }
-            progress.stalled_tasks.insert(task_id_str.clone());
-            return Ok(());
-        }
-    }
+    )?;
+    // Retain and report admission through the same path as the pool. §FS-rhei-run.3.4
+    let Some(arm) = progress.spawn_refusals.admission(
+        task_id_str, current_state, identity.as_deref(), visit_count, admitted, sink,
+    ) else {
+        progress.stalled_tasks.insert(task_id_str.clone());
+        return Ok(());
+    };
+    // Every receipt of this visit names the arm it was admitted on. §FS-rhei-budgets.6.2.1
+    plan.budget_arm = arm;
     // A sequential pass runs one invocation at a time, so nothing else of this
     // run is in flight. §FS-rhei-memory.4.3
     let exclusions = loaded_task_exclusions(

@@ -102,7 +102,7 @@ choosing one.
     "codex": {
       "command": ["codex", "exec"],
       "model_flag": "--model",
-      "mcp_flag": "--mcp",
+      "mcp_flag": "-c",
       "stdin_prompt": true,
       "modes": {
         "yolo": ["--sandbox", "danger-full-access", "--skip-git-repo-check", "-c", "approval_policy=\"never\""],

@@ -187,7 +187,7 @@ fn claim_transaction_partial_ledger_failure_preserves_another_writer() {
         done_tx.send(result).expect("report writer result");
     });
     assert_eq!(
-        lock_rx.recv_timeout(Duration::from_secs(2)).expect("writer lock attempt"),
+        lock_rx.recv_timeout(TEST_PATIENCE).expect("writer lock attempt"),
         LedgerLockEvent::Contended,
         "the competing writer must encounter the claim's held ledger lock"
     );
@@ -208,11 +208,11 @@ fn claim_transaction_partial_ledger_failure_preserves_another_writer() {
     drop(task_lock);
     drop(metadata_lock);
     assert_eq!(
-        lock_rx.recv_timeout(Duration::from_secs(2)).expect("writer lock acquisition"),
+        lock_rx.recv_timeout(TEST_PATIENCE).expect("writer lock acquisition"),
         LedgerLockEvent::Acquired
     );
     done_rx
-        .recv_timeout(Duration::from_secs(2))
+        .recv_timeout(TEST_PATIENCE)
         .expect("writer completion")
         .expect("writer append");
     writer.join().expect("writer thread");

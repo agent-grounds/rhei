@@ -145,7 +145,16 @@ transitions:
     /// fires is decided by the attempt budget and never by the exit.
     // §FS-rhei-run.5.1
     fn poll_machine() -> rhei_validator::StateMachine {
-        rhei_validator::StateMachine::from_yaml_str(
+        poll_machine_declaring(POLL_SELF_LOOP, POLL_EXHAUSTION_EDGE)
+    }
+
+    const POLL_SELF_LOOP: &str = "  - from: waiting\n    to: waiting\n    exit_code: 75\n";
+    const POLL_EXHAUSTION_EDGE: &str = "  - from: waiting\n    to: exhausted\n    exit_code: 75\n";
+
+    /// The poll machine with its two exit-75 rules declared in the order given.
+    // §FS-rhei-run.5.1
+    fn poll_machine_declaring(first: &str, second: &str) -> rhei_validator::StateMachine {
+        rhei_validator::StateMachine::from_yaml_str(&format!(
             r#"name: polling-exit
 version: 1
 states:
@@ -160,14 +169,8 @@ states:
     description: The budget ran out
     final: true
 transitions:
-  - from: waiting
-    to: waiting
-    exit_code: 75
-  - from: waiting
-    to: exhausted
-    exit_code: 75
-"#,
-        )
+{first}{second}"#
+        ))
         .expect("valid polling machine")
     }
 
@@ -223,5 +226,48 @@ transitions:
         assert_eq!(route.to, "waiting");
         // The self-loop is the first rule declared, and an unspent budget
         // leaves that unchanged too. §FS-rhei-run.5.1
+        assert_eq!(route.selected_rule, 0);
+    }
+
+    /// Declaring the exhaustion edge first does not let it pre-empt the retry:
+    /// while the budget lasts the self-loop wins whatever the line order, and
+    /// once it is spent the edge is taken. §FS-rhei-run.5.1 §FS-rhei-programs.8.2
+    #[test]
+    fn a_poll_retries_before_its_exhaustion_edge_whatever_their_declaration_order() {
+        let machine = poll_machine_declaring(POLL_EXHAUSTION_EDGE, POLL_SELF_LOOP);
+        let (task, metadata) = polling_task(1);
+        let route =
+            find_program_exit_transition(&machine, Some(&metadata), &task, "waiting", 75)
+                .expect("selection should not error")
+                .expect("the self-loop is selected");
+        assert_eq!(route.to, "waiting");
+        // The rule fired is the self-loop, declared second here. §FS-rhei-transitions.4.4
+        assert_eq!(route.selected_rule, 1);
+
+        let (task, metadata) = polling_task(2);
+        let route =
+            find_program_exit_transition(&machine, Some(&metadata), &task, "waiting", 75)
+                .expect("selection should not error")
+                .expect("the exhaustion edge is selected");
+        assert_eq!(route.to, "exhausted");
+        assert!(!route.matched.is_declared_route());
+        assert_eq!(route.selected_rule, 0);
+    }
+
+    /// Specificity still comes first: a `nonzero` self-loop does not beat an
+    /// exact exit edge while the budget lasts. §FS-rhei-run.5.1 §FS-rhei-programs.3.2
+    #[test]
+    fn a_nonzero_poll_self_loop_does_not_beat_an_exact_exit_edge() {
+        let machine = poll_machine_declaring(
+            POLL_EXHAUSTION_EDGE,
+            "  - from: waiting\n    to: waiting\n    exit_code: nonzero\n",
+        );
+        let (task, metadata) = polling_task(1);
+        let route =
+            find_program_exit_transition(&machine, Some(&metadata), &task, "waiting", 75)
+                .expect("selection should not error")
+                .expect("the exact edge is selected");
+        assert_eq!(route.to, "exhausted");
+        assert!(route.matched.is_declared_route());
         assert_eq!(route.selected_rule, 0);
     }

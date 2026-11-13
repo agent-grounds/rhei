@@ -21,7 +21,7 @@ Flags are grouped by concern:
 | `--dry-run`              | false   | Print the sequence of transitions that would be made without executing them |
 | `--no-callbacks`         | false   | Skip execution of `on_leave` / `on_enter` callbacks                        |
 | `--continue-on-error`    | false   | Continue to the next task when an agent or program exits non-zero          |
-| `--parallel <N>`         | 1       | Maximum number of agents or programs to run concurrently (0 = unlimited)   |
+| `--parallel <N>`         | 1       | Maximum number of tasks to run concurrently; each task's `all_targets` / `all_models` arms run alongside it (0 = unlimited); see [§FS-rhei-run.5.3](rhei-run.spec.md#53-what---parallel-counts) |
 | `--prices <PATH>`        | `defaults.prices`, else profile or built-in | Override profile-derived and built-in pricing with a validated local price book and copy it into the run's accounting roots. Its default is the `defaults.prices` settings key ([§FS-rhei-agents.1.1.1](rhei-agents.spec.md#111-defaults)), which a machine or project file may set so every run here prices from one book; a path given on the command line wins. Without either, selected profiles with authored rates produce a generated snapshot before execution; otherwise built-in pricing is unchanged. See [§FS-rhei-cost-accounting.5.1](rhei-cost-accounting.spec.md#51-price-book-selection). |
 | `--rhei <RHEI_ID>`       | all     | Narrow this run to the named rheis (repeatable). See [§FS-rhei-run.2.5](rhei-run.spec.md#25-project-scope---rhei).                  |
 | `--strict-inputs`        | false   | Seal this run's execution inputs and refuse a spawn, program or callback whose sealed inputs changed. Without it no seal is written or checked. See [§FS-rhei-run.3.8](rhei-run.spec.md#38-strict-inputs). |
@@ -1466,7 +1466,9 @@ why it is reported for every task instead of aborting on the first.
 
 ## 5. Parallel Execution
 
-With `--parallel N`, up to `N` subprocesses run concurrently. The orchestrator:
+With `--parallel N`, up to `N` tasks run concurrently, each with every
+invocation its state resolves to; `N` counts tasks, not subprocesses
+([§FS-rhei-run.5.3](rhei-run.spec.md#53-what---parallel-counts)). The orchestrator:
 
 - Assigns each spawn a slot index.
 - Writes one line to `runtime/transitions.log` per `SlotAssigned` and one per
@@ -1599,7 +1601,33 @@ The [`concurrent`](rhei-states.spec.md#12-per-state-fields) flag on a `StateDef`
 - `concurrent: true` — any number of ready tasks in this state may be scheduled together (bounded by `--parallel`).
 - `concurrent: false` (the default) — at most one ready task in this state is scheduled per pass. Additional tasks remain ready and are picked up on the next pass.
 
-The flag does not change state entry/exit semantics or transitions, and it does not affect within-task fanout (`all_targets` / `all_models`): every resolved invocation for a single scheduled task is still spawned together.
+The flag does not change state entry/exit semantics or transitions, and it does not affect within-task fanout (`all_targets` / `all_models`): every resolved invocation for a single scheduled task is still spawned together. Those invocations take no `--parallel` slot of their own ([§FS-rhei-run.5.3](rhei-run.spec.md#53-what---parallel-counts)).
+
+### 5.3. What `--parallel` Counts
+
+`--parallel N` bounds the number of **tasks** in flight, not the number of
+agents or programs. A task scheduled into the pool spawns every invocation its
+state resolves to — each `all_targets` / `all_models` arm
+([§FS-rhei-states.1.2](rhei-states.spec.md#12-per-state-fields)) — together, and the arms take no slot of their own. So:
+
+- `N` tasks in a state that fans out to `k` arms keep up to `N × k` agents
+  running at once. The default `--parallel 1` runs one task, and so `k` agents
+  for a `k`-arm state.
+- A task whose fan-out is wider than `N` is still admitted whole: its arms are
+  never split across passes or held back to fit `N`.
+- A task leaves the pool, freeing its slot for the next ready task, only once
+  every one of its arms has exited and been settled.
+- `0` removes the bound on tasks; it never limited arms.
+
+To size a run against an agent budget `A` — a provider's rate limit, local CPU,
+the spend allowed in flight — pass `--parallel` no greater than `A` divided by
+the widest fan-out among the states the run will drive, or set
+`concurrent: false` on the fanning state ([§FS-rhei-run.5.2](rhei-run.spec.md#52-concurrent-vs-serial-states)) so that one of its tasks
+is in flight at a time. No option caps the arms of a single task: a state with
+`k` arms always runs `k` agents for each task it schedules.
+
+The `rhei run --help` entry for `--parallel` names this unit and says that a
+task's fan-out arms run alongside it.
 
 ## 6. Relationship to Other Commands
 

@@ -456,6 +456,7 @@ mod worker_edit_revert_support;
 mod worker_edit_revert_tests;
 mod worker_edit_stop_help_tests;
 mod worker_edit_stop_report_tests;
+mod workspace_link_base_tests;
 mod workspace_link_escape_tests;
 mod workspace_task_metadata_tests;
 

@@ -15,6 +15,8 @@ use super::*;
 
 #[path = "agent_target_edit_failure_support.rs"]
 mod failure_support;
+#[path = "agent_target_edit_read_fault_tests.rs"]
+mod read_fault_tests;
 
 /// Logs one line per spawn naming the target it ran for, and writes the one
 /// output every identity shares, so a first entry's pre-populated-work rule

@@ -1,14 +1,19 @@
 //! The real failed-own-record scenario, optionally run under controlled startup
 //! schedules. The scheduler wraps the agent; it never changes its exit policy.
-//! §FS-rhei-agent-visit-pairing.2 §FS-rhei-agent-visit-pairing.5
+//! §FS-rhei-agent-visit-pairing.2 §FS-rhei-agent-visit-pairing.5.1
 
 use super::*;
 use serde_json::Value;
 
 /// Port of #619's interpreter shim. Private files coordinate actual startup;
 /// the one-second delay deliberately makes c slow, rather than fixing a race.
-/// A prerequisite timeout has a distinct exit code and diagnostic.
-pub(super) const STARTUP_SCHEDULER: &str = r#"import json
+/// A prerequisite timeout has a distinct exit code and diagnostic. Both of its
+/// reads of c's record wait out a refusal, so the snapshot at d's deliberate
+/// exit is always written. §FS-rhei-agent-visit-pairing.5.1
+pub(super) const STARTUP_SCHEDULER: &str = concat!(
+    include_str!("fixtures/shared_access_refused.py"),
+    include_str!("fixtures/agent_target_edit_c_record.py"),
+    r#"import json
 import os
 from pathlib import Path
 import runpy
@@ -31,17 +36,6 @@ def wait_for(description, predicate):
     sys.exit(97)
 
 
-def c_succeeded():
-    path = runtime / 'spawns/task-plan.1-work-mock-mock-c-2.json'
-    try:
-        record = json.loads(path.read_text(encoding='utf-8'))
-    except (FileNotFoundError, json.JSONDecodeError):
-        return False
-    return (record.get('task') == 'plan.1' and record.get('state') == 'work'
-            and record.get('moves') == 2 and record.get('ending') == 'exited'
-            and record.get('code') == 0)
-
-
 if target == 'mock:mock:c':
     (runtime / 'scheduled-c-started').write_text(str(os.getpid()))
     if order == 'd-first':
@@ -51,19 +45,18 @@ elif target == 'mock:mock:d':
     if order == 'd-first':
         wait_for('c started', lambda: (runtime / 'scheduled-c-started').exists())
     else:
-        wait_for('c successful current-visit record', c_succeeded)
+        _await_c_success(root, 'startup prerequisite (c successful current-visit record)')
     (runtime / 'scheduled-d-dispatched').write_text(str(os.getpid()))
 try:
     runpy.run_path(str(root / 'mock-agent.py'), run_name='__main__')
 except SystemExit as outcome:
     if target == 'mock:mock:d' and outcome.code == 1:
-        try:
-            c_record = json.loads((runtime / 'spawns/task-plan.1-work-mock-mock-c-2.json').read_text(encoding='utf-8'))
-        except (FileNotFoundError, json.JSONDecodeError):
-            c_record = None
+        # §FS-rhei-agent-visit-pairing.5.1: a refusal is read again; only an absent record is None.
+        c_record, _ = _read_c_record(root, time.monotonic() + 5, "snapshot of c's record at d's exit")
         (runtime / 'c-at-d-exit.json').write_text(json.dumps(c_record))
     raise
-"#;
+"#
+);
 
 fn records(fixture: &Finished) -> [Value; 3] {
     ["c", "d", "x"].map(|name| {

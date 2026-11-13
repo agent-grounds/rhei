@@ -43,6 +43,7 @@ Runs after Task 2.
 /// exhaustion; unrelated errors propagate. §FS-rhei-run.3.7.3.1
 /// Task 3 runs the same state and writes nothing.
 pub(super) const ONE_FILE_COVER: &str = concat!(
+    include_str!("fixtures/shared_access_refused.py"),
     include_str!("fixtures/worker_edit_shared_writer.py"),
     r#"concurrent = sys.argv[1] == 'concurrent'
 here = pathlib.Path(__file__).parent

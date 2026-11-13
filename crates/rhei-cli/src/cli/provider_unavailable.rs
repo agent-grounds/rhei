@@ -60,8 +60,9 @@ struct ProviderUnavailable {
 
 /// Recognize a `pi` session that lost its provider, from everything but the
 /// missing output, which only the output check knows. The family is tested and
-/// the registry id never is; a target that resolves no provider has nothing to
-/// key the wait on and is not recognized. §FS-rhei-agents.2.5
+/// the registry id never is; an invocation with no provider to key the wait on,
+/// resolved or derived from pi's model reference, is not recognized.
+/// §FS-rhei-agents.2.5
 fn classify_provider_unavailable(
     resolved: &ResolvedAgent,
     status: std::process::ExitStatus,

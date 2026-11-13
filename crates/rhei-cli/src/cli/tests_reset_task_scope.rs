@@ -1,7 +1,7 @@
 // The three rules a `--task` reset rests on that its end-to-end tests reach only
 // through whole runs: the closure and the edge each ticket is listed by, the
 // stripping that keeps a kept ticket's lines in a file it shares, and the
-// longest id a file matched by prefix or component pattern belongs to.
+// ticket a file matched by prefix or component pattern belongs to.
 
 // §AR-source-file-size.3 §FS-rhei-reset.2.5
 
@@ -212,16 +212,100 @@ structure:
         assert!(!ComponentPattern::applies_to("runtime/out/{task_id}-{state}.md"));
 
         let short = ComponentPattern::new(root, template, "x.build");
-        let long = short.for_id("x.build-docs");
+        let long = ComponentPattern::new(root, template, "x.build-docs");
         let mut found = short.entries().expect("list");
         found.sort();
         let (mine, theirs) =
             (root.join("runtime/review/x.build-1.md"), root.join("runtime/review/x.build-docs-1.md"));
         assert_eq!(found, vec![mine.clone(), theirs.clone()]);
 
-        let owners = PrefixOwners { patterns: vec![short.clone(), long.clone()], ..Default::default() };
+        let owners = PrefixOwners { ids: ids(&["x.build", "x.build-docs"]), ..Default::default() };
+        assert_eq!(owners.pattern_entries(&short).expect("list"), vec![mine.clone()]);
+        assert_eq!(owners.pattern_entries(&long).expect("list"), vec![theirs.clone()]);
+
+        // `{state}` reaches results/ and supervise/, and `{visit_count}` takes `docs`:
+        // x.build's pattern matches x.build-docs's result and brief, which stay theirs.
+        for file in ["runtime/results/x.build-docs.md", "runtime/supervise/x.build-docs.md"] {
+            fs::create_dir_all(root.join(file).parent().expect("a parent")).expect("dirs");
+            fs::write(root.join(file), "theirs\n").expect("a file");
+            assert!(short.entries().expect("list").contains(&root.join(file)), "the wildcards reach {file}");
+        }
         assert_eq!(owners.pattern_entries(&short).expect("list"), vec![mine]);
         assert_eq!(owners.pattern_entries(&long).expect("list"), vec![theirs]);
+    }
+
+    fn ids(ids: &[&str]) -> BTreeSet<String> {
+        ids.iter().map(|id| id.to_string()).collect()
+    }
+
+    /// Under every shape of declared path with a placeholder before the id, a ticket's
+    /// pattern owns only that ticket's own files, though a longer id's output, result
+    /// and brief lie where its placeholders reach. §FS-rhei-reset.2.1
+    #[test]
+    fn a_component_pattern_owns_only_its_own_tickets_files_under_every_shape() {
+        let shapes = [
+            ("runtime/{state}/{task_id}.md", "runtime/pending/x.build.md", "runtime/pending/x.build-docs.md"),
+            ("runtime/{state}/{task_id}-{visit_count}.md", "runtime/pending/x.build-1.md", "runtime/pending/x.build-docs-1.md"),
+            ("runtime/{state}/{task_id}{visit_count}.md", "runtime/pending/x.build1.md", "runtime/pending/x.build-docs1.md"),
+            ("runtime/{state}-{task_id}-{visit_count}.md", "runtime/pending-x.build-1.md", "runtime/pending-x.build-docs-1.md"),
+            ("runtime/{state}/{task_id}/out.md", "runtime/pending/x.build/out.md", "runtime/pending/x.build-docs/out.md"),
+        ];
+        let owners = PrefixOwners { ids: ids(&["x.build", "x.build-docs", "build", "build-docs"]), ..Default::default() };
+        for (template, mine, theirs) in shapes {
+            let dir = tempfile::tempdir().expect("tempdir");
+            let root = dir.path();
+            let own = [mine, "runtime/results/x.build.md", "runtime/supervise/x.build.md"];
+            let other = [theirs, "runtime/results/x.build-docs.md", "runtime/supervise/x.build-docs.md"];
+            for file in own.iter().chain(&other) {
+                fs::create_dir_all(root.join(file).parent().expect("a parent")).expect("dirs");
+                fs::write(root.join(file), "x\n").expect("a file");
+            }
+            for (id, expected, files) in [("x.build", mine, &own), ("x.build-docs", theirs, &other)] {
+                let found = owners.pattern_entries(&ComponentPattern::new(root, template, id)).expect("list");
+                assert!(found.contains(&root.join(expected)), "{template}: {id} owns {expected}: {found:?}");
+                assert!(
+                    found.iter().all(|path| files.iter().any(|file| root.join(file) == *path)),
+                    "{template}: {id} owns only its own files: {found:?}"
+                );
+            }
+        }
+    }
+
+    /// Below its first placeholder a pattern enters no symbolic link, whether at a
+    /// placeholder level or a literal one; a link it matches as its last component
+    /// is removed as the link, never what it points at. §FS-rhei-reset.2.1
+    #[cfg(unix)]
+    #[test]
+    fn a_component_pattern_never_descends_through_a_symbolic_link() {
+        use std::os::unix::fs::symlink;
+        let dir = tempfile::tempdir().expect("tempdir");
+        let (root, outside) = (dir.path().join("root"), dir.path().join("outside"));
+        for file in ["root/runtime/pending/out/x.1.md", "outside/out/x.1.md", "outside/dir/keep.md", "outside/file.md"] {
+            fs::create_dir_all(dir.path().join(file).parent().expect("a parent")).expect("dirs");
+            fs::write(dir.path().join(file), "x\n").expect("a file");
+        }
+        for level in ["review", "done/out", "kept/out"] {
+            fs::create_dir_all(root.join("runtime").join(level)).expect("dirs");
+        }
+        symlink(&outside, root.join("runtime/elsewhere")).expect("a link at a placeholder level");
+        symlink(outside.join("out"), root.join("runtime/review/out")).expect("a link at a literal level");
+        symlink(outside.join("dir"), root.join("runtime/done/out/x.1.md")).expect("a last link to a dir");
+        symlink(outside.join("file.md"), root.join("runtime/kept/out/x.1.md")).expect("a last link to a file");
+
+        let pattern = ComponentPattern::new(&root, "runtime/{state}/out/{task_id}.md", "x.1");
+        let mut found = pattern.entries().expect("list");
+        found.sort();
+        let links = [root.join("runtime/done/out/x.1.md"), root.join("runtime/kept/out/x.1.md")];
+        assert_eq!(found, vec![links[0].clone(), links[1].clone(), root.join("runtime/pending/out/x.1.md")]);
+
+        let mut removed = Vec::new();
+        for link in &links {
+            assert!(remove_runtime_path(link, &mut removed).expect("remove"), "{link:?} goes");
+            assert!(fs::symlink_metadata(link).is_err(), "the link itself is gone");
+        }
+        for file in ["out/x.1.md", "dir/keep.md", "file.md"] {
+            assert_eq!(fs::read_to_string(outside.join(file)).expect("kept"), "x\n", "{file} is never reached");
+        }
     }
 
     /// The kept line names five tickets and counts the rest. §FS-rhei-reset.4

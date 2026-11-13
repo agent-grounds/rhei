@@ -4,6 +4,8 @@
 
 // §FS-rhei-reset.2.1 §FS-rhei-reset.2.5
 
+use std::fs;
+
 use super::reset_task_scope_support::*;
 
 /// A machine whose output puts `{state}` before `{task_id}`, so the literal text up
@@ -108,4 +110,128 @@ fn a_placeholder_before_the_id_keeps_another_rheis_files_under_rhei_scope() {
 
     let validate = world.rhei(&["validate", "."]);
     assert!(validate.status.success(), "the project still validates:\n{}", validate.stderr);
+}
+
+/// A machine whose output puts `{state}` before `{task_id}` and `{visit_count}`
+/// after it, so `x.build`'s pattern reaches every directory under `runtime/` and
+/// matches `x.build-docs`'s result and brief.
+const VISIT_MACHINE: &str = "name: visit
+version: 1
+states:
+  pending:
+    initial: true
+    description: Open
+    outputs:
+      - name: note
+        path: runtime/{state}/{task_id}-{visit_count}.md
+  completed: { final: true, description: Done }
+transitions:
+  - { from: pending, to: completed, description: Done }
+";
+
+const BUILD_PLAN: &str = "# Rhei: X\n\n## Tasks\n\n### Task build: build\n**State:** pending\n\n\
+                          ### Task build-docs: docs\n**State:** pending\n\n### Task lint: lint\n**State:** pending\n";
+
+/// `x.build`, `x.build-docs` and `x.lint` under [`VISIT_MACHINE`], each with its
+/// output, and `finished` of them completed.
+fn visit_world(name: &str, finished: &[&str]) -> ScopeWorld {
+    let world = ScopeWorld::new(name);
+    world.write("states.yaml", VISIT_MACHINE);
+    world.write("x.rhei.md", BUILD_PLAN);
+    for ticket in finished {
+        world.write(&format!("runtime/pending/{ticket}-1.md"), &format!("output of {ticket}\n"));
+    }
+    world.finish("x.rhei.md", finished);
+    world
+}
+
+/// `--task x.build` leaves `x.build-docs`'s result and brief byte for byte, though
+/// `x.build`'s pattern matches both, and keeps every file of `x.lint`.
+/// §FS-rhei-reset.2.1 §FS-rhei-reset.2.5
+#[test]
+fn a_placeholder_after_the_id_never_takes_a_longer_ids_result_or_brief() {
+    let world = visit_world("reset-task-visit-shape", &["x.build", "x.build-docs", "x.lint"]);
+    world.write("runtime/supervise/x.build-docs.md", "brief for docs\n");
+    let kept = [
+        "runtime/results/x.build-docs.md",
+        "runtime/supervise/x.build-docs.md",
+        "runtime/pending/x.build-docs-1.md",
+        "runtime/results/x.lint.md",
+        "runtime/pending/x.lint-1.md",
+    ]
+    .map(|file| (file, world.read(file)));
+    let rows = [ledger_rows(&world, "x.build-docs"), ledger_rows(&world, "x.lint")];
+
+    let reset = world.reset("x.rhei.md", &["--task", "x.build", "--yes"]);
+    assert_line(&reset, "  Task x.build: completed → pending");
+
+    for (file, bytes) in &kept {
+        assert!(world.exists(file), "{file} is kept:\n{}", reset.stdout);
+        assert_eq!(&world.read(file), bytes, "{file} is kept byte for byte");
+    }
+    assert_eq!([ledger_rows(&world, "x.build-docs"), ledger_rows(&world, "x.lint")], rows);
+    assert!(!world.exists("runtime/pending/x.build-1.md"), "x.build's output goes");
+    assert!(!world.exists("runtime/results/x.build.md"), "x.build's result goes");
+    assert_eq!(world.state_of("x.rhei.md", "x.build-docs"), "completed");
+
+    let validate = world.rhei(&["validate", "x.rhei.md"]);
+    assert!(validate.status.success(), "the plan still validates:\n{}", validate.stderr);
+}
+
+/// A pending `x.build-docs` the scope leaves out keeps its brief.
+/// §FS-rhei-reset.2.1
+#[test]
+fn a_placeholder_after_the_id_never_takes_a_pending_longer_ids_brief() {
+    let world = visit_world("reset-task-visit-brief", &["x.build"]);
+    world.write("runtime/supervise/x.build-docs.md", "brief for docs\n");
+
+    let reset = world.reset("x.rhei.md", &["--task", "x.build", "--yes"]);
+    assert_line(&reset, "  Task x.build: completed → pending");
+    assert_eq!(world.read("runtime/supervise/x.build-docs.md"), "brief for docs\n");
+    assert!(!world.exists("runtime/pending/x.build-1.md"), "x.build's output goes");
+}
+
+/// A symbolic link to a directory outside the execution root, where `{state}`
+/// stands, is never descended through, under `--task` or `--rhei`; a link the
+/// pattern matches as its last component goes as a link, and what it points at
+/// stays. §FS-rhei-reset.2.1
+#[cfg(unix)]
+#[test]
+fn a_placeholder_before_the_id_never_follows_a_link_out_of_the_execution_root() {
+    use std::os::unix::fs::symlink;
+    for scope in [&["--task", "paper.2"][..], &["--rhei", "paper"][..]] {
+        let plan = "# Rhei: Paper\n\n## Tasks\n\n### Task 1: venue\n**State:** pending\n\n\
+                    ### Task 2: ingest\n**State:** pending\n";
+        let world = state_first_world(
+            "reset-state-first-link",
+            "paper.rhei.md",
+            &[("paper.rhei.md", plan)],
+            &["paper.1", "paper.2"],
+        );
+        let outside = world.root.parent().expect("a parent").join("outside");
+        fs::create_dir_all(outside.join("target")).expect("outside");
+        fs::write(outside.join("paper.2.md"), "not rhei's\n").expect("outside file");
+        fs::write(outside.join("target/note.md"), "not rhei's either\n").expect("outside file");
+        symlink(&outside, world.path("runtime/elsewhere")).expect("a link where {state} stands");
+        fs::create_dir_all(world.path("runtime/linked")).expect("linked");
+        let last = world.path("runtime/linked/paper.2.md");
+        symlink(outside.join("target"), &last).expect("a link as the last component");
+
+        let reset = world.reset("paper.rhei.md", &[scope, &["--yes"]].concat());
+        assert!(reset.status.success(), "{scope:?}:\n{}{}", reset.stdout, reset.stderr);
+        assert_eq!(fs::read_to_string(outside.join("paper.2.md")).expect("kept"), "not rhei's\n");
+        assert_eq!(
+            fs::read_to_string(outside.join("target/note.md")).expect("kept"),
+            "not rhei's either\n"
+        );
+        assert!(
+            fs::symlink_metadata(world.path("runtime/elsewhere")).is_ok(),
+            "{scope:?}: the link stays"
+        );
+        assert!(
+            fs::symlink_metadata(&last).is_err(),
+            "{scope:?}: the matched link goes, as a link"
+        );
+        assert!(!world.exists("runtime/pending/paper.2.md"), "{scope:?}: paper.2's output goes");
+    }
 }

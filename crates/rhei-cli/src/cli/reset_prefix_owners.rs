@@ -1,6 +1,6 @@
 // Which ticket a runtime file matched by prefix, or by a component pattern,
-// belongs to: the longest ticket id in the project whose prefix or pattern it
-// matches.
+// belongs to: the longest ticket id in the project whose prefix it matches, or
+// that a component pattern's path is owned by.
 //
 // Its own part because it is the one question a narrowed reset asks of every
 // ticket in the project, not only of those in its scope: `x.build`'s prefix is
@@ -9,14 +9,14 @@
 // §AR-source-file-size.3 §FS-rhei-reset.2.1
 
 /// Every prefix a project ticket's runtime files are matched by, per directory, and
-/// every component pattern.
+/// every project ticket id.
 /// §FS-rhei-reset.2.1
 #[derive(Default)]
 struct PrefixOwners {
     by_dir: BTreeMap<PathBuf, BTreeSet<String>>,
-    /// Every ticket's component patterns, for the same question about a path one
-    /// of them matches.
-    patterns: Vec<ComponentPattern>,
+    /// Every project ticket's qualified id and its rhei-local one, which a path a
+    /// component pattern matches is asked about. §FS-rhei-reset.2.1
+    ids: BTreeSet<String>,
 }
 
 impl PrefixOwners {
@@ -30,17 +30,17 @@ impl PrefixOwners {
             let local_id = rhei_local_id_str(task_id);
             let bases: &[&PathBuf] =
                 if *root == project_root { &[root] } else { &[root, &project_root] };
+            let ids: &[&str] = if local_id == task_id { &[task_id] } else { &[task_id, local_id] };
+            owners.ids.extend(ids.iter().map(|id| id.to_string()));
             for base in bases {
                 let runtime = base.join("runtime");
-                let ids: &[&str] = if local_id == task_id { &[task_id] } else { &[task_id, local_id] };
                 for id in ids {
                     for target in scoped_runtime_targets(&runtime, id, machine) {
                         match target {
                             ScopedTarget::Prefixed { dir, prefix } => {
                                 owners.by_dir.entry(dir).or_default().insert(prefix);
                             }
-                            ScopedTarget::Pattern(pattern) => owners.patterns.push(pattern),
-                            ScopedTarget::Exact(_) => {}
+                            ScopedTarget::Pattern(_) | ScopedTarget::Exact(_) => {}
                         }
                     }
                 }
@@ -68,20 +68,16 @@ impl PrefixOwners {
         Ok(paths)
     }
 
-    /// The paths `pattern` matches that no longer id's pattern matches too, which
-    /// are what a narrowed reset removes for it; the directory a listing failed in,
-    /// with the error, where one did. §FS-rhei-reset.2.1
+    /// The paths `pattern` matches that its ticket owns, where no longer project id
+    /// could stand at `{task_id}`, which are what a narrowed reset removes for it;
+    /// the directory a listing failed in, with the error, where one did.
+    /// §FS-rhei-reset.2.1
     fn pattern_entries(
         &self,
         pattern: &ComponentPattern,
     ) -> Result<Vec<PathBuf>, (PathBuf, std::io::Error)> {
         let mut paths = pattern.entries()?;
-        paths.retain(|path| {
-            !self
-                .patterns
-                .iter()
-                .any(|other| other.id.len() > pattern.id.len() && other.matches(path))
-        });
+        paths.retain(|path| pattern.owns(path, self.ids.iter().map(String::as_str)));
         Ok(paths)
     }
 }

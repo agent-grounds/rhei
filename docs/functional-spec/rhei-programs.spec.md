@@ -173,7 +173,7 @@ When a program exits and has not already advanced the task (via `rhei transition
 2. Evaluate specific matches first: integer and integer-array conditions are checked against the actual exit code.
 3. If no specific match and the exit code is non-zero, evaluate `"nonzero"` transitions.
 4. If exactly one transition matches, fire that rule (with *its* `on_leave`/`on_enter` callbacks).
-5. If multiple transitions match at the same specificity level, also evaluate `condition` fields to disambiguate. A `condition:` is a tiebreaker *between* the rules that matched the exit code, never a second gate applied afterwards to the rule that won. If still ambiguous after conditions, it is a validation error.
+5. If multiple transitions match at the same specificity level, also evaluate `condition` fields to disambiguate. A `condition:` is a tiebreaker *between* the rules that matched the exit code, never a second gate applied afterwards to the rule that won. If still ambiguous after conditions, it is a validation error ([§FS-rhei-programs.8.2](rhei-programs.spec.md#82-transition-level) says which pairs are refused when the machine loads).
 6. If no transition matches and exit code is `0`, log a warning: `warning: program exited 0 but task {id} did not advance from '{state}'`.
 7. If no transition matches and exit code is non-zero, log an error and apply the `--continue-on-error` policy.
 
@@ -512,7 +512,11 @@ transitions:
   - Two integer arrays must not share any value.
   - A specific integer must not appear in another transition's integer array.
   - At most one `"nonzero"` transition per source state (before `condition` disambiguation).
-- When multiple `"nonzero"` or overlapping transitions exist from the same source, they must have mutually exclusive `condition` fields to disambiguate.
+  - An exact duplicate — the same `from`, `to` and `exit_code` twice — overlaps like any other pair.
+- Two rules **overlap** when they can match the same exit code at the same specificity: their integer and integer-array values share a code, or both are `"nonzero"`. A specific rule never overlaps a `"nonzero"` rule, because step 2 of [the evaluation order](#32-evaluation-order) is tried before step 3.
+- When multiple `"nonzero"` or overlapping transitions exist from the same source, they must have mutually exclusive `condition` fields to disambiguate. rhei judges that statically and conservatively: an overlapping pair is accepted only when **both** rules declare a `condition` and the two conditions are not the same text once surrounding whitespace is trimmed. The pair is refused when either rule has no `condition`, because the unconditioned rule matches whenever the other's condition holds, and when both carry the same condition. rhei proves nothing beyond this, so two distinct conditions that are both true at run time are the author's to keep apart.
+- **The poll exception.** On a state that declares `poll:`, a self-loop and a non-self-loop rule that overlap are told apart by the attempt budget rather than by a condition, so the pair is valid with no `condition` on either: the self-loop is the retry while `poll.max_attempts` lasts and the other rule is the exhaustion edge ([§FS-rhei-run.5.1](rhei-run.spec.md#51-polling-states)). The exception covers that pair only. Two overlapping non-self-loop rules from a poll state are refused, and so are two overlapping self-loops.
+- An overlap is a load error, so `rhei states`, `rhei validate` and `rhei run` all refuse the machine, and declaration order never gets to decide where an exit goes ([§FS-rhei-programs.3.2](rhei-programs.spec.md#32-evaluation-order)). The error names the source state, the exit code the two rules both match (the lowest shared one, or `nonzero`), and both competing rules as `'from' -> 'to'`, for example: `state 'analyze' has two exit_code rules matching exit code 12 with no condition to tell them apart: 'analyze' -> 'human-intervention' and 'analyze' -> 'native'`. Where a state has several overlapping pairs, the first by declaration order is the one reported.
 
 ## 9. Per-State Fields (additions to States Specification)
 

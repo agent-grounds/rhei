@@ -169,11 +169,12 @@ structure:
     }
 
     /// A file a shorter id's prefix matches belongs to the longest id whose prefix
-    /// matches it, so `x.build` leaves `x.build-docs`'s. §FS-rhei-reset.2.1
+    /// matches it while that ticket is kept, so `x.build` leaves `x.build-docs`'s.
+    /// §FS-rhei-reset.2.1
     #[test]
     fn a_prefix_matched_file_goes_to_the_longest_id_whose_prefix_it_matches() {
         let dir = tempfile::tempdir().expect("tempdir");
-        let (path, loaded) = plan(
+        let (_, loaded) = plan(
             &dir,
             "# Rhei: X\n\n## Tasks\n\n### Task build: build\n**State:** pending\n\n\
              ### Task build-docs: docs\n**State:** pending\n",
@@ -184,10 +185,12 @@ structure:
             fs::write(logs.join(name), "log\n").expect("a log");
         }
 
-        let owners = PrefixOwners::index(&loaded, &path, &machines());
-        let short = owners.entries(&logs, "task-x.build-").expect("list");
+        let scope = closure(&loaded, &["x.build"]);
+        let owners = RuntimeOwners::index(&loaded, ResetScope::Tickets(&scope));
+        let log = |id: &str| ScopedTarget::Prefixed(NamedPrefix::new(logs.clone(), "task-", id));
+        let short = owners.entries(&log("x.build")).expect("list");
         assert_eq!(short, vec![logs.join("task-x.build-pending.log")]);
-        let long = owners.entries(&logs, "task-x.build-docs-").expect("list");
+        let long = owners.entries(&log("x.build-docs")).expect("list");
         assert_eq!(long, vec![logs.join("task-x.build-docs-pending.log")]);
     }
 
@@ -209,7 +212,8 @@ structure:
         }
         let template = "runtime/{state}/{task_id}-{visit_count}.md";
         assert!(ComponentPattern::applies_to(template));
-        assert!(!ComponentPattern::applies_to("runtime/out/{task_id}-{state}.md"));
+        assert!(ComponentPattern::applies_to("runtime/out/{task_id}-{state}.md"));
+        assert!(!ComponentPattern::applies_to("runtime/out/{task_id}.md"));
 
         let short = ComponentPattern::new(root, template, "x.build");
         let long = ComponentPattern::new(root, template, "x.build-docs");
@@ -219,9 +223,9 @@ structure:
             (root.join("runtime/review/x.build-1.md"), root.join("runtime/review/x.build-docs-1.md"));
         assert_eq!(found, vec![mine.clone(), theirs.clone()]);
 
-        let owners = PrefixOwners { ids: ids(&["x.build", "x.build-docs"]), ..Default::default() };
-        assert_eq!(owners.pattern_entries(&short).expect("list"), vec![mine.clone()]);
-        assert_eq!(owners.pattern_entries(&long).expect("list"), vec![theirs.clone()]);
+        let owners = RuntimeOwners { kept: ids(&["x.build", "x.build-docs"]), ..Default::default() };
+        assert_eq!(owned(&owners, &short), vec![mine.clone()]);
+        assert_eq!(owned(&owners, &long), vec![theirs.clone()]);
 
         // `{state}` reaches results/ and supervise/, and `{visit_count}` takes `docs`:
         // x.build's pattern matches x.build-docs's result and brief, which stay theirs.
@@ -230,38 +234,51 @@ structure:
             fs::write(root.join(file), "theirs\n").expect("a file");
             assert!(short.entries().expect("list").contains(&root.join(file)), "the wildcards reach {file}");
         }
-        assert_eq!(owners.pattern_entries(&short).expect("list"), vec![mine]);
-        assert_eq!(owners.pattern_entries(&long).expect("list"), vec![theirs]);
+        assert_eq!(owned(&owners, &short), vec![mine]);
+        assert_eq!(owned(&owners, &long), vec![theirs]);
     }
 
     fn ids(ids: &[&str]) -> BTreeSet<String> {
         ids.iter().map(|id| id.to_string()).collect()
     }
 
-    /// Under every shape of declared path with a placeholder before the id, a ticket's
-    /// pattern owns only that ticket's own files, though a longer id's output, result
-    /// and brief lie where its placeholders reach. §FS-rhei-reset.2.1
+    /// The paths `pattern` matches that its ticket owns against `owners`.
+    fn owned(owners: &RuntimeOwners, pattern: &ComponentPattern) -> Vec<PathBuf> {
+        let mut paths = owners.entries(&ScopedTarget::Pattern(pattern.clone())).expect("list");
+        paths.sort();
+        paths
+    }
+
+    /// Under every shape of declared path with another placeholder, before the id or
+    /// after it, a ticket's pattern owns only that ticket's own files, though a longer
+    /// id's output, result and brief lie where its placeholders reach. The last column
+    /// is more of the longer id's: its brief beside an id-first path, which `{state}`
+    /// taking `docs` matches, and its first output in a directory of two. §FS-rhei-reset.2.1
     #[test]
     fn a_component_pattern_owns_only_its_own_tickets_files_under_every_shape() {
-        let shapes = [
-            ("runtime/{state}/{task_id}.md", "runtime/pending/x.build.md", "runtime/pending/x.build-docs.md"),
-            ("runtime/{state}/{task_id}-{visit_count}.md", "runtime/pending/x.build-1.md", "runtime/pending/x.build-docs-1.md"),
-            ("runtime/{state}/{task_id}{visit_count}.md", "runtime/pending/x.build1.md", "runtime/pending/x.build-docs1.md"),
-            ("runtime/{state}-{task_id}-{visit_count}.md", "runtime/pending-x.build-1.md", "runtime/pending-x.build-docs-1.md"),
-            ("runtime/{state}/{task_id}/out.md", "runtime/pending/x.build/out.md", "runtime/pending/x.build-docs/out.md"),
+        let shapes: [(&str, &str, &str, &[&str]); 8] = [
+            ("runtime/{state}/{task_id}.md", "runtime/pending/x.build.md", "runtime/pending/x.build-docs.md", &[]),
+            ("runtime/{state}/{task_id}-{visit_count}.md", "runtime/pending/x.build-1.md", "runtime/pending/x.build-docs-1.md", &[]),
+            ("runtime/{state}/{task_id}{visit_count}.md", "runtime/pending/x.build1.md", "runtime/pending/x.build-docs1.md", &[]),
+            ("runtime/{state}-{task_id}-{visit_count}.md", "runtime/pending-x.build-1.md", "runtime/pending-x.build-docs-1.md", &[]),
+            ("runtime/{state}/{task_id}/out.md", "runtime/pending/x.build/out.md", "runtime/pending/x.build-docs/out.md", &[]),
+            ("runtime/supervise/{task_id}-{state}.md", "runtime/supervise/x.build-pending.md", "runtime/supervise/x.build-docs-pending.md", &[]),
+            ("runtime/fix-summary/{task_id}.{visit_count}.md", "runtime/fix-summary/x.build.1.md", "runtime/fix-summary/x.build-docs.1.md", &["runtime/fix-summary/x.build-docs.md"]),
+            ("runtime/notes/{task_id}-{state}.md", "runtime/notes/x.build-pending.md", "runtime/notes/x.build-docs-pending.md", &["runtime/notes/x.build-docs.md"]),
         ];
-        let owners = PrefixOwners { ids: ids(&["x.build", "x.build-docs", "build", "build-docs"]), ..Default::default() };
-        for (template, mine, theirs) in shapes {
+        let owners = RuntimeOwners { kept: ids(&["x.build", "x.build-docs", "build", "build-docs"]), ..Default::default() };
+        for (template, mine, theirs, also) in shapes {
             let dir = tempfile::tempdir().expect("tempdir");
             let root = dir.path();
-            let own = [mine, "runtime/results/x.build.md", "runtime/supervise/x.build.md"];
-            let other = [theirs, "runtime/results/x.build-docs.md", "runtime/supervise/x.build-docs.md"];
+            let own = vec![mine, "runtime/results/x.build.md", "runtime/supervise/x.build.md"];
+            let mut other = vec![theirs, "runtime/results/x.build-docs.md", "runtime/supervise/x.build-docs.md"];
+            other.extend(also);
             for file in own.iter().chain(&other) {
                 fs::create_dir_all(root.join(file).parent().expect("a parent")).expect("dirs");
                 fs::write(root.join(file), "x\n").expect("a file");
             }
             for (id, expected, files) in [("x.build", mine, &own), ("x.build-docs", theirs, &other)] {
-                let found = owners.pattern_entries(&ComponentPattern::new(root, template, id)).expect("list");
+                let found = owned(&owners, &ComponentPattern::new(root, template, id));
                 assert!(found.contains(&root.join(expected)), "{template}: {id} owns {expected}: {found:?}");
                 assert!(
                     found.iter().all(|path| files.iter().any(|file| root.join(file) == *path)),
@@ -269,6 +286,60 @@ structure:
                 );
             }
         }
+    }
+
+    /// Only a ticket the reset keeps claims a path a longer id of its could stand in. One
+    /// it reaches stakes no claim, so the path is taken, and that ticket is counted as
+    /// losing it too; the same for a name rhei writes. §FS-rhei-reset.2.1 §FS-rhei-reset.2.5.3
+    #[test]
+    fn only_a_kept_ticket_claims_a_path_its_longer_id_could_stand_in() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let root = dir.path();
+        let summaries = root.join("runtime/fix-summary");
+        let logs = root.join("runtime/logs");
+        fs::create_dir_all(&summaries).expect("summaries");
+        fs::create_dir_all(&logs).expect("logs");
+        for name in ["x.1.1.md", "x.1.2.md", "x.1.1.1.md"] {
+            fs::write(summaries.join(name), "x\n").expect("a summary");
+        }
+        for name in ["task-x.build-pending.log", "task-x.build-docs-pending.log"] {
+            fs::write(logs.join(name), "log\n").expect("a log");
+        }
+        let reached = |ids: &[&str]| -> BTreeMap<String, BTreeSet<String>> {
+            ids.iter().map(|id| (id.to_string(), BTreeSet::from([id.to_string()]))).collect()
+        };
+        let sorted = |owners: &RuntimeOwners, target: &ScopedTarget| {
+            let mut paths = owners.entries(target).expect("list");
+            paths.sort();
+            paths
+        };
+        let standing = |owners: &RuntimeOwners, target: &ScopedTarget, path: &Path| {
+            owners.standing(target, path).cloned().collect::<Vec<_>>()
+        };
+
+        // The ci-heal summary: `x.1.1` could stand in `x.1.1.md`, `x.1`'s first summary.
+        let summary = ScopedTarget::Pattern(ComponentPattern::new(
+            root,
+            "runtime/fix-summary/{task_id}.{visit_count}.md",
+            "x.1",
+        ));
+        let kept = RuntimeOwners { kept: ids(&["x.1.1"]), reached: reached(&["x.1"]) };
+        assert_eq!(sorted(&kept, &summary), vec![summaries.join("x.1.2.md")]);
+        let both = RuntimeOwners { kept: BTreeSet::new(), reached: reached(&["x.1", "x.1.1"]) };
+        let all = ["x.1.1.1.md", "x.1.1.md", "x.1.2.md"].map(|name| summaries.join(name));
+        assert_eq!(sorted(&both, &summary), all.to_vec());
+        assert_eq!(standing(&both, &summary, &all[0]), vec!["x.1.1"]);
+        assert_eq!(standing(&both, &summary, &all[1]), vec!["x.1.1"]);
+        assert!(standing(&both, &summary, &all[2]).is_empty(), "no longer id stands in x.1.2.md");
+
+        // A log rhei writes: `x.build-docs`'s is `x.build`'s only while it is reached too.
+        let log = ScopedTarget::Prefixed(NamedPrefix::new(logs.clone(), "task-", "x.build"));
+        let (mine, theirs) = (logs.join("task-x.build-pending.log"), logs.join("task-x.build-docs-pending.log"));
+        let kept = RuntimeOwners { kept: ids(&["x.build-docs"]), reached: reached(&["x.build"]) };
+        assert_eq!(sorted(&kept, &log), vec![mine.clone()]);
+        let both = RuntimeOwners { kept: BTreeSet::new(), reached: reached(&["x.build", "x.build-docs"]) };
+        assert_eq!(sorted(&both, &log), vec![theirs.clone(), mine]);
+        assert_eq!(standing(&both, &log, &theirs), vec!["x.build-docs"]);
     }
 
     /// Below its first placeholder a pattern enters no symbolic link, whether at a

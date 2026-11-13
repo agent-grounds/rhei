@@ -123,18 +123,10 @@ impl ResetDirectoryCheck {
     /// What a narrowed reset would remove, in the order it removes it. §FS-rhei-reset.2.1
     fn scoped_removals(&mut self, removals: &ScopedRemovals) -> MietteResult<()> {
         for target in &removals.targets {
-            match target {
-                ScopedTarget::Exact(path) if path.exists() => self.removal(path),
-                ScopedTarget::Exact(_) => {}
-                ScopedTarget::Prefixed { dir, prefix } => match removals.owners.entries(dir, prefix) {
-                    // Only what the removal removes: it skips a dangling link.
-                    Ok(paths) => paths.iter().filter(|path| path.exists()).for_each(|path| self.removal(path)),
-                    Err(err) => self.unlistable(dir, err),
-                },
-                ScopedTarget::Pattern(pattern) => match removals.owners.pattern_entries(pattern) {
-                    Ok(paths) => paths.iter().filter(|path| path.exists()).for_each(|path| self.removal(path)),
-                    Err((dir, err)) => self.unlistable(&dir, err),
-                },
+            match removals.owners.entries(target) {
+                // Only what the removal removes: it skips a dangling link.
+                Ok(paths) => paths.iter().filter(|path| path.exists()).for_each(|path| self.removal(path)),
+                Err((dir, err)) => self.unlistable(&dir, err),
             }
         }
         for (root, ids) in &removals.ledgers {

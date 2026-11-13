@@ -109,3 +109,44 @@ fn a_longer_ids_result_is_not_read_as_the_shorter_ids_history() {
     );
     assert_eq!(fs::read_to_string(dir.join(files[0].0)).expect("kept"), "result of docs");
 }
+
+/// `{task_id}` before `{state}`: `auth.build`'s path `auth.build-{state}.md` matches
+/// `auth.build-docs`'s empty brief too, with `{state}` taking `docs`. A longer id
+/// could stand there, so it is refused as another ticket's, never cleaned.
+#[test]
+fn a_longer_ids_brief_beside_an_id_first_path_is_refused_not_cleaned() {
+    let files = [("runtime/supervise/auth.build-docs.md", "")];
+    let template = "runtime/supervise/{task_id}-{state}.md";
+    let dir = project("remove-id-first-brief", template, &["build", "build-docs"], &files);
+
+    let result = new_run(&["remove", "auth.build"], &dir);
+    assert_failure(&result, "auth.build cannot be removed");
+    let said = flattened_output(&result);
+    assert!(
+        said.contains("runtime/supervise/auth.build-docs.md may belong to another ticket"),
+        "got:\n{said}"
+    );
+    assert!(dir.join(files[0].0).is_file(), "auth.build-docs's brief stays");
+    assert!(plan_has(&dir, "### Task build:"));
+}
+
+/// The ci-heal summary `runtime/fix-summary/{task_id}.{visit_count}.md`: `auth.1.1`'s
+/// path is `auth.1.1.<visit>.md`, so `auth.1.1.md`, `auth.1`'s first summary, is never
+/// its and stays when `auth.1.1` is removed.
+#[test]
+fn the_declared_tail_keeps_a_parents_summary_from_a_childs_removal() {
+    let dir =
+        project("remove-id-first-tail", "runtime/fix-summary/{task_id}.{visit_count}.md", &[], &[]);
+    let plan = "# Rhei: Auth\n\n---\nstructure:\n  maxLevels: 3\n---\n\n## Tasks\n\n\
+                ### Task 1: parent\n**State:** pending\n\n#### Task 1.1: child\n**State:** pending\n\n\
+                ### Task 2: other\n**State:** pending\n";
+    fs::write(dir.join("auth.rhei.md"), plan).expect("the plan");
+    fs::create_dir_all(dir.join("runtime/fix-summary")).expect("the summaries");
+    fs::write(dir.join("runtime/fix-summary/auth.1.1.md"), "").expect("auth.1's first summary");
+
+    let result = new_run(&["remove", "auth.1.1"], &dir);
+    assert_success(&result);
+    assert!(!result.stdout.contains("auth.1.1.md"), "got:\n{}", result.stdout);
+    assert!(dir.join("runtime/fix-summary/auth.1.1.md").is_file(), "auth.1's summary stays");
+    assert!(!plan_has(&dir, "#### Task 1.1:") && plan_has(&dir, "### Task 1:"));
+}

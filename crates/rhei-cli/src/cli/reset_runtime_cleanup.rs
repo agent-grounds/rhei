@@ -147,15 +147,13 @@ fn report_reset_summary(decision: &ResetDecision, removed_runtime: bool) {
     }
 }
 
-/// One runtime path a narrowed reset removes for a ticket: either a fully
-/// resolved path, or a literal prefix within a directory when the artifact
-/// template still carries run-time placeholders (`{state}`, `{visit_count}`,
-/// `{model}`, …) that a reset cannot resolve, or, where such a placeholder comes
-/// before `{task_id}`, the template matched component by component.
-/// §FS-rhei-reset.2.1
+/// One runtime path a narrowed reset removes for a ticket: a fully resolved path,
+/// a name rhei writes itself matched by its prefix, or a declared path that still
+/// carries run-time placeholders (`{state}`, `{visit_count}`, `{model}`, …), matched
+/// in full, component by component. §FS-rhei-reset.2.1
 enum ScopedTarget {
     Exact(PathBuf),
-    Prefixed { dir: PathBuf, prefix: String },
+    Prefixed(NamedPrefix),
     Pattern(ComponentPattern),
 }
 
@@ -166,8 +164,8 @@ struct ScopedRemovals {
     /// Ledger lines are pruned per execution root, once, after the per-ticket
     /// sweep: sibling rheis share one `state-transitions.log`.
     ledgers: BTreeMap<PathBuf, BTreeSet<String>>,
-    /// Who owns a file a prefix matches, so the removal leaves a longer id's.
-    owners: PrefixOwners,
+    /// Which tickets the reset keeps, so the removal leaves a path one could own.
+    owners: RuntimeOwners,
     /// Roots holding a record keyed by an in-scope ticket's bare local id that a
     /// ticket scope did not sweep. §FS-rhei-reset.2.5.5
     bare_kept: BTreeSet<PathBuf>,
@@ -206,7 +204,7 @@ fn scoped_removals(
         *sweep_ok.entry(root).or_insert(true) &= scope.contains(task_id);
     }
     let legacy_sweep_ok = |root: &PathBuf| sweep_ok.get(root).copied().unwrap_or(false);
-    let owners = PrefixOwners::index(loaded, input, machines);
+    let owners = RuntimeOwners::index(loaded, scope);
     let mut bare_kept = BTreeSet::new();
     let mut losing = BTreeSet::new();
     let mut ledger_rows: BTreeMap<PathBuf, BTreeMap<String, String>> = BTreeMap::new();
@@ -242,18 +240,25 @@ fn scoped_removals(
             } else if local_id != task_id && scope.tickets().is_some() {
                 // Kept, and said so where there is one to keep. §FS-rhei-reset.2.5.5
                 let bare = scoped_runtime_targets(&runtime, local_id, machine);
-                if bare.iter().any(|target| target_exists(target, &owners)) {
+                if bare.iter().any(|target| owners.takes_any(target)) {
                     bare_kept.insert(base);
                 }
             }
         }
-        // What the ticket loses decides whether its supervisor is held for it.
-        // §FS-rhei-reset.2.5.3
+        // What the ticket loses decides whether its supervisor is held for it, and a
+        // file it takes where a longer in-scope id could stand is lost by that ticket
+        // too. §FS-rhei-reset.2.5.3
         if scope.tickets().is_some() {
             let rows = ledger_rows.entry(root.clone()).or_insert_with(|| ledger_first_departures(&root));
-            if rows.contains_key(task_id.as_str())
-                || own.iter().any(|target| target_exists(target, &owners))
-            {
+            let mut loses = rows.contains_key(task_id.as_str());
+            for target in &own {
+                let paths = owners.entries(target).unwrap_or_default();
+                loses |= !paths.is_empty();
+                for path in &paths {
+                    losing.extend(owners.standing(target, path).cloned());
+                }
+            }
+            if loses {
                 losing.insert(task_id.clone());
             }
         }
@@ -273,19 +278,6 @@ fn scoped_removals(
         }
     }
     ScopedRemovals { targets, ledgers, owners, bare_kept, losing }
-}
-
-/// Whether `target` names anything on disk now that the removal would take.
-fn target_exists(target: &ScopedTarget, owners: &PrefixOwners) -> bool {
-    match target {
-        ScopedTarget::Exact(path) => path.exists(),
-        ScopedTarget::Prefixed { dir, prefix } => {
-            owners.entries(dir, prefix).is_ok_and(|paths| !paths.is_empty())
-        }
-        ScopedTarget::Pattern(pattern) => {
-            owners.pattern_entries(pattern).is_ok_and(|paths| !paths.is_empty())
-        }
-    }
 }
 
 /// Remove what [`scoped_removals`] names, recording in `progress` what has landed.
@@ -325,23 +317,17 @@ fn scoped_runtime_targets(
         // §FS-rhei-reset.2.1: exact export homes are independent of machine artifact contracts.
         ScopedTarget::Exact(runtime.join("exports").join(task_id)),
         // §FS-rhei-agents.9 / §FS-rhei-programs.5: `task-<id>-<state>[-…].log`.
-        ScopedTarget::Prefixed { dir: runtime.join("logs"), prefix: format!("task-{task_id}-") },
+        ScopedTarget::Prefixed(NamedPrefix::new(runtime.join("logs"), "task-", task_id)),
         // The record of every spawn those logs came from. §FS-rhei-agents.8.4
-        ScopedTarget::Prefixed { dir: runtime.join("spawns"), prefix: format!("task-{task_id}-") },
+        ScopedTarget::Prefixed(NamedPrefix::new(runtime.join("spawns"), "task-", task_id)),
         // The session reports rendered from those logs, `.orphaned-…` ones
         // included. §FS-rhei-reset.2.1
-        ScopedTarget::Prefixed { dir: runtime.join("reports"), prefix: format!("task-{task_id}-") },
+        ScopedTarget::Prefixed(NamedPrefix::new(runtime.join("reports"), "task-", task_id)),
         // §FS-rhei-snapshots.4: `<id>-<state>-<slug>-<nonce>/` session dirs.
-        ScopedTarget::Prefixed {
-            dir: runtime.join("snapshot-sessions"),
-            prefix: format!("{task_id}-"),
-        },
+        ScopedTarget::Prefixed(NamedPrefix::new(runtime.join("snapshot-sessions"), "", task_id)),
         ScopedTarget::Exact(runtime.join("worktree-refs").join(format!("{task_id}.yaml"))),
         // §FS-rhei-cost-accounting.2: per-ticket captures and task index.
-        ScopedTarget::Prefixed {
-            dir: runtime.join("accounting").join("captures"),
-            prefix: format!("{accounting_id}-"),
-        },
+        ScopedTarget::Prefixed(NamedPrefix::capture(runtime.join("accounting").join("captures"), task_id)),
         ScopedTarget::Exact(
             runtime.join("accounting").join("tasks").join(format!("{accounting_id}.json")),
         ),
@@ -357,66 +343,33 @@ fn scoped_runtime_targets(
             if !artifact.path.contains("{task_id}") || !seen.insert(artifact.path.clone()) {
                 continue;
             }
-            // A placeholder before the id leaves a prefix no ticket id stands in, so
-            // that path is matched one component at a time. §FS-rhei-reset.2.1
-            if ComponentPattern::applies_to(&artifact.path) {
-                targets.push(ScopedTarget::Pattern(ComponentPattern::new(root, &artifact.path, task_id)));
-                continue;
-            }
-            let resolved = artifact.path.replace("{task_id}", task_id);
-            match resolved.split_once('{') {
-                // A template with placeholders a reset cannot resolve becomes a
-                // literal prefix; the text between `{task_id}` and the next
-                // placeholder keeps `auth.1` from matching `auth.10`.
-                Some((literal, _)) => {
-                    let literal = root.join(literal);
-                    let Some(dir) = literal.parent().map(Path::to_path_buf) else { continue };
-                    let Some(prefix) =
-                        literal.file_name().and_then(|name| name.to_str()).map(str::to_string)
-                    else {
-                        continue;
-                    };
-                    if !prefix.is_empty() {
-                        targets.push(ScopedTarget::Prefixed { dir, prefix });
-                    }
-                }
-                None => targets.push(ScopedTarget::Exact(root.join(resolved))),
-            }
+            // A placeholder a reset cannot resolve, before the id or after it, leaves a
+            // path matched in full, one component at a time. §FS-rhei-reset.2.1
+            targets.push(if ComponentPattern::applies_to(&artifact.path) {
+                ScopedTarget::Pattern(ComponentPattern::new(root, &artifact.path, task_id))
+            } else {
+                ScopedTarget::Exact(root.join(artifact.path.replace("{task_id}", task_id)))
+            });
         }
     }
     targets
 }
 
-/// Remove what `target` names; a file a prefix matches only where no longer id owns
-/// it. §FS-rhei-reset.2.1
+/// Remove what `target` names and its ticket owns, where no ticket the reset keeps
+/// could own it. §FS-rhei-reset.2.1
 fn remove_scoped_target(
     target: &ScopedTarget,
-    owners: &PrefixOwners,
+    owners: &RuntimeOwners,
     removed_paths: &mut Vec<PathBuf>,
 ) -> MietteResult<bool> {
-    match target {
-        ScopedTarget::Exact(path) => remove_runtime_path(path, removed_paths),
-        ScopedTarget::Prefixed { dir, prefix } => {
-            let paths = owners
-                .entries(dir, prefix)
-                .map_err(|err| file_io_report(dir, "failed to read runtime directory", err))?;
-            let mut removed = false;
-            for path in paths {
-                removed |= remove_runtime_path(&path, removed_paths)?;
-            }
-            Ok(removed)
-        }
-        ScopedTarget::Pattern(pattern) => {
-            let paths = owners
-                .pattern_entries(pattern)
-                .map_err(|(dir, err)| file_io_report(&dir, "failed to read runtime directory", err))?;
-            let mut removed = false;
-            for path in paths {
-                removed |= remove_runtime_path(&path, removed_paths)?;
-            }
-            Ok(removed)
-        }
+    let paths = owners
+        .entries(target)
+        .map_err(|(dir, err)| file_io_report(&dir, "failed to read runtime directory", err))?;
+    let mut removed = false;
+    for path in paths {
+        removed |= remove_runtime_path(&path, removed_paths)?;
     }
+    Ok(removed)
 }
 
 /// The entries of `dir` whose name starts with `prefix`; none where `dir` is not a

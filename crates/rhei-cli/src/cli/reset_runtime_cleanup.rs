@@ -5,8 +5,8 @@
 /// Runtime directories a full reset would delete, in report order. A narrowed
 /// reset removes per-ticket artifacts rather than whole trees, so it lists
 /// none and the preview says so in words. §FS-rhei-panta.6.4
-fn reset_runtime_preview(loaded: &LoadedPlan, input: &Path, scope: &RheiScope) -> Vec<PathBuf> {
-    if scope.is_some() {
+fn reset_runtime_preview(loaded: &LoadedPlan, input: &Path, scope: ResetScope<'_>) -> Vec<PathBuf> {
+    if scope.is_narrowed() {
         return Vec::new();
     }
     let mut dirs: Vec<PathBuf> = Vec::new();
@@ -27,17 +27,29 @@ fn reset_runtime_preview(loaded: &LoadedPlan, input: &Path, scope: &RheiScope) -
 /// and summary while the complete writer stack remains held.
 // §FS-rhei-reset.1.2 §FS-rhei-reset.4
 struct ResetDecision {
+    /// The rheis it reaches: the named ones, or those a ticket scope's tickets are in.
     scope: RheiScope,
+    /// The tickets `--task` reaches, when it narrowed the reset. §FS-rhei-reset.2.5
+    tickets: Option<TicketScope>,
     task_count: usize,
     descendant_count: usize,
     authored: AuthoredStates,
     runtime_targets: Vec<PathBuf>,
+    /// What a ticket scope says after its moves. §FS-rhei-reset.4
+    left: TicketScopeLeft,
+}
+
+impl ResetDecision {
+    /// The scope every step of the reset asks.
+    fn reset_scope(&self) -> ResetScope<'_> {
+        ResetScope::of(&self.scope, self.tickets.as_ref())
+    }
 }
 
 fn collect_reset_decision(
     loaded: &LoadedPlan,
     input: &Path,
-    scope: &RheiScope,
+    scope: ResetScope<'_>,
     resolved: &ResolvedMachineSet,
 ) -> MietteResult<ResetDecision> {
     // §FS-rhei-reset.2.1: corrupt pairs refuse before any destructive rewrite.
@@ -59,10 +71,14 @@ fn collect_reset_decision(
         .rhei
         .tasks
         .iter()
-        .filter(|task| task_in_rhei_scope(scope, &task.id.to_string()))
+        .filter(|task| scope.contains(&task.id.to_string()))
         .collect();
-    let task_count = in_scope.len();
-    let total_nodes: usize = in_scope.iter().map(|task| count_nodes(task)).sum();
+    // A ticket scope counts its tickets, at any depth, as the tasks it resets.
+    // §FS-rhei-reset.4
+    let (task_count, total_nodes) = match scope.tickets() {
+        Some(tickets) => (tickets.reached.len(), tickets.reached.len()),
+        None => (in_scope.len(), in_scope.iter().map(|task| count_nodes(task)).sum()),
+    };
 
     let authored = collect_authored_states(loaded, input, scope, machines);
     // A reset that would leave a plan validation refuses is refused here, before any
@@ -75,12 +91,15 @@ fn collect_reset_decision(
     if let Some(refusal) = reset_filesystem_refusal(loaded, input, scope, machines, &authored)? {
         return Err(refusal);
     }
+    let left = TicketScopeLeft::collect(loaded, input, scope, machines, &authored);
     Ok(ResetDecision {
-        scope: scope.clone(),
+        scope: scope.rheis(),
+        tickets: scope.tickets().cloned(),
         task_count,
         descendant_count: total_nodes.saturating_sub(task_count),
         authored,
         runtime_targets: reset_runtime_preview(loaded, input, scope),
+        left,
     })
 }
 
@@ -96,7 +115,8 @@ fn report_reset_preview(decision: &ResetDecision) {
             decision.task_count, decision.descendant_count
         );
     }
-    report_state_moves(&decision.authored, "Would move");
+    report_state_moves(&decision.authored, "Would move", decision.tickets.as_ref());
+    decision.left.report("Would hold");
     if decision.runtime_targets.is_empty() {
         // §FS-rhei-reset.2.1: the preview includes ticket-owned export directories.
         println!("Would remove per-ticket runtime artifacts (results, exports, ledgers).");
@@ -118,7 +138,8 @@ fn report_reset_summary(decision: &ResetDecision, removed_runtime: bool) {
             decision.task_count, decision.descendant_count
         );
     }
-    report_state_moves(&decision.authored, "Moved");
+    report_state_moves(&decision.authored, "Moved", decision.tickets.as_ref());
+    decision.left.report("Held");
     if removed_runtime {
         println!("Removed runtime output.");
     } else {
@@ -142,6 +163,11 @@ struct ScopedRemovals {
     /// Ledger lines are pruned per execution root, once, after the per-ticket
     /// sweep: sibling rheis share one `state-transitions.log`.
     ledgers: BTreeMap<PathBuf, BTreeSet<String>>,
+    /// Who owns a file a prefix matches, so the removal leaves a longer id's.
+    owners: PrefixOwners,
+    /// Roots holding a record keyed by an in-scope ticket's bare local id that a
+    /// ticket scope did not sweep. §FS-rhei-reset.2.5.5
+    bare_kept: BTreeSet<PathBuf>,
 }
 
 /// The one enumeration of [`ScopedRemovals`], for the removal and for the check that it
@@ -149,7 +175,7 @@ struct ScopedRemovals {
 fn scoped_removals(
     loaded: &LoadedPlan,
     input: &Path,
-    scope: &RheiScope,
+    scope: ResetScope<'_>,
     machines: &rhei_validator::MachineSet,
 ) -> ScopedRemovals {
     let mut targets = Vec::new();
@@ -166,25 +192,22 @@ fn scoped_removals(
 
     let mut ledgers: BTreeMap<PathBuf, BTreeSet<String>> = BTreeMap::new();
 
-    // Pre-qualification runtime records are keyed by the rhei-local id; a
-    // local-id sweep at a root is only unambiguous when every rhei rooted
-    // there is in scope — shared roots collide on local ids. §FS-rhei-panta.6.4
-    let mut root_owners: BTreeMap<&PathBuf, BTreeSet<&str>> = BTreeMap::new();
+    // Pre-qualification records are keyed by the rhei-local id; a local-id sweep at a root is
+    // only unambiguous when every ticket rooted there is in scope — shared roots collide on
+    // local ids. §FS-rhei-panta.6.4 §FS-rhei-reset.2.5.5
+    let mut sweep_ok: BTreeMap<&PathBuf, bool> = BTreeMap::new();
     for (task_id, root) in &loaded.task_roots {
-        let owner = task_id.split_once('.').map(|(head, _)| head).unwrap_or(task_id);
-        root_owners.entry(root).or_default().insert(owner);
+        *sweep_ok.entry(root).or_insert(true) &= scope.contains(task_id);
     }
-    let legacy_sweep_ok = |root: &PathBuf| {
-        root_owners
-            .get(root)
-            .is_some_and(|owners| owners.iter().all(|owner| task_in_rhei_scope(scope, owner)))
-    };
+    let legacy_sweep_ok = |root: &PathBuf| sweep_ok.get(root).copied().unwrap_or(false);
+    let owners = PrefixOwners::index(loaded, input, machines);
+    let mut bare_kept = BTreeSet::new();
 
     // Run-orchestrated logs and captures land under the project execution
     // root even for tickets whose own rhei root is a subdirectory, so a
     // narrowed reset must sweep both roots. §FS-rhei-reset.2.1
     let project_root = execution_workspace_root(input);
-    for task_id in task_ids.iter().filter(|id| task_in_rhei_scope(scope, id)) {
+    for task_id in task_ids.iter().filter(|id| scope.contains(id)) {
         let root = loaded.task_root(task_id, input);
         let ledger_ids = ledgers.entry(root.clone()).or_default();
         ledger_ids.insert(task_id.clone());
@@ -207,10 +230,39 @@ fn scoped_removals(
             targets.extend(scoped_runtime_targets(&runtime, task_id, machine));
             if local_id != task_id && legacy_sweep_ok(&base) {
                 targets.extend(scoped_runtime_targets(&runtime, local_id, machine));
+            } else if local_id != task_id && scope.tickets().is_some() {
+                // Kept, and said so where there is one to keep. §FS-rhei-reset.2.5.5
+                let bare = scoped_runtime_targets(&runtime, local_id, machine);
+                if bare.iter().any(|target| target_exists(target, &owners)) {
+                    bare_kept.insert(base);
+                }
             }
         }
     }
-    ScopedRemovals { targets, ledgers }
+    if scope.tickets().is_some() {
+        // A ledger row keyed by a bare local id is such a record too.
+        for (root, ids) in ledgers.iter().filter(|(root, _)| !legacy_sweep_ok(root)) {
+            let rows = ledger_first_departures(root);
+            let bare = |id: &String| {
+                let local = rhei_local_id_str(id);
+                local != id.as_str() && rows.contains_key(local)
+            };
+            if ids.iter().any(bare) {
+                bare_kept.insert(root.clone());
+            }
+        }
+    }
+    ScopedRemovals { targets, ledgers, owners, bare_kept }
+}
+
+/// Whether `target` names anything on disk now that the removal would take.
+fn target_exists(target: &ScopedTarget, owners: &PrefixOwners) -> bool {
+    match target {
+        ScopedTarget::Exact(path) => path.exists(),
+        ScopedTarget::Prefixed { dir, prefix } => {
+            owners.entries(dir, prefix).is_ok_and(|paths| !paths.is_empty())
+        }
+    }
 }
 
 /// Remove what [`scoped_removals`] names, recording in `progress` what has landed.
@@ -218,7 +270,7 @@ fn scoped_removals(
 fn remove_scoped_runtime_artifacts(
     loaded: &LoadedPlan,
     input: &Path,
-    scope: &RheiScope,
+    scope: ResetScope<'_>,
     machines: &rhei_validator::MachineSet,
     reset_locks: &mut ResetWriterLocks,
     progress: &mut ResetProgress,
@@ -226,7 +278,7 @@ fn remove_scoped_runtime_artifacts(
     let removals = scoped_removals(loaded, input, scope, machines);
     let mut removed = false;
     for target in &removals.targets {
-        removed |= remove_scoped_target(target, &mut progress.removed_paths)?;
+        removed |= remove_scoped_target(target, &removals.owners, &mut progress.removed_paths)?;
     }
     for (root, ids) in &removals.ledgers {
         let pruned = prune_transition_ledger(root, ids, reset_locks)?;
@@ -306,11 +358,18 @@ fn scoped_runtime_targets(
     targets
 }
 
-fn remove_scoped_target(target: &ScopedTarget, removed_paths: &mut Vec<PathBuf>) -> MietteResult<bool> {
+/// Remove what `target` names; a file a prefix matches only where no longer id owns
+/// it. §FS-rhei-reset.2.1
+fn remove_scoped_target(
+    target: &ScopedTarget,
+    owners: &PrefixOwners,
+    removed_paths: &mut Vec<PathBuf>,
+) -> MietteResult<bool> {
     match target {
         ScopedTarget::Exact(path) => remove_runtime_path(path, removed_paths),
         ScopedTarget::Prefixed { dir, prefix } => {
-            let paths = matching_entries(dir, prefix)
+            let paths = owners
+                .entries(dir, prefix)
                 .map_err(|err| file_io_report(dir, "failed to read runtime directory", err))?;
             let mut removed = false;
             for path in paths {

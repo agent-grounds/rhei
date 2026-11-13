@@ -61,7 +61,7 @@ impl ResetRefusal {
 fn reset_refusal(
     loaded: &LoadedPlan,
     input: &Path,
-    scope: &RheiScope,
+    scope: ResetScope<'_>,
     machines: &rhei_validator::MachineSet,
     authored: &AuthoredStates,
 ) -> MietteResult<Option<ResetRefusal>> {
@@ -85,9 +85,9 @@ fn errors_the_offered_reset_introduces(
     machines: &rhei_validator::MachineSet,
 ) -> Vec<String> {
     let scope: RheiScope = Some(BTreeSet::from([rhei.to_string()]));
-    let authored = collect_authored_states(loaded, input, &scope, machines);
+    let authored = collect_authored_states(loaded, input, (&scope).into(), machines);
     let standing = rhei_validator::validate_with_machine_set(&loaded.rhei, machines).errors;
-    errors_a_reset_introduces(loaded, input, &scope, machines, &authored, &standing)
+    errors_a_reset_introduces(loaded, input, (&scope).into(), machines, &authored, &standing)
         .unwrap_or_default()
 }
 
@@ -97,7 +97,7 @@ fn errors_the_offered_reset_introduces(
 fn errors_a_reset_introduces(
     loaded: &LoadedPlan,
     input: &Path,
-    scope: &RheiScope,
+    scope: ResetScope<'_>,
     machines: &rhei_validator::MachineSet,
     authored: &AuthoredStates,
     standing: &[String],
@@ -115,7 +115,7 @@ fn errors_a_reset_introduces(
 fn plan_a_reset_leaves(
     loaded: &LoadedPlan,
     input: &Path,
-    scope: &RheiScope,
+    scope: ResetScope<'_>,
     authored: &AuthoredStates,
     mut staged: HashMap<PathBuf, String>,
 ) -> MietteResult<LoadedPlan> {
@@ -128,16 +128,17 @@ fn plan_a_reset_leaves(
         let moves = authored.by_file.get(&file).unwrap_or(&no_moves);
         // Scanned after the mark, staged with it. §REQ-cross-platform.9
         let (mark, raw) = split_byte_order_mark(&raw);
-        let text = format!("{mark}{}", reset_file_text(raw, moves, loaded.document_role(&file))?);
+        let under = reset_strips_under(scope, moves);
+        let text = format!("{mark}{}", reset_file_text(raw, moves, loaded.document_role(&file), under)?);
         staged.insert(file, text);
     }
-    for (file, task_ids) in reset_metadata_targets(loaded, input, scope) {
+    for (file, edit) in reset_metadata_targets(loaded, input, scope, authored) {
         let raw = match staged.get(&file) {
             Some(text) => text.clone(),
             None => read_plan_source(&file, "failed to read metadata document")?,
         };
         let (mark, raw) = split_byte_order_mark(&raw);
-        staged.insert(file.clone(), format!("{mark}{}", reset_metadata_text(&file, raw, &task_ids)?));
+        staged.insert(file.clone(), format!("{mark}{}", reset_metadata_text(&file, raw, &edit)?));
     }
     rhei_core::source::read_staged(staged, || load_plan(input))
 }
@@ -150,7 +151,7 @@ fn plan_a_reset_leaves(
 fn refusal_help(
     loaded: &LoadedPlan,
     input: &Path,
-    scope: &RheiScope,
+    scope: ResetScope<'_>,
     machines: &rhei_validator::MachineSet,
     authored: &AuthoredStates,
     standing: &[String],
@@ -214,7 +215,7 @@ fn refusal_help(
 fn edits_let_the_reset_through(
     loaded: &LoadedPlan,
     input: &Path,
-    scope: &RheiScope,
+    scope: ResetScope<'_>,
     machines: &rhei_validator::MachineSet,
     standing: &[String],
     edits: &[(&rhei_core::ast::Task, String)],

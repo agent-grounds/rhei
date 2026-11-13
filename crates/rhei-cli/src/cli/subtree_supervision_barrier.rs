@@ -90,6 +90,7 @@ impl SupervisionTransition<'_> {
                 from: self.from.to_string(),
                 to: self.to.to_string(),
                 visit: self.to_visit.max(1),
+                reset: false,
             },
         ))
     }

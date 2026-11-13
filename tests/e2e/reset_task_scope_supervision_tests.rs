@@ -64,7 +64,6 @@ fn finished_chain(name: &str) -> (TestDir, PathBuf, PathBuf) {
 /// A released supervisor the scope leaves out is held, with a reset checkpoint
 /// for each reopened step, and its state line is left as it was.
 #[test]
-#[ignore = "red until #679: `rhei reset --task` is an unknown argument; implement removes this"]
 fn a_supervisor_the_scope_leaves_out_is_held_with_reset_checkpoints() {
     let (dir, plan, machine) = finished_chain("reset-task-held-supervisor");
     let implement = fs::read_to_string(dir.join("runtime/results/plan.1.1.md")).expect("kept");
@@ -114,7 +113,6 @@ fn a_supervisor_the_scope_leaves_out_is_held_with_reset_checkpoints() {
 /// A finished supervisor over the reopened step is taken along, alone, back to
 /// `supervising`: no supervision block is already held, so it is not held again.
 #[test]
-#[ignore = "red until #679: `rhei reset --task` is an unknown argument; implement removes this"]
 fn a_finished_supervisor_is_reopened_and_not_held_a_second_time() {
     let (_dir, plan, machine) = finished_chain("reset-task-finished-supervisor");
     assert_success(&run_cli("complete", &plan, &machine, &["--task", "1", "--result", "shipped"]));

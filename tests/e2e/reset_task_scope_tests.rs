@@ -12,7 +12,6 @@ use super::reset_task_scope_support::*;
 /// The issue's repro: a new version of the paper arrives, so `ingest` and the two
 /// tickets that read it run again, and `venue` keeps everything it had.
 #[test]
-#[ignore = "red until #679: `rhei reset --task` is an unknown argument; implement removes this"]
 fn the_issues_repro_resets_ingest_and_its_dependents_and_keeps_venue_byte_for_byte() {
     let world = ScopeWorld::paper("reset-task-repro");
     let plan_before = world.read("paper.rhei.md");
@@ -66,7 +65,6 @@ fn the_issues_repro_resets_ingest_and_its_dependents_and_keeps_venue_byte_for_by
 
 /// Priors of a named ticket are never pulled in: `paper.3` goes back alone.
 #[test]
-#[ignore = "red until #679: `rhei reset --task` is an unknown argument; implement removes this"]
 fn a_named_tickets_priors_are_never_pulled_in() {
     let world = ScopeWorld::paper("reset-task-no-priors");
     let ingest_result = world.read("runtime/results/paper.2.md");
@@ -85,7 +83,6 @@ fn a_named_tickets_priors_are_never_pulled_in() {
 
 /// `a → b → c`: each ticket names the edge that reached it, and `d` is untouched.
 #[test]
-#[ignore = "red until #679: `rhei reset --task` is an unknown argument; implement removes this"]
 fn a_transitive_chain_is_reset_with_the_edge_that_reached_each_ticket() {
     let world = ScopeWorld::new("reset-task-chain");
     world.write(
@@ -143,7 +140,6 @@ fn finished_family(name: &str) -> ScopeWorld {
 }
 
 #[test]
-#[ignore = "red until #679: `rhei reset --task` is an unknown argument; implement removes this"]
 fn children_of_a_named_ticket_and_of_a_dependent_are_reset() {
     let world = finished_family("reset-task-children");
 
@@ -159,7 +155,6 @@ fn children_of_a_named_ticket_and_of_a_dependent_are_reset() {
 /// The finished parent goes back alone: its other child keeps its result, and
 /// the parent's own dependent comes along.
 #[test]
-#[ignore = "red until #679: `rhei reset --task` is an unknown argument; implement removes this"]
 fn a_finished_ancestor_is_taken_alone_and_its_other_children_are_kept() {
     let world = finished_family("reset-task-ancestor");
     let sibling = fs::read(world.path("runtime/results/x.1.1.md")).expect("sibling result");
@@ -182,7 +177,6 @@ fn a_finished_ancestor_is_taken_alone_and_its_other_children_are_kept() {
 /// A finished parent with no ledger row has no state to go back to: the
 /// refusal of §FS-rhei-reset.2.3 stands, with nothing changed.
 #[test]
-#[ignore = "red until #679: `rhei reset --task` is an unknown argument; implement removes this"]
 fn a_finished_ancestor_with_no_ledger_rows_is_still_refused() {
     let world = ScopeWorld::new("reset-task-ledgerless-ancestor");
     world.write("x.rhei.md", FAMILY);
@@ -216,7 +210,6 @@ transitions:
 /// `x.build`'s prefix matches `x.build-docs`'s files too; they are the longer
 /// id's, so `--task x.build` leaves them. §FS-rhei-reset.2.1
 #[test]
-#[ignore = "red until #679: `rhei reset --task` is an unknown argument; implement removes this"]
 fn a_prefix_matched_file_belongs_to_the_longest_ticket_id() {
     let world = ScopeWorld::new("reset-task-prefix");
     world.write("states.yaml", PREFIX_MACHINE);

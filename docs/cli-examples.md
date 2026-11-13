@@ -232,7 +232,8 @@ rhei verify WORKSPACE --json
 
 It exits `0` when everything named still matches, `1` on any mismatch,
 missing or unlisted file, and `2` on a usage error such as a short digest. A
-path a narrowed `rhei reset --rhei` removed is reported as pruned, not missing.
+path a narrowed `rhei reset --rhei` or `rhei reset --task` removed is reported
+as pruned, not missing.
 See [§FS-rhei-verify](functional-spec/rhei-verify.spec.md#fs-rhei-verify-rhei-verify) and [§FS-rhei-evidence](functional-spec/rhei-evidence.spec.md#fs-rhei-evidence-per-invocation-evidence).
 
 Keep a run's evidence after its workspace is gone, or hand it to someone who

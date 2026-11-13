@@ -454,6 +454,11 @@ a run the event lists, whatever is at that path now; the newer run's own
 manifest covers the new bytes ([§FS-rhei-verify.3](rhei-verify.spec.md#3-findings)). Ordering comes from that
 list, never from timestamps.
 
+For a `--task` scope ([§FS-rhei-reset.2.5](rhei-reset.spec.md#25-ticket-scope---task)), `tickets` is its closure, and `rheis` is
+the sorted, distinct rheis those tickets belong to, though the reset left their
+other tickets as they were: `rheis` says where the event's paths are, not what
+was reset whole.
+
 A log moved away by hand, the other remedy for a refused log, is later reported
 as missing: the reset is the remedy that records why the log went.
 

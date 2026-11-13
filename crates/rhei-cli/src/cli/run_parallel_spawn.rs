@@ -140,7 +140,7 @@ fn spawn_parallel_agent_work_item(
     )?;
     // Initial fills, refills and fanout retain evidence per invocation. §FS-rhei-run.3.4
     let Some(budget_arm) = spawn_refusals.admission(
-        task_id, state, identity.as_deref(), visit_count, admitted, sink,
+        task_id, state, identity.as_deref(), log_number, admitted, sink,
     ) else {
         return Ok(ParallelAgentSpawnOutcome::Skipped);
     };

@@ -86,7 +86,7 @@ fn assert_command_attached(case: &CodexRun) {
     let expected = json!({
         "command": "lookup-server", "args": ARGUMENTS,
         "env": {"TOKEN": TOKEN, "PATH": case.dir.join("bin"), "EMPTY": ""},
-        "cwd": fs::canonicalize(&case.dir).expect("checkout root").join("server home")
+        "cwd": rhei_core::platform::canonical_path(&case.dir).expect("checkout root").join("server home")
     });
     assert_eq!(record["config"]["mcp_servers"], json!({"lookup": expected}));
     if let Some(servers) = native_servers(case) {

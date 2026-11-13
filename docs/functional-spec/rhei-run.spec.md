@@ -1393,6 +1393,23 @@ line. It remains on the callback-only path, which reports its selected
 transition or the existing `withheld:` outcome when an empty supervising visit
 cannot release its descendants.
 
+Before projecting pending agent or program work, a dry run uses the same
+read-only spawn planning as the real run, with the same task and runtime roots,
+state machine, invocation identity, entry number and attempt. This applies to
+both sequential and pooled dispatch. Reusable work and callback-only states
+do not plan a new spawn.
+
+If planning refuses an invocation, the dry run reports the concrete cause and
+any recovery guidance the real run offers, instead of that invocation's
+successful spawn line or projected post-work transition. For example, a file
+at the planned log path with no accounting spawn record is reported with that
+path and the move-away/reset guidance of [§FS-rhei-agents.8.1](rhei-agents.spec.md#81-log-file-naming).
+An unreadable entry-numbering ledger is likewise a planning refusal, not a
+successful prediction. These are the existing planner's refusals; dry run
+neither allocates another log name nor changes which spawns the real run
+accepts. It continues reporting the other selected work and exits non-zero
+when a pending invocation is refused, as the real run would on the same state.
+
 No file lock is acquired, no markdown is rewritten, and no runtime artifacts are created.
 
 Plain and JSON dry runs use their selected run frontend and carry initial

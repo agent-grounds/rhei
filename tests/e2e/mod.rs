@@ -38,6 +38,8 @@ mod archive_snapshot_tests;
 mod archive_support;
 mod archive_tamper_tests;
 mod archive_tests;
+mod budget_admission_halt_support;
+mod budget_admission_halt_tests;
 mod budget_ancestry_project_tests;
 mod budget_ceiling_equality_tests;
 mod budget_ceiling_tests;

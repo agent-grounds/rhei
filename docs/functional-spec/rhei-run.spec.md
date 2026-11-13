@@ -925,6 +925,23 @@ pass stops working that ticket and continues with the others; the run exits
 non-zero under step 9 once a pass makes no progress, naming every ticket it
 stopped and why.
 
+Budget-admission refusals participate in the final refusal diagnosis of step 9
+in both serial and parallel execution, including initial pool fills and refills.
+The final halt identifies refused admission (or refused spawning), names every
+affected ticket and its refused state, and repeats its concrete cause or points
+to the refusal diagnostic above. It must not replace that diagnosis with the
+generic blocked, gated, or assigned explanation or send the reader only to
+`rhei list`. The diagnostic and help together give an actionable remedy: for an
+unavailable inherited ancestor, they identify
+`RHEI_BUDGET_PARENT_RESERVATION` as the source and explain how to correct the
+inherited descriptor or, for a run outside that ancestor's context, remove it
+from the environment before retrying
+([§FS-rhei-budgets.7.1](rhei-budgets.spec.md#71-how-the-descriptor-reaches-a-nested-run)).
+Refusal evidence remains relevant while the ticket is stranded in that state;
+a later successful admission or state change must not leave stale refusal help.
+Allocation-refusal, ordinary-blockage, and unfired-timeout diagnoses retain
+their meanings when those cause the halt.
+
 The halt names the dimension, the effective bound with its value source and —
 when the machine clamped it — its limiting source, the consumed, outstanding
 and remaining amounts, the accounting mode, and exactly the one remedy that

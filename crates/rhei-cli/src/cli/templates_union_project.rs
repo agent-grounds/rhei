@@ -45,10 +45,12 @@
     /// settings root a member rhei resolves: a copy beside the rhei is read by
     /// nothing, and the machine the union just brought names the agents it
     /// defines. Values the project already holds win, and the summary names
-    /// both what was added and what was kept.
+    /// both what was added and what was kept. `rendered` is `source`'s path in
+    /// the rendered part.
     /// §FS-rhei-library.2 §FS-rhei-templates.6.2 §FS-rhei-agents.1.1
     fn hoist_settings_into_project(
         source: &Path,
+        rendered: &Path,
         project: &Path,
         writes: &mut UnionWrites,
     ) -> MietteResult<()> {
@@ -64,7 +66,7 @@
         let (mut added, mut kept) = (Vec::new(), Vec::new());
         merge_settings_value(&mut merged, &incoming, "", &mut added, &mut kept);
         let target = project_settings_write_path(project);
-        let rendered = serde_json::to_string_pretty(&merged)
+        let merged_text = serde_json::to_string_pretty(&merged)
             .map_err(|err| {
                 miette!(help = internal_error_help(), "failed to render merged settings: {err}")
             })?
@@ -82,7 +84,12 @@
                 kept.join(", ")
             ));
         }
-        writes.files.push((target, rendered));
+        // A project with no settings gains the template's as a file of its own,
+        // which is the rendering; one it has stays itself. §FS-rhei-errors.4.1
+        if existing.is_none() {
+            writes.rendered.push((target.clone(), rendered.to_path_buf()));
+        }
+        writes.files.push((target, merged_text));
         Ok(())
     }
 

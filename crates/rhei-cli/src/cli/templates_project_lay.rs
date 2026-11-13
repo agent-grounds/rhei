@@ -218,7 +218,8 @@
             });
         }
         if let Some(found) = resolve_rhei_home_file(rendered, WORKSPACE_SETTINGS_FILE) {
-            hoist_settings_into_project(found.path(), project, &mut writes)?;
+            let relative = found.path().strip_prefix(rendered).unwrap_or(found.path());
+            hoist_settings_into_project(found.path(), relative, project, &mut writes)?;
         }
         Ok(ProjectRoot { writes, copied, replaced: changed })
     }

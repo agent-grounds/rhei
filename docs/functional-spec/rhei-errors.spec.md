@@ -460,7 +460,13 @@ target's own files stay themselves ([§FS-rhei-library.2](rhei-library.spec.md#2
    template that rendered it — as the reader can open it from the invocation
    directory. A project template's member is rendered from its `includes:`
    entry's template, so the file named is that template's, never a path under
-   the project template.
+   the project template. The one file rendering moves is a template's root
+   `settings.json`, which lands in rhei's project-local home
+   ([§FS-rhei-templates.6.1.2](rhei-templates.spec.md#612-behavior)) or is hoisted into the project's
+   ([§FS-rhei-templates.6.2](rhei-templates.spec.md#62-instantiating-inside-a-panta-project)). A refusal of that rendered settings file names the
+   template's `settings.json`, and where an `includes:` union joined its
+   templates' settings into it, says the setting may be in one of those
+   templates instead.
 2. **A rendered location still shown is marked.** Where the refusal still shows
    the rendered location, it says that the location is the rendering of that
    template file, and gives its status: proposed and not written when nothing

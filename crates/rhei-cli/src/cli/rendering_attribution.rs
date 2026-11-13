@@ -119,23 +119,26 @@ impl RenderingAttribution {
     /// recorded file, or where the template has none there the template by the
     /// caller's reference, never a file that does not exist. §FS-rhei-errors.4.1
     fn source(&self, relative: &Path) -> String {
+        // The one file materialize moves: its root settings. §FS-rhei-templates.6.1.2
+        let settings = relative == rendered_template_settings(Path::new(""));
+        let relative = if settings { Path::new(TEMPLATE_SETTINGS_FILE) } else { relative };
         let counterpart = !relative.as_os_str().is_empty()
             && self.template_dir.join(relative).is_file();
         let named = match (counterpart, self.builtin) {
             (true, true) => {
-                return format!(
-                    "{} of the built-in template '{}'",
-                    relative.display(),
-                    self.template_ref
-                );
+                format!("{} of the built-in template '{}'", relative.display(), self.template_ref)
             }
-            (true, false) => return display_path(&self.template_dir.join(relative)),
+            (true, false) => display_path(&self.template_dir.join(relative)),
             (false, true) => format!("the built-in template '{}'", self.template_ref),
             (false, false) => format!("the template '{}'", self.template_ref),
         };
-        // An `includes:` union renames what it joins, so the line may be in one of
-        // those templates instead. §FS-rhei-errors.4.1
-        if self.includes { format!("{named} or a template it includes") } else { named }
+        // An `includes:` union renames what it joins and joins its templates'
+        // settings, so the line may be in one of those templates instead. §FS-rhei-errors.4.1
+        if self.includes && (!counterpart || settings) {
+            format!("{named} or a template it includes")
+        } else {
+            named
+        }
     }
 }
 
@@ -213,6 +216,33 @@ fn diagnostic_location(path: &Path) -> String {
 /// target's own machines are themselves. §FS-rhei-errors.4.1 §FS-rhei-library.7.5
 fn machine_rendering(path: Option<&Path>) -> Option<String> {
     path.and_then(rendered_origin).map(|origin| origin.rendering)
+}
+
+/// The settings file a template may ship at its root. §FS-rhei-templates.6.1.2
+const TEMPLATE_SETTINGS_FILE: &str = "settings.json";
+
+/// Where a template's root `settings.json` is rendered under `rendered`: rhei's
+/// project-local home, not beside the plan. Materialize writes it here and a
+/// refusal reads it back as that file, so both take it from this one rule.
+/// Nothing else is rendered there, because materialize never copies a template's
+/// dot-directories. §FS-rhei-templates.6.1.2 §FS-rhei-errors.4.1
+fn rendered_template_settings(rendered: &Path) -> PathBuf {
+    rhei_home_write_path(rendered, TEMPLATE_SETTINGS_FILE)
+}
+
+/// A file as a refusal quotes it, `'<path>'`, then, where it lies in a rendering,
+/// whose rendering it is; and, when that rendering is gone, the retry a help gives
+/// in place of re-checking it. A file in no rendering is quoted as it always was.
+/// §FS-rhei-errors.4.1
+fn quoted_rendered_file(path: &Path) -> (String, Option<&'static str>) {
+    let quoted = format!("'{}'", path.display());
+    match rendered_origin(path) {
+        Some(origin) => (
+            format!("{quoted}, {}", origin.rendering),
+            origin.discarded.then_some(RENDERING_RETRY),
+        ),
+        None => (quoted, None),
+    }
 }
 
 /// The same instantiation again, after fixing what the template rendered.

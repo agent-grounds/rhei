@@ -364,25 +364,26 @@ fn load_settings_document(path: &Path) -> MietteResult<SettingsDocument> {
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
             return Ok(empty_settings_document());
         }
-        Err(err) => {
-            return Err(miette!(
-                help = settings_help(),
-                "failed to read settings '{}': {err}", path.display()
-            ));
-        }
+        Err(err) => return Err(settings_load_report(path, "read", err)),
     };
     let raw: serde_json::Value = serde_json::from_str(&contents)
-        .map_err(|err| miette!(
-            help = settings_help(),
-            "failed to parse settings '{}': {err}", path.display()
-        ))?;
+        .map_err(|err| settings_load_report(path, "parse", err))?;
     validate_profile_prices_document(path, &raw)?;
     let typed: RheiSettings = serde_json::from_value(raw.clone())
-        .map_err(|err| miette!(
-            help = settings_help(),
-            "failed to decode settings '{}': {err}", path.display()
-        ))?;
+        .map_err(|err| settings_load_report(path, "decode", err))?;
     Ok(SettingsDocument { raw, typed, source_path: Some(path.to_path_buf()) })
+}
+
+/// A settings file that does not load, named as the file it is. One a template
+/// rendered is named as that rendering, and one that is gone is fixed in the
+/// template and instantiated again rather than validated. §FS-rhei-errors.4.1
+fn settings_load_report(path: &Path, failed: &str, err: impl std::fmt::Display) -> miette::Report {
+    let (shown, retry) = quoted_rendered_file(path);
+    let help = match retry {
+        Some(retry) => format!("correct the settings {retry}"),
+        None => settings_help(),
+    };
+    miette!(help = help, "failed to {failed} settings {shown}: {err}")
 }
 
 /// Validate profile rates before typed decoding so every failure can name the
@@ -443,8 +444,12 @@ fn validate_profile_prices_document(path: &Path, raw: &serde_json::Value) -> Mie
 }
 
 fn invalid_profile_price(path: &Path, field: &str, problem: &str) -> miette::Report {
-    miette!(
-        help = "provide currency, effective_at, and all four integer micro-currency rates; omit reserved generated-entry keys",
-        "invalid profile price in settings '{}': {field} {problem}", path.display()
-    )
+    const HELP: &str = "provide currency, effective_at, and all four integer micro-currency rates; omit reserved generated-entry keys";
+    // A rendered file is the template's, and one that is gone is not validated. §FS-rhei-errors.4.1
+    let (shown, retry) = quoted_rendered_file(path);
+    let help = match retry {
+        Some(retry) => format!("{HELP}. Make that change {retry}"),
+        None => HELP.to_owned(),
+    };
+    miette!(help = help, "invalid profile price in settings {shown}: {field} {problem}")
 }

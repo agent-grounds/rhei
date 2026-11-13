@@ -92,8 +92,9 @@
             // in rhei's project-local home; non-root `settings.json` stays put.
             // Rhei writes the current home only. §FS-rhei-templates.1.1
             let at_template_root = src_dir == template_root;
-            let dest_path = if at_template_root && name_str == "settings.json" {
-                let settings_path = rhei_home_write_path(dest_dir, "settings.json");
+            let dest_path = if at_template_root && name_str == TEMPLATE_SETTINGS_FILE {
+                // The rule a refusal maps the rendering back by. §FS-rhei-errors.4.1
+                let settings_path = rendered_template_settings(dest_dir);
                 let settings_dir = settings_path.parent().unwrap_or(dest_dir).to_path_buf();
                 fs::create_dir_all(&settings_dir).map_err(|err| {
                     target.io_report(

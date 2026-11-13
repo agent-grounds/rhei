@@ -355,7 +355,11 @@ which is canonical.
 
 - `run_id`, `status` (`finished`, `failed`, `interrupted` or `incomplete`),
   `exit_code`, `started_at`, `ended_at`, and `finalized_by` (`null` unless
-  [§FS-rhei-evidence.9.3](rhei-evidence.spec.md#93-a-run-killed-outright) wrote it);
+  [§FS-rhei-evidence.9.3](rhei-evidence.spec.md#93-a-run-killed-outright) wrote it). `status` is `interrupted` for a run a signal
+  ended, `incomplete` for one finalized after it was killed, and otherwise the
+  terminal status `run.json` takes from the same exit code
+  ([§FS-rhei-run-headless.2](rhei-run-headless.spec.md#2-the-run-descriptor)): `finished` for `0` and for the idle `3`, `failed`
+  for any other;
 - `rhei_build` and `checkout_head_at_start`, as on `run.json`;
 - `invocations`: each process's `kind`, its id (`invocation_id` or
   `callback_id`), its `key`, and whether it `completed`;

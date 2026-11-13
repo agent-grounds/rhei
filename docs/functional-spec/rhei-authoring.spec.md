@@ -179,6 +179,23 @@ point `**Prior:**` at the completed task.
 **Prior:** Task fetch-prs    ← Invalid when `fetch-prs` is this task's parent
 ```
 
+Nesting does not carry ordering down to the children either. A `**Prior:**` on a parent
+gates that parent's own visit only: it does not hold its children, and a child
+with no `**Prior:**` of its own is ready at once, while the parent's
+prerequisites are still open
+([§FS-rhei-plan-language.3.1](rhei-plan-language.spec.md#31-dependency-integrity)). So give each child that must wait
+the `**Prior:**` itself; `rhei list --ready` shows which tasks would start.
+
+```markdown
+### Task 2: Build on the ground
+**State:** pending
+**Prior:** Task 1
+
+#### Task 2.1: First part
+**State:** pending
+**Prior:** Task 1    ← Without it, Task 2.1 starts beside Task 1
+```
+
 `**Prior:**` is the markdown authoring form. SDKs expose the same data under
 idiomatic names — `task.metadata.dependsOn` (TypeScript/JavaScript, Java,
 CLI JSON) or `task.metadata.depends_on` (Python). See

@@ -21,7 +21,7 @@ fn raised_budget_release(project: bool) {
     fixture.raise_budget();
     assert_success(&run_cli_without_machine("validate", &run_input, &[]));
     // A project run is addressed through its member: there is no member run.json.
-    let release = fixture.transition(&fixture.input, "human-review", "work");
+    let release = fixture.transition_live(&mut live, &fixture.input, "human-review", "work");
     assert_release_success(&release, fixture.id, "human-review", "work");
     wait_for_budget_run(&mut live, "the same run re-gating at visit 3", || {
         fixture.gated() && fixture.visits() == 3
@@ -75,7 +75,7 @@ fn selected_scope_release(project_run: bool) {
         }
         let input = if project_address { &*fixture.dir } else { &fixture.input };
         fixture.raise_budget();
-        let release = fixture.transition(input, "human-review", "work");
+        let release = fixture.transition_live(&mut live, input, "human-review", "work");
         assert_release_success(&release, fixture.id, "human-review", "work");
         assert_advisory(&release, fixture.id, &fixture.dir, descriptor["id"].as_str());
         if !project_run {
@@ -179,7 +179,7 @@ fn issue_653_gate_release_without_descriptor_gives_foreground_recovery() {
         });
         assert!(live.output().contains("could not publish the run descriptor"));
         fixture.raise_budget();
-        let release = fixture.transition(&fixture.input, "human-review", "work");
+        let release = fixture.transition_live(&mut live, &fixture.input, "human-review", "work");
         assert_release_success(&release, fixture.id, "human-review", "work");
         assert_advisory(&release, fixture.id, &fixture.dir, None);
         assert!(release.stderr.contains("interrupt the foreground run"), "{}", release.stderr);
@@ -228,7 +228,7 @@ fn issue_653_gate_release_offers_usable_descriptor_path_without_registry() {
     });
     let descriptor = fixture.descriptor(&fixture.dir);
     fixture.raise_budget();
-    let release = fixture.transition(&fixture.input, "human-review", "work");
+    let release = fixture.transition_live(&mut live, &fixture.input, "human-review", "work");
     assert_release_success(&release, fixture.id, "human-review", "work");
     assert_advisory(&release, fixture.id, &fixture.dir, descriptor["id"].as_str());
     #[cfg(unix)]

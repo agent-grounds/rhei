@@ -79,13 +79,11 @@ fn publication_preserves_live_release(scope: &str) {
 }
 
 #[test]
-#[ignore = "red until #702: standalone budget publication must preserve the live advisory; implement removes this"]
 fn issue_702_standalone_budget_publication_preserves_live_release() {
     publication_preserves_live_release("standalone");
 }
 
 #[test]
-#[ignore = "red until #702: project budget publication must preserve the live advisory; implement removes this"]
 fn issue_702_project_budget_publication_preserves_live_release() {
     publication_preserves_live_release("project");
 }

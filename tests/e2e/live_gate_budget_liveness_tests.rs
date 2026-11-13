@@ -43,13 +43,11 @@ fn exited_run_is_not_ready(project: bool) {
 }
 
 #[test]
-#[ignore = "red until #702: observed standalone exit must reject live readiness; implement removes this"]
 fn issue_702_standalone_readiness_rejects_an_exited_run() {
     exited_run_is_not_ready(false);
 }
 
 #[test]
-#[ignore = "red until #702: observed project exit must reject live readiness; implement removes this"]
 fn issue_702_project_readiness_rejects_an_exited_run() {
     exited_run_is_not_ready(true);
 }

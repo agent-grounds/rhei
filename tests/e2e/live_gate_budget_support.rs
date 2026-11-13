@@ -153,13 +153,32 @@ node_policy:
         CliRun::from(&output)
     }
 
+    /// A live release must report an exited scheduler before checking its advisory.
+    /// §FS-rhei-transition-cmd.3.4 §REQ-cross-platform.4.1
+    pub fn transition_live(
+        &self,
+        run: &mut RunningChild,
+        input: &Path,
+        from: &str,
+        to: &str,
+    ) -> CliRun {
+        wait_for_budget_run(run, "live gate release", || true);
+        let release = self.transition(input, from, to);
+        wait_for_budget_run(run, "live gate-release advisory", || true);
+        release
+    }
+
     pub fn visits(&self) -> usize {
         fs::read_to_string(self.member.join("visits.txt")).unwrap_or_default().lines().count()
     }
 
+    /// Publish the complete machine before the scheduler can reload it. §REQ-cross-platform.4.1
     pub fn raise_budget(&self) {
         let machine = fs::read_to_string(&self.machine).unwrap();
-        fs::write(&self.machine, machine.replace("visits: 2", "visits: 5")).unwrap();
+        let staged = self.machine.with_extension("yaml.tmp");
+        fs::write(&staged, machine.replace("visits: 2", "visits: 5")).unwrap();
+        // Rename replaces the destination on Windows too; wait out open-handle refusals.
+        rhei_core::open_handle::wait_out(|| fs::rename(&staged, &self.machine)).unwrap();
     }
 
     pub fn gated(&self) -> bool {
@@ -177,6 +196,8 @@ node_policy:
     }
 }
 
+/// Reject observed exit before accepting even a persistent gate/visits predicate.
+/// §REQ-cross-platform.4.1
 pub(super) fn wait_for_budget_run(
     run: &mut RunningChild,
     label: &str,
@@ -186,10 +207,10 @@ pub(super) fn wait_for_budget_run(
     let deadline = Instant::now() + Duration::from_secs(60);
     loop {
         let status = run.child().try_wait().unwrap();
+        assert!(status.is_none(), "run exited {status:?} before {label}; {}", run.output());
         if predicate() {
             return;
         }
-        assert!(status.is_none(), "run exited {status:?} before {label}; {}", run.output());
         assert!(Instant::now() < deadline, "timed out waiting for {label}; {}", run.output());
         std::thread::sleep(Duration::from_millis(25));
     }

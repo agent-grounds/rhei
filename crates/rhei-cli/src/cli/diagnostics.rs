@@ -340,9 +340,10 @@ fn display_path(path: &Path) -> String {
 }
 
 /// Convert a parser error into an Elm-style diagnostic report.
+/// Misplaced task headings carry their own edit. §FS-rhei-errors.1.7
 fn parse_report(path: &Path, input: &str, err: &rhei_core::parser::ParseError) -> Report {
     miette!(
-        help = plan_authoring_help(),
+        help = parse_error_help(err),
         "{}", render_parse_diagnostic(path, input, err)
     )
 }
@@ -357,8 +358,12 @@ fn parse_errors_report(
     input: &str,
     errors: &[rhei_core::parser::ParseError],
 ) -> Report {
+    // A precise edit remains available even after an independent generic error. §FS-rhei-errors.1.7
+    let specific = errors.iter().find(|err| {
+        matches!(err.kind, rhei_core::parser::ParseErrorKind::TaskHeadingAboveTasks { .. })
+    });
     miette!(
-        help = plan_authoring_help(),
+        help = specific.map_or_else(plan_authoring_help, parse_error_help),
         "{}", render_multi_parse_diagnostic(path, input, errors)
     )
 }
@@ -468,11 +473,11 @@ fn render_multi_parse_diagnostic(
 // §FS-rhei-validate.4.2: parse diagnostics read the same in both scopes.
 fn nested_parse_report(err: &rhei_core::parser::ParseError) -> Report {
     let Some(path) = err.file.as_deref() else {
-        return miette!(help = plan_authoring_help(), "{}", err.message);
+        return miette!(help = parse_error_help(err), "{}", err.message);
     };
     let Ok(source) = std::fs::read_to_string(path) else {
         // The file moved or is unreadable; the message still stands on its own.
-        return miette!(help = plan_authoring_help(), "{}: {}", diagnostic_location(path), err.message);
+        return miette!(help = parse_error_help(err), "{}: {}", diagnostic_location(path), err.message);
     };
     // The project loader stops at the first error per entry, so the diagnostic
     // that actually explains the mistake — the structural one recovery reaches

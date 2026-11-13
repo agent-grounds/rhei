@@ -27,8 +27,6 @@ mod unrecorded_arrivals {
     /// arrival before it reveals the first stay, so this one is entry 2.
     // §FS-rhei-agents.8.1
     #[test]
-    #[ignore = "red until #667: a departure with no arrival before it is not counted as an \
-                arrival; implement removes this"]
     fn a_departure_with_no_arrival_before_it_counts_as_an_arrival() {
         let dir = tempfile::tempdir().expect("tmpdir");
         ledger_at(dir.path(), "plan.1 prepare@park\nplan.1 gate@check\nplan.1 check@gate\n");
@@ -93,8 +91,6 @@ mod unrecorded_arrivals {
     /// for: the refusal says so and points at the ledger, not at a reset.
     // §FS-rhei-agents.8.1 §FS-rhei-agents.8.4
     #[test]
-    #[ignore = "red until #667: a log an earlier stay's spawn record names is refused as one no \
-                record accounts for; implement removes this"]
     fn a_log_an_earlier_stays_record_names_is_refused_as_that_stays() {
         let dir = tempfile::tempdir().expect("tmpdir");
         let runtime = dir.path().join("runtime");

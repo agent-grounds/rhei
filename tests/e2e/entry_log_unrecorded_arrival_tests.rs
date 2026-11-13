@@ -118,8 +118,6 @@ fn assert_two_gate_entries(
 /// 2 rather than a second entry 1 refused for a log its own record names.
 // §FS-rhei-agents.8.1 §FS-rhei-authoring.7
 #[test]
-#[ignore = "red until #667: an arrival only a departure reveals is not counted, so the second \
-            stay reuses entry 1's log name and is refused; implement removes this"]
 fn a_hand_edited_arrival_still_gives_the_next_stay_its_own_entry() {
     let (dir, plan, machine) = parked_fixture("entry-log-hand-edited-arrival");
     let authored = fs::read_to_string(&plan).expect("plan");

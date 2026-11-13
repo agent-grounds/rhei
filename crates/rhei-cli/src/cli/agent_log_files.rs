@@ -75,9 +75,13 @@ fn resolve_log_number_report(
     ticket_entry_number_report(task_root, runtime_dir, task_id, state_name).map(LogNumber::Entry)
 }
 
-/// How many times the ticket has arrived in `state_name`: its arrivals over the
-/// two ledgers the move count reads, summed, plus one when it was placed there
-/// initially — its first ledger line leaves the state, or it has none yet.
+/// How many times the ticket has arrived in `state_name`, recorded or not, so
+/// that no stay takes an earlier stay's name (agent-grounds/rhei#309): every
+/// ledger line that lands in the state, over the two ledgers the move count
+/// reads, summed, plus each unrecorded arrival a line leaving the state reveals
+/// when the ticket's line before it does not land there. An initial placement
+/// is the first line's case; a `**State:**` line edited by hand is the case
+/// agent-grounds/rhei#667 found. A ticket with no ledger line is on entry 1.
 ///
 /// The movement parser is the ledger's own, so a forced metadata row and its
 /// movement row are one arrival and a metadata row it does not know is none. A
@@ -105,8 +109,8 @@ fn ticket_entry_number_report(
 ) -> MietteResult<u64> {
     let owning = task_root.join("runtime").join("state-transitions.log");
     let running = runtime_dir.join("state-transitions.log");
-    let mut first_from: Option<String> = None;
     let mut arrivals = 0u64;
+    let mut earlier_ledger_has_line = false;
     for path in std::iter::once(&owning).chain((running != owning).then_some(&running)) {
         let raw = match read_transition_ledger(path) {
             Ok(raw) => raw,
@@ -121,13 +125,19 @@ fn ticket_entry_number_report(
                 let context = unreadable_ledger(path, &err.to_string());
                 ledger_report(path, err).wrap_err(context)
             })?;
+        // Whether the ticket's line before this one lands in the state: none for
+        // the first line, and at the seam the owning ledger's line counts as one
+        // that does, so the seam reveals nothing. §FS-rhei-agents.8.1
+        let mut before_lands = earlier_ledger_has_line.then_some(true);
         for movement in movements.into_iter().filter(|movement| movement.task_id == task_id) {
-            first_from.get_or_insert_with(|| movement.from.clone());
-            arrivals += u64::from(movement.to == state_name);
+            let lands = movement.to == state_name;
+            let unrecorded = movement.from == state_name && before_lands != Some(true);
+            arrivals += u64::from(lands) + u64::from(unrecorded);
+            before_lands = Some(lands);
         }
+        earlier_ledger_has_line |= before_lands.is_some();
     }
-    let placed_here = first_from.is_none_or(|from| from == state_name);
-    Ok((arrivals + u64::from(placed_here)).max(1))
+    Ok(arrivals.max(1))
 }
 
 /// The refusal an unreadable ledger is: no entry number, so no name. §FS-rhei-agents.8.1

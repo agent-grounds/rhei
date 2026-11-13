@@ -188,6 +188,7 @@ include!("cli/provenance_identity.rs");
 include!("cli/supervised.rs");
 include!("cli/agent_command.rs");
 include!("cli/mcp_config_file.rs");
+include!("cli/codex_mcp.rs");
 include!("cli/mcp_preflight.rs");
 include!("cli/agent_output_reader.rs");
 include!("cli/agent_spawn.rs");

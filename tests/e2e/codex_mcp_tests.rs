@@ -6,7 +6,6 @@ use super::*;
 use serde_json::json;
 
 #[test]
-#[ignore = "red until #666: required command reaches Codex as native configuration; implement removes this"]
 fn codex_mcp_required_command_uses_native_configuration() {
     let settings = json!({"mcp_servers": {"lookup": command_server()}});
     let control = run_case("control", settings.clone(), "    mcp_servers: []\n", "codex");
@@ -45,7 +44,6 @@ fn assert_command_attached(case: &CodexRun) {
 }
 
 #[test]
-#[ignore = "red until #666: multiple definitions and dotted server ids survive native loading; implement removes this"]
 fn codex_mcp_multiple_definitions_preserve_server_ids() {
     let case = run_case(
         "server-ids",
@@ -75,7 +73,6 @@ fn codex_mcp_multiple_definitions_preserve_server_ids() {
 }
 
 #[test]
-#[ignore = "red until #666: defaults and Codex family inherit native attachment; implement removes this"]
 fn codex_mcp_defaults_and_family_use_native_configuration() {
     // Exercise defaults on the built-in, and defaults/state entries on a wrapper.
     let mut failures = Vec::new();
@@ -104,7 +101,6 @@ fn codex_mcp_defaults_and_family_use_native_configuration() {
 }
 
 #[test]
-#[ignore = "red until #666: unsupported required transports block before spawn; implement removes this"]
 fn codex_mcp_required_unsupported_transports_are_unavailable() {
     for (transport, scheme) in [("sse", "http"), ("websocket", "ws")] {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("reachable host");
@@ -130,7 +126,6 @@ fn codex_mcp_required_unsupported_transports_are_unavailable() {
 }
 
 #[test]
-#[ignore = "red until #666: unsupported optional transports report false and are dropped; implement removes this"]
 fn codex_mcp_optional_unsupported_transports_are_dropped() {
     for (transport, scheme) in [("sse", "http"), ("websocket", "ws")] {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("reachable host");

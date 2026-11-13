@@ -97,7 +97,8 @@ fn built_in_agents() -> BTreeMap<String, CustomAgentProfile> {
             prompt_flag: None,
             model_flag: Some("--model".to_string()),
             stdin_prompt: true,
-            mcp_flag: Some("--mcp".to_string()),
+            // §FS-rhei-agents.1.1.2.1: Codex consumes native configuration, not server ids.
+            mcp_flag: Some("-c".to_string()),
             // §FS-rhei-agents.2: `codex` is the only built-in declaring `writable_roots`.
             writable_roots: Some(rhei_validator::WritableRootsAdapter {
                 path_flag: "--add-dir".to_string(),

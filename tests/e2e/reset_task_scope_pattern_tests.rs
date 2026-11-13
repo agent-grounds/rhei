@@ -4,8 +4,6 @@
 
 // §FS-rhei-reset.2.1 §FS-rhei-reset.2.5
 
-use std::fs;
-
 use super::reset_task_scope_support::*;
 
 /// A machine whose output puts `{state}` before `{task_id}`, so the literal text up
@@ -198,6 +196,7 @@ fn a_placeholder_after_the_id_never_takes_a_pending_longer_ids_brief() {
 #[cfg(unix)]
 #[test]
 fn a_placeholder_before_the_id_never_follows_a_link_out_of_the_execution_root() {
+    use std::fs;
     use std::os::unix::fs::symlink;
     for scope in [&["--task", "paper.2"][..], &["--rhei", "paper"][..]] {
         let plan = "# Rhei: Paper\n\n## Tasks\n\n### Task 1: venue\n**State:** pending\n\n\

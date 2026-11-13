@@ -32,6 +32,19 @@ impl RunStatus {
     fn is_terminal(self) -> bool {
         matches!(self, RunStatus::Finished | RunStatus::Failed)
     }
+
+    /// The terminal status a run's own exit code stamps: `finished` for `0`
+    /// and for the idle stop of `--until-idle` (§FS-rhei-run-json.5), `failed`
+    /// for any other code, as §FS-rhei-run-headless.2 says. This is the one
+    /// place the rule lives: the descriptor and the evidence manifest both
+    /// read it, which is how they agree (§FS-rhei-evidence.9.1).
+    pub(crate) fn for_exit_code(exit_code: i32) -> Self {
+        if exit_code == 0 || exit_code == EXIT_IDLE {
+            RunStatus::Finished
+        } else {
+            RunStatus::Failed
+        }
+    }
 }
 
 /// What a liveness probe could establish. The third answer is the point: an
@@ -471,7 +484,9 @@ pub(crate) fn finalize_run_descriptor(exit_code: i32) {
     if descriptor.id != published.id || descriptor.pid != published.pid {
         return;
     }
-    descriptor.status = if exit_code == 0 { RunStatus::Finished } else { RunStatus::Failed };
+    // An idle stop is finished too; `exit_code` tells it from a complete run.
+    // §FS-rhei-run-headless.2
+    descriptor.status = RunStatus::for_exit_code(exit_code);
     descriptor.exit_code = Some(exit_code);
     // Written before run.json takes its terminal status, so the two agree.
     // §FS-rhei-evidence.9

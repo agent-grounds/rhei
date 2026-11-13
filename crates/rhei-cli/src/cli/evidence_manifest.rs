@@ -205,12 +205,12 @@ fn finish_evidence_run(exit_code: i32) -> Option<serde_json::Value> {
     let run = evidence_run()?;
     let mut written = run.manifest.lock().unwrap_or_else(|poison| poison.into_inner());
     if written.is_none() {
+        // A signal wins; otherwise the status run.json takes from the same code.
+        // §FS-rhei-evidence.9.1
         let status = if interrupt_exit_code().is_some() {
             "interrupted"
-        } else if exit_code == 0 {
-            "finished"
         } else {
-            "failed"
+            RunStatus::for_exit_code(exit_code).label()
         };
         let accounting =
             run.accounting.lock().unwrap_or_else(|poison| poison.into_inner()).iter().cloned().collect();

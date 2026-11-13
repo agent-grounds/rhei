@@ -3,7 +3,10 @@
 use super::provider_limit_support::*;
 use super::*;
 
-fn fanout_machine(second: &str) -> String {
+/// `SIMPLE_MACHINE` fanned out over `codex:openai:alpha` and `second`, each
+/// arm owing its own output, so a finished arm is satisfied while its sibling
+/// is still to be spawned. §FS-rhei-run.3.3
+pub(super) fn fanout_machine(second: &str) -> String {
     SIMPLE_MACHINE.replace(
         "    target: codex:openai:alpha",
         &format!("    all_targets:\n      - codex:openai:alpha\n      - {second}"),

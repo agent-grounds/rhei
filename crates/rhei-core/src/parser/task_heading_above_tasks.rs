@@ -42,16 +42,3 @@ pub(super) fn refusal<'a>(
         ..ParseError::new(message, Some(heading_line))
     }
 }
-
-/// The end of the block the heading at index `start` opens: the index of the
-/// next heading outside a fence, or the end of `lines`. Recovery drops the
-/// whole block: every field in it sits under that heading, and dropping the
-/// heading alone would leave them to be refused again, each as a field outside
-/// a task. §FS-rhei-errors.1.7
-pub(super) fn block_end(lines: &[&str], start: usize) -> usize {
-    let mut fence = FenceTracker::default();
-    let next = lines[start + 1..]
-        .iter()
-        .position(|raw| !fence.read(raw) && !fence.is_open() && is_heading(raw.trim()));
-    next.map_or(lines.len(), |offset| start + 1 + offset)
-}

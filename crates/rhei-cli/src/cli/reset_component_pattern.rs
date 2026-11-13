@@ -1,10 +1,10 @@
 // A declared `{task_id}` artifact path with a placeholder before the id, matched
-// one path component at a time.
+// one path component at a time, and whose a path it matches is.
 //
 // Its own part because it is one rule with several readers: cut at its first
 // placeholder, such a path leaves a prefix no ticket id stands in, and a reset that
 // swept that prefix took every ticket's files under it. Both narrowings, the
-// bare-id check and `rhei remove` ask it.
+// bare-id check, the writability check and `rhei remove` ask it.
 
 // §AR-source-file-size.3 §FS-rhei-reset.2.1
 
@@ -16,13 +16,21 @@
 struct ComponentPattern {
     /// The execution root the declared path is relative to.
     root: PathBuf,
-    /// The declared path, `{task_id}` still in it.
-    template: String,
     /// The ticket id `{task_id}` stands for.
     id: String,
-    /// Each component of the resolved path as the literal pieces between its
-    /// placeholders: a single piece is a literal name.
-    components: Vec<Vec<String>>,
+    components: Vec<PatternComponent>,
+}
+
+/// One path component of a [`ComponentPattern`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct PatternComponent {
+    /// The resolved component as the literal pieces between its placeholders: a
+    /// single piece is a literal name.
+    pieces: Vec<String>,
+    /// Where the component holds `{task_id}`, the pieces of the declared text before
+    /// its first `{task_id}` and of the resolved text after it: where the id is
+    /// matched, which `pieces` no longer says.
+    id_slot: Option<(Vec<String>, Vec<String>)>,
 }
 
 impl ComponentPattern {
@@ -34,31 +42,37 @@ impl ComponentPattern {
 
     fn new(root: &Path, template: &str, id: &str) -> Self {
         let components = template
-            .replace("{task_id}", id)
             .split('/')
             .filter(|part| !part.is_empty() && *part != ".")
-            .map(component_pieces)
+            .map(|part| PatternComponent {
+                pieces: component_pieces(&part.replace("{task_id}", id)),
+                id_slot: part.split_once("{task_id}").map(|(before, after)| {
+                    (component_pieces(before), component_pieces(&after.replace("{task_id}", id)))
+                }),
+            })
             .collect();
-        Self { root: root.to_path_buf(), template: template.to_string(), id: id.to_string(), components }
-    }
-
-    /// The same declared path for another ticket id.
-    fn for_id(&self, id: &str) -> Self {
-        Self::new(&self.root, &self.template, id)
+        Self { root: root.to_path_buf(), id: id.to_string(), components }
     }
 
     /// Every path under `root` it matches now, read one level at a time; the
-    /// directory a listing failed in, with the error, where one did.
+    /// directory a listing failed in, with the error, where one did. From its first
+    /// placeholder down it enters only real directories, never a symbolic link, and a
+    /// link is matched only as the last component. §FS-rhei-reset.2.1
     fn entries(&self) -> Result<Vec<PathBuf>, (PathBuf, std::io::Error)> {
         let mut level = vec![self.root.clone()];
-        for (depth, pieces) in self.components.iter().enumerate() {
+        let mut placeholder_seen = false;
+        for (depth, component) in self.components.iter().enumerate() {
             let last = depth + 1 == self.components.len();
-            let present = |path: &Path| {
-                if last { fs::symlink_metadata(path).is_ok() } else { path.is_dir() }
+            placeholder_seen |= component.pieces.len() > 1;
+            let present = |path: &Path| match fs::symlink_metadata(path) {
+                Ok(_) if last => true,
+                Ok(meta) if placeholder_seen => meta.is_dir(),
+                Ok(_) => path.is_dir(),
+                Err(_) => false,
             };
             let mut next = Vec::new();
             for dir in &level {
-                if let [literal] = pieces.as_slice() {
+                if let [literal] = component.pieces.as_slice() {
                     let path = dir.join(literal);
                     if present(&path) {
                         next.push(path);
@@ -70,7 +84,8 @@ impl ComponentPattern {
                 }
                 for entry in fs::read_dir(dir).map_err(|err| (dir.clone(), err))?.flatten() {
                     let path = entry.path();
-                    let matched = entry.file_name().to_str().is_some_and(|name| pieces_match(pieces, name));
+                    let name = entry.file_name();
+                    let matched = name.to_str().is_some_and(|name| pieces_match(&component.pieces, name));
                     if matched && present(&path) {
                         next.push(path);
                     }
@@ -81,16 +96,50 @@ impl ComponentPattern {
         Ok(level)
     }
 
-    /// Whether `path` is one it matches, component for component.
-    fn matches(&self, path: &Path) -> bool {
-        let Ok(rest) = path.strip_prefix(&self.root) else { return false };
-        let names: Vec<Option<&str>> = rest.components().map(|part| part.as_os_str().to_str()).collect();
-        names.len() == self.components.len()
-            && names
-                .iter()
-                .zip(&self.components)
-                .all(|(name, pieces)| name.is_some_and(|name| pieces_match(pieces, name)))
+    /// Whether `path` is this ticket's: it matches, component for component, and no
+    /// longer id of `ids` could stand where `{task_id}` stands in it. A placeholder
+    /// reaches files of every naming, so that a longer id's own instance of the same
+    /// path does not match proves nothing. §FS-rhei-reset.2.1 §FS-rhei-remove.4.2
+    fn owns<'a>(&self, path: &Path, ids: impl IntoIterator<Item = &'a str>) -> bool {
+        let Some(names) = self.names(path) else { return false };
+        let id = self.id.as_str();
+        let longer: Vec<&str> =
+            ids.into_iter().filter(|other| other.len() > id.len() && other.contains(id)).collect();
+        names.iter().zip(&self.components).all(|(name, component)| {
+            pieces_match(&component.pieces, name)
+                && component.id_slot.as_ref().is_none_or(|(before, after)| {
+                    !longer_id_stands(name, id, before, after, &longer)
+                })
+        })
     }
+
+    /// `path`'s components under `root`, where there are as many as it has.
+    fn names<'p>(&self, path: &'p Path) -> Option<Vec<&'p str>> {
+        let rest = path.strip_prefix(&self.root).ok()?;
+        let names: Option<Vec<&str>> = rest.components().map(|part| part.as_os_str().to_str()).collect();
+        names.filter(|names| names.len() == self.components.len())
+    }
+}
+
+/// Whether one of `longer` could stand where `{task_id}` stands in `name`: it
+/// begins where the text before it reads as `before`, the declared text before
+/// `{task_id}`, and runs over a place `id` is matched at. Nothing after the id is
+/// asked of it. §FS-rhei-reset.2.1
+fn longer_id_stands(name: &str, id: &str, before: &[String], after: &[String], longer: &[&str]) -> bool {
+    let starts: Vec<usize> = (0..=name.len())
+        .filter(|&at| name.is_char_boundary(at) && pieces_match(before, &name[..at]))
+        .collect();
+    let mine: Vec<usize> = starts
+        .iter()
+        .copied()
+        .filter(|&at| name[at..].starts_with(id) && pieces_match(after, &name[at + id.len()..]))
+        .collect();
+    longer.iter().any(|other| {
+        starts.iter().any(|&from| {
+            name[from..].starts_with(other)
+                && mine.iter().any(|&at| from <= at && at + id.len() <= from + other.len())
+        })
+    })
 }
 
 /// One path component as the literal pieces between its placeholders:

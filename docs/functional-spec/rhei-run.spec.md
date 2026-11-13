@@ -803,6 +803,35 @@ writes its manifest with the run's status. A run killed outright writes
 neither; the next `rhei run` in that workspace finalizes it as `incomplete`
 once it holds the run lock ([§FS-rhei-evidence.9.3](rhei-evidence.spec.md#93-a-run-killed-outright)).
 
+#### 3.2.1. Proving Shutdown Inside Deadline-Triggered Grace
+
+A test of shutdown precedence inside the deadline-triggered grace must
+establish the order it claims: the stop token is initially unset and the
+deadline expired; the real termination sequence enters grace; the shutdown
+raise completes; termination and reaping complete; the returned cause is
+`Interrupted`. The test must assert that delivery happened inside that
+termination path. Raising before the wait proves a different case, and joining
+a sleeping raiser after the wait proves only eventual delivery.
+
+Delivery must be ordered independently of how quickly a worker is scheduled.
+An invocation-local synchronous test hook at grace entry may provide that
+order, but it must run before termination can complete even if a stalled
+waiter skips every time-guarded grace poll. A hook reachable only from such a
+poll does not establish the premise. Test support must affect only the
+invocation under test and leave the normal termination policy unchanged. A
+handshake alternative must hold termination until delivery is acknowledged,
+bound every wait with a generous finite margin, and release, kill, and reap
+on failure. [§REQ-cross-platform.8](../requirements/cross-platform.md#8-a-margin-outlasts-a-stalled-runner)
+
+The test retains the real deadline-triggered termination and its grace bound;
+lengthening grace or accepting either cause does not prove the ordering.
+[§REQ-cross-platform.8.1](../requirements/cross-platform.md#81-a-bound-that-is-the-behaviour-stays-as-tight-as-the-behaviour)
+As a negative control, removing only the final shutdown reread after
+termination must make the ordered test fail with `TimedOut` instead of
+`Interrupted`. A scheduling measure that delays the old sleeping raiser beyond
+grace exposes the harness defect separately: a raise after cause selection
+does not establish a mid-grace shutdown or a production classification defect.
+
 ### 3.3. Provider-Limit Parking
 
 A recognized provider limit ([§FS-rhei-agents.2.3](rhei-agents.spec.md#23-recognized-provider-refusals)) parks the invocation

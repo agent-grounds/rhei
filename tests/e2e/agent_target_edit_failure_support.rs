@@ -8,7 +8,7 @@ use serde_json::Value;
 /// Port of #619's interpreter shim. Private files coordinate actual startup;
 /// the one-second delay deliberately makes c slow, rather than fixing a race.
 /// A prerequisite timeout has a distinct exit code and diagnostic.
-const STARTUP_SCHEDULER: &str = r#"import json
+pub(super) const STARTUP_SCHEDULER: &str = r#"import json
 import os
 from pathlib import Path
 import runpy
@@ -91,6 +91,16 @@ fn assert_c_finished_before_d_exit(fixture: &Finished, successful_c: &Value) {
 }
 
 pub(super) fn check_failed_own_record(order: Option<&str>) {
+    check_failed_own_record_with(order, "", &|_| {});
+}
+
+/// The same scenario with `prefix` prepended to the scheduler, and `inspect`
+/// called on the fixture directory after each run, before its assertions.
+pub(super) fn check_failed_own_record_with(
+    order: Option<&str>,
+    prefix: &str,
+    inspect: &dyn Fn(&std::path::Path),
+) {
     let fixture = finished_then_died(
         "agent-target-edit-own-failed",
         r#"all_targets: ["mock:mock:x"]"#,
@@ -101,13 +111,15 @@ pub(super) fn check_failed_own_record(order: Option<&str>) {
     if let Some(order) = order {
         fs::write(fixture.dir.join("startup-order"), order).expect("private startup schedule");
         let wrapper = fixture.dir.join("startup-scheduler.py");
-        fs::write(&wrapper, STARTUP_SCHEDULER).expect("private interpreter scheduler");
+        fs::write(&wrapper, format!("{prefix}{STARTUP_SCHEDULER}"))
+            .expect("private interpreter scheduler");
         write_settings(&fixture.dir, &wrapper, false);
     }
     fs::write(&fixture.machine, machine(r#"all_targets: ["mock:mock:c", "mock:mock:d"]"#))
         .expect("edit the target in place");
     let args = ["--no-tui", "--no-callbacks"];
     let first = run_cli("run", &fixture.plan, &fixture.machine, &args);
+    inspect(&fixture.dir);
     let first_records = records(&fixture);
     let journal = fs::read_to_string(fixture.dir.join("runtime/transitions.log")).expect("journal");
     eprintln!("schedule={order:?}\nrecords c/d/x: {first_records:#?}\njournal:\n{journal}");
@@ -145,6 +157,7 @@ pub(super) fn check_failed_own_record(order: Option<&str>) {
 
     let before_second = spawn_lines(&fixture.dir).len();
     let second = run_cli("run", &fixture.plan, &fixture.machine, &args);
+    inspect(&fixture.dir);
     let respawned = spawn_lines(&fixture.dir).split_off(before_second);
     assert_eq!(
         respawned,

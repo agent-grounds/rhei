@@ -76,6 +76,30 @@ establish that order within their fixture, rather than rely on startup order.
 An orphan with no invocation to answer for (a removed fan-out member) or an
 invocation with no orphan (an added one) pairs nothing and passes silently.
 
+### 5.1. Ordering Fixture Harness
+
+The failed-own-record scenario establishes that order with fixture reads of
+the successful sibling c's current-visit spawn record: d's poll before its
+deliberate exit, the startup scheduler's check that c succeeded before d is
+dispatched, and the scheduler's snapshot of c's record taken at d's deliberate
+exit. Rhei replaces that record by rename, and a reader that overlaps the
+replacement may be refused
+([§AR-agent-orchestrator-workflow.3.3.1.1](../architecture/agent-orchestrator-workflow.spec.md#3311-a-replacement-refused-by-an-open-handle)).
+
+Each of the three reads retries an access, sharing or lock refusal
+(`PermissionError`, or Windows error 5, 32 or 33) within the fixture's existing
+5-second monotonic bound, so a transient refusal neither escapes d's process
+nor is mistaken for d's deliberate exit: the snapshot is always written after
+that exit and holds c's successful record. A refusal that lasts to the bound
+ends with the fixture's prerequisite-timeout exit, 97, naming c's record path
+and the last refusal; the snapshot read never records a refused read as a
+missing record. Unrelated I/O errors propagate without a retry. This binds this
+test harness, not the engine's reads.
+
+A deterministic regression injects one recognizable refusal into each of the
+three reads of the actual fixtures and still requires the whole scenario above,
+and injects a permanent refusal and an unrelated error into each read directly.
+
 ## 6. The Legacy First-Visit Branch
 
 The legacy first-visit interpretation of [§FS-rhei-agents.3.2](rhei-agents.spec.md#32-completion-condition), which may reuse

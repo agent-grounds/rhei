@@ -8,8 +8,9 @@
 
 /// Whether the bound admits this arm, reported either way: a worker pool that
 /// skipped it would be the exception that makes the count untrue. One arm at a
-/// time, which is the stated residual. A refusal is the pool's stall.
-/// §FS-rhei-run.3.4 §FS-rhei-budgets.6.1 §FS-rhei-budgets.4.2
+/// time, which is the stated residual. A refusal is the pool's stall: `None`.
+/// An admission returns the arm it admitted, `Some(None)` where nothing is
+/// accounted. §FS-rhei-run.3.4 §FS-rhei-budgets.6.1 §FS-rhei-budgets.4.2 §FS-rhei-budgets.6.2.1
 #[allow(clippy::too_many_arguments)]
 fn admit_parallel_agent_spawn(
     item: &AgentWorkItem,
@@ -22,7 +23,7 @@ fn admit_parallel_agent_spawn(
     opts: &RunOptions,
     budget_run: &BudgetRun,
     sink: &Arc<dyn rhei_tui::EventSink>,
-) -> MietteResult<bool> {
+) -> MietteResult<Option<Option<String>>> {
     match budget_admit_spawn(
         input,
         loaded,
@@ -36,16 +37,16 @@ fn admit_parallel_agent_spawn(
         budget_run,
     )? {
         // §FS-rhei-budgets.9
-        BudgetAdmission::Admitted { bounds, note } => {
+        BudgetAdmission::Admitted { bounds, note, arm } => {
             sink.emit(rhei_tui::RunEvent::BudgetSnapshot { bounds });
             // Nothing is wrong, so it is a note and not a warning.
             // §FS-rhei-budgets.7.2
             if let Some(note) = note {
                 emit_run_message(sink, rhei_tui::MessageLevel::Info, note);
             }
-            Ok(true)
+            Ok(Some(arm))
         }
-        BudgetAdmission::NotAccounted => Ok(true),
+        BudgetAdmission::NotAccounted => Ok(Some(None)),
         BudgetAdmission::Refused { halt, event, bounds } => {
             // The same current facts on a refused pool admission. §FS-rhei-budgets.9
             if !bounds.is_empty() {
@@ -55,7 +56,7 @@ fn admit_parallel_agent_spawn(
             if let Some(event) = event {
                 sink.emit(*event);
             }
-            Ok(false)
+            Ok(None)
         }
     }
 }

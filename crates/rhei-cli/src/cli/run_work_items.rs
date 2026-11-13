@@ -106,36 +106,9 @@ struct ParallelAgentCompletion {
     accounting_recorded: bool,
     accounting_warning: Option<String>,
     slot: rhei_tui::Slot,
-}
-
-/// A parallel agent that ran to completion, handed to the post-exit handling
-/// that decides what its exit means. Split out of `ParallelAgentCompletion`
-/// because the interrupted and spawn-failure arms answer for themselves.
-struct ParallelAgentExit {
-    task_id_str: String,
-    state_name: String,
-    started_at: std::time::SystemTime,
-    /// Carried on from the completion, still unemitted: this is the path that
-    /// selects the transition telling a wait from a failure.
-    // §FS-rhei-states.2.2
-    release: PendingSlotRelease,
-    resolved: ResolvedAgent,
-    log: PathBuf,
-    snapshot_preload: SnapshotPreload,
-    visit_count: u64,
-    /// Whether the visit this invocation belongs to has an attempt left after
-    /// it. Decided at the spawn, where the budget is resolved, and read where
-    /// the run says what it will do next.
-    // §FS-rhei-agents.3.2.1 §FS-rhei-agents.3.2.3
-    retry_outlook: RetryOutlook,
-    /// The supervisor's subtree as this spawn found it, for a supervising
-    /// state; `None` for every other. §FS-rhei-supervision.3.6
-    subtree_before: Option<SubtreeShape>,
-    /// Where this spawn recorded itself, so a withheld release edge can give
-    /// back the attempt it was charged. §FS-rhei-agents.3.2.3
-    spawn_record: PathBuf,
-    accounting_recorded: bool,
-    outcome: AgentSpawnOutcome,
+    /// The reservation this arm was admitted on, so its exit settles it and no
+    /// sibling. §FS-rhei-budgets.6.2.1
+    budget_arm: Option<String>,
 }
 
 struct ParallelProgramCompletion {

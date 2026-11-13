@@ -26,7 +26,6 @@ use super::budget_support::*;
 /// on record.
 // §FS-rhei-budgets.6.2.1
 #[test]
-#[ignore = "red until #657: the first arm's exit charges the running arm $20.00 unmeasurable; implement removes this"]
 fn each_fan_out_arm_settles_at_its_own_exit_from_its_own_record() {
     let fan = fan_out("budget-fan-out-settle", [CODEX, CLAUDE], "cld");
     fan.run(true);
@@ -64,7 +63,6 @@ fn each_fan_out_arm_settles_at_its_own_exit_from_its_own_record() {
 /// first record to land is not the first arm's.
 // §FS-rhei-budgets.6.2.1
 #[test]
-#[ignore = "red until #657: the claude arm's $3.00 is booked to the codex arm's reservation; implement removes this"]
 fn an_arm_that_finishes_first_is_booked_to_its_own_reservation() {
     let fan = fan_out("budget-fan-out-swapped", [CODEX, CLAUDE], "cdx");
     fan.run(true);
@@ -92,7 +90,6 @@ fn an_arm_that_finishes_first_is_booked_to_its_own_reservation() {
 /// against the bound a second time, mid-visit.
 // §FS-rhei-budgets.6.2.1 §FS-rhei-budgets.4.1
 #[test]
-#[ignore = "red until #657: the first arm's exit releases the travel unit and the edge is charged a fresh one; implement removes this"]
 fn a_fan_out_holds_its_one_travel_unit_until_no_arm_is_still_running() {
     let fan = fan_out("budget-fan-out-travel", [CODEX, CLAUDE], "cld");
     fan.run(true);
@@ -126,7 +123,6 @@ fn a_fan_out_holds_its_one_travel_unit_until_no_arm_is_still_running() {
 /// each still settles from its own record.
 // §FS-rhei-budgets.6.2.1
 #[test]
-#[ignore = "red until #657: without --parallel the running arm is still charged $20.00 unmeasurable; implement removes this"]
 fn a_fan_out_run_without_parallel_settles_each_arm_from_its_own_record() {
     let fan = fan_out("budget-fan-out-unflagged", [CODEX, CLAUDE], "cld");
     fan.run(false);
@@ -170,7 +166,6 @@ fn a_fan_out_arm_with_no_accounting_record_is_still_charged_the_reserve() {
 /// so a nested run started by the second arm is placed under the second arm.
 // §FS-rhei-budgets.6.2.1 §FS-rhei-budgets.7.1
 #[test]
-#[ignore = "red until #657: both arms are handed the first arm's reservation; implement removes this"]
 fn each_fan_out_arm_hands_its_descendants_its_own_reservation() {
     let fan = fan_out("budget-fan-out-ancestry", [CODEX, CLAUDE], "cld");
     fan.run(true);
@@ -191,7 +186,6 @@ fn each_fan_out_arm_hands_its_descendants_its_own_reservation() {
 /// return confirms the first arm's start and no other.
 // §FS-rhei-budgets.6.2.1 §FS-rhei-budgets.6.2
 #[test]
-#[ignore = "red until #657: the first arm's return confirms the running arm's start; implement removes this"]
 fn a_fan_out_arm_s_start_is_confirmed_only_once_its_own_process_returns() {
     let fan = fan_out("budget-fan-out-start", [CODEX, CLAUDE], "cld");
     fan.run(true);

@@ -43,6 +43,7 @@ fn plan_spawn_attempt(
         previous,
         evidence_state: serde_json::Value::Null,
         reset: None,
+        budget_arm: None,
     }
 }
 
@@ -356,4 +357,25 @@ impl<'a> SpawnSiteRoots<'a> {
 fn no_run_options() -> &'static RunOptions {
     static DEFAULTS: std::sync::OnceLock<RunOptions> = std::sync::OnceLock::new();
     DEFAULTS.get_or_init(default_run_options)
+}
+
+/// A plan for a unit test that only cares about the transcript a spawn writes:
+/// the first attempt of a first visit, recording beside the log it is given.
+#[cfg(test)]
+fn spawn_plan_for_test(log: &Path) -> SpawnPlan {
+    SpawnPlan {
+        log: log.to_path_buf(),
+        record: log.with_extension("spawn.json"),
+        moves: 0,
+        attempt: 1,
+        accounting: Some(AccountingAttemptIdentity {
+            invocation_id: "test::pending::mock::visit-1::run-test::move-0::attempt-1".into(),
+            run_id: Some("test".into()),
+        }),
+        charged: 0,
+        previous: None,
+        evidence_state: serde_json::Value::Null,
+        reset: None,
+        budget_arm: None,
+    }
 }

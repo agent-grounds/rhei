@@ -29,18 +29,21 @@ struct Measurement {
 ///
 /// Called where the accounting record is already durable, on whichever thread
 /// wrote it: the claim map is process-global and keyed by ticket, so the
-/// sequential and the parallel path reach it the same way. `None` is the
+/// sequential and the parallel path reach it the same way. It is stored on
+/// `arm`, the reservation of the invocation that wrote it, never on a sibling's.
+/// §FS-rhei-budgets.6.2.1 `None` is the
 /// class with no accounting extractor at all — no record is ever written for
 /// it — and it is deliberately *not* recorded here, so the settle charges it
 /// the reserve as `unmeasurable` rather than as nothing.
 /// §FS-rhei-budgets.6.2 §FS-rhei-cost-accounting.3.2
 fn budget_record_spend(
     task_id_str: &str,
+    arm: Option<&str>,
     usage: Option<&rhei_tui::UsageSummary>,
     book: &PriceBook,
     origin: &PriceBookOrigin,
 ) {
-    let Some(usage) = usage else { return };
+    let (Some(arm), Some(usage)) = (arm, usage) else { return };
     // A record whose pricing is `unpriced` or `not-applicable` carries no
     // amount, and a day that read `$0.00` for it would read healthy hardest
     // for the models nobody has written a price for yet. The currency is
@@ -56,8 +59,8 @@ fn budget_record_spend(
     let measurement =
         Measurement { amount_micro, currency: usage.currency.clone(), basis, pricing_context };
     with_claims(|claims| {
-        if let Some(claim) = claims.get_mut(task_id_str) {
-            claim.measured.push(measurement);
+        if let Some(held) = claims.get_mut(task_id_str).and_then(|claim| claim.arm_mut(arm)) {
+            held.measured = Some(measurement);
         }
     });
 }
@@ -85,21 +88,28 @@ fn unpriced_pricing_context(
     }
 }
 
-/// End the visit this claim paid for.
+/// End one arm of the visit this claim paid for, at that arm's own exit.
 ///
-/// A travel unit still held is one no edge was applied against — a poll wait, a
-/// completion that selected nothing, a stall — and it goes back. An invocation
-/// unit goes back only when no start was ever recorded, which is this engine
-/// knowing it never created the subprocess; once a start exists the unit is
-/// consumed, ambiguous or not. And once a start exists, every arm owes the
-/// day an amount: what the record said, or the worst case that was reserved
-/// for it. §FS-rhei-budgets.4.1 §FS-rhei-budgets.6.2
+/// The arm settles from its own record alone: once a start exists it owes the
+/// day what that record said, or the worst case reserved for it when it wrote
+/// none; with no start, its whole reservation goes back, which is this engine
+/// knowing it never created the subprocess. A sibling still running is not
+/// touched. §FS-rhei-budgets.6.2 §FS-rhei-budgets.6.2.1
+///
+/// The claim's shared part waits for its last live arm, so the edge that arm
+/// applies converts the one travel unit the visit holds. A travel unit still
+/// held then is one no edge was applied against — a poll wait, a completion
+/// that selected nothing, a stall — and it goes back. §FS-rhei-budgets.4.1
 fn budget_settle_visit(
     workspace_root: &Path,
     task_id_str: &str,
+    arm: Option<&str>,
     sink: &Arc<dyn rhei_tui::EventSink>,
 ) {
-    let Some(claim) = with_claims(|claims| claims.remove(task_id_str)) else { return };
+    let Some(arm) = arm else { return };
+    let Some(ended) = with_claims(|claims| end_held_arm(claims, task_id_str, arm)) else {
+        return;
+    };
     // Best effort by design: a visit that ends while the account cannot be
     // opened leaves the unit outstanding, which is the conservative direction.
     // Failing the run over a unit nobody spent would be the other one.
@@ -107,37 +117,65 @@ fn budget_settle_visit(
     let project_root = budget_project_root(workspace_root);
     let Ok(Some(account)) = Account::locate(&project_root) else { return };
     let Ok(mut journal) = account.open(true) else { return };
-    if claim.started {
+    let held = &ended.arm;
+    if held.started {
         // The account's own: an arm with no currency — nothing to settle, or a
         // record whose pricing named none — is charged in the one its reserve
         // was taken in rather than in a guess. §FS-rhei-budgets.5.5
-        let held = journal.snapshot().ok().and_then(|snapshot| snapshot.currency);
-        let fallback = held.as_deref().unwrap_or("USD");
+        let snapshot_currency = journal.snapshot().ok().and_then(|snapshot| snapshot.currency);
+        let fallback = snapshot_currency.as_deref().unwrap_or("USD");
         // Money first, because the travel release below may return early and
         // the amount is owed either way. A dropped settle leaves the reserve
         // outstanding and is surfaced as `unsettled`. §FS-rhei-budgets.6.2
-        for (index, arm) in claim.arms.iter().enumerate() {
-            let measured = claim.measured.get(index);
-            let amount = measured.map_or(built_in::SPEND_RESERVE, |m| {
-                m.amount_micro
-            });
-            let basis = measured.map_or(SpendBasis::Unmeasurable, |m| m.basis);
-            let currency = measured.and_then(|m| m.currency.as_deref()).unwrap_or(fallback);
-            let context = measured.and_then(|m| m.pricing_context.as_ref());
-            let _ =
-                journal.settle_spend_in_context(arm, amount, currency, basis, context, &audit);
-        }
-        if let Some(travel) = &claim.travel {
-            let _ = journal.release_travel(travel, &audit);
-        }
+        let measured = held.measured.as_ref();
+        let amount = measured.map_or(built_in::SPEND_RESERVE, |m| m.amount_micro);
+        let basis = measured.map_or(SpendBasis::Unmeasurable, |m| m.basis);
+        let currency = measured.and_then(|m| m.currency.as_deref()).unwrap_or(fallback);
+        let context = measured.and_then(|m| m.pricing_context.as_ref());
+        let _ = journal.settle_spend_in_context(arm, amount, currency, basis, context, &audit);
     } else {
         // Nothing started, so the whole reservation goes back — its invocation
-        // unit, its travel unit, and the worst case it reserved against the day.
-        for arm in &claim.arms {
-            let _ = journal.release_unstarted(arm, &audit);
-        }
+        // unit, any travel unit it carries, and the worst case it reserved.
+        let _ = journal.release_unstarted(arm, &audit);
+    }
+    if let Some(travel) = &ended.unapplied_travel {
+        let _ = journal.release_travel(travel, &audit);
     }
     // The settle is the visit's last receipt, so this is the account the run
     // ends on when it is the run's last visit. §FS-rhei-run-json.2.1
-    emit_budget_account(sink, &journal, &claim.ticket, &claim.bounds);
+    emit_budget_account(sink, &journal, &ended.ticket, &ended.bounds);
+}
+
+/// What one arm's exit takes out of the claim map, decided under its lock.
+struct EndedArm {
+    arm: HeldArm,
+    /// The travel unit to give back: set only when this was the claim's last
+    /// live arm and no edge took the unit. §FS-rhei-budgets.6.2.1
+    unapplied_travel: Option<String>,
+    ticket: String,
+    bounds: CountBounds,
+}
+
+/// Take `arm` out of its claim, and the claim out of the map once no arm of it
+/// is live. §FS-rhei-budgets.6.2.1
+fn end_held_arm(
+    claims: &mut BTreeMap<String, HeldClaim>,
+    task_id_str: &str,
+    arm: &str,
+) -> Option<EndedArm> {
+    let claim = claims.get_mut(task_id_str)?;
+    let index = claim.arms.iter().position(|held| held.reservation == arm)?;
+    let held = claim.arms.remove(index);
+    // An unstarted arm's release returns the travel unit it carries, so the
+    // claim no longer holds one for a sibling's edge to convert.
+    if !held.started && claim.travel.as_deref() == Some(arm) {
+        claim.travel = None;
+    }
+    let (ticket, bounds) = (claim.ticket.clone(), claim.bounds.clone());
+    let unapplied_travel = if claim.arms.is_empty() {
+        claims.remove(task_id_str).and_then(|claim| claim.travel)
+    } else {
+        None
+    };
+    Some(EndedArm { arm: held, unapplied_travel, ticket, bounds })
 }

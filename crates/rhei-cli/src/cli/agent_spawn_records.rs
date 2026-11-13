@@ -258,6 +258,10 @@ struct SpawnPlan {
     /// `None` on a plan no spawn site made, which has no invocation to name.
     // §FS-rhei-agents.8.1 §FS-rhei-reset.5.1
     reset: Option<ResetOffer>,
+    /// The reservation this spawn was admitted on, set once admission names it;
+    /// `None` where nothing is accounted. Every budget receipt of this arm, and
+    /// the descriptor its descendants inherit, names it. §FS-rhei-budgets.6.2.1
+    budget_arm: Option<String>,
 }
 
 impl SpawnPlan {
@@ -506,24 +510,4 @@ fn resolve_attempt_budget(
 fn poll_attempt_budget(state_def: &rhei_validator::StateDef) -> Option<AttemptBudget> {
     let poll = state_def.poll.as_ref()?;
     Some(AttemptBudget::Poll { max_attempts: u64::from(poll.max_attempts) })
-}
-
-/// A plan for a unit test that only cares about the transcript a spawn writes:
-/// the first attempt of a first visit, recording beside the log it is given.
-#[cfg(test)]
-fn spawn_plan_for_test(log: &Path) -> SpawnPlan {
-    SpawnPlan {
-        log: log.to_path_buf(),
-        record: log.with_extension("spawn.json"),
-        moves: 0,
-        attempt: 1,
-        accounting: Some(AccountingAttemptIdentity {
-            invocation_id: "test::pending::mock::visit-1::run-test::move-0::attempt-1".into(),
-            run_id: Some("test".into()),
-        }),
-        charged: 0,
-        previous: None,
-        evidence_state: serde_json::Value::Null,
-        reset: None,
-    }
 }

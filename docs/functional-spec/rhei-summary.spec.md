@@ -144,7 +144,10 @@ number counts entries, not invocations; the lead counts those
   either timestamp is missing.
 - An agent spawn with no accounting record ([§FS-rhei-cost-accounting.6.2.1](rhei-cost-accounting.spec.md#621-agent-spawns-with-no-record))
   is an entry too, placed by its `started`. It carries the task id, the state,
-  the spawn's `worker`, its duration from `started` and `ended`, and the words
+  the spawn's `worker`, its duration from `started` and `ended` — none for a
+  `killed` spawn, whose `ended` is when the next run learned of the kill, not
+  when it stopped ([§FS-rhei-agents.8.4](rhei-agents.spec.md#84-spawn-records)), so the time between a kill and the run
+  after it is never counted as run time — and the words
   `no accounting record` in place of a model and token counts, which the spawn
   does not know. It carries no `(visit N)`: a spawn record names no visit, and
   its file name is never matched to find one ([§FS-rhei-agents.8.4](rhei-agents.spec.md#84-spawn-records)):

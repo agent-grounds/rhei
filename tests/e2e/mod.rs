@@ -198,6 +198,10 @@ mod into_validation_refusal_project_load_tests;
 mod into_validation_refusal_project_tests;
 mod into_validation_refusal_support;
 mod into_validation_refusal_tests;
+#[cfg(unix)]
+mod killed_run_resume_tests;
+#[cfg(unix)]
+mod killed_run_support;
 mod laid_output_root_tests;
 mod list_ready_tests;
 mod list_task_metadata_tests;

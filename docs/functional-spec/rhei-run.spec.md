@@ -778,6 +778,15 @@ OOM-killed supervisor — which runs no code at all — still delivers `SIGTERM`
 what it started. That backstop is best-effort and Linux-only; the handled paths
 above are the contract. [§GOAL-rhei-outcomes](../goals.md#goal-rhei-outcomes-goals)
 
+**After a supervisor's death.** The next `rhei run` finalizes the killed run
+before it plans a spawn ([§FS-rhei-evidence.9.3](rhei-evidence.spec.md#93-a-run-killed-outright)), and then picks up where it
+died. An agent visit it cut off resumes as its next attempt once its process
+group is gone, earlier states are not repeated, and the killed transcript is
+kept byte for byte; while anything in the group still runs, the run refuses that
+ticket and lists what to stop. A program visit it cut off is refused and left for
+a person, because the program may have finished. rhei neither adopts nor reaps
+what the dead run started ([§FS-rhei-agents.8.1.1](rhei-agents.spec.md#811-an-agent-killed-with-its-run)).
+
 **Lost console output.** When the run's own output disappears mid-run — the
 reader of a pipe stopped (`EPIPE`), or the terminal it was printing to went
 away (`EIO`) — `rhei run` ends the way a Unix filter does: quietly, with status

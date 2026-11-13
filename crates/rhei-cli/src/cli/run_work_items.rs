@@ -410,8 +410,7 @@ fn collect_ready_agent_work_items(
             &current_state,
             state_def,
             invocations,
-            sink,
-            &machines.reset,
+            Some((sink, &machines.reset)),
         )
         .into_iter()
         .filter(|resolved| {

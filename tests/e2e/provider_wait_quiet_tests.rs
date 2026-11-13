@@ -44,7 +44,6 @@ result('## Result\n\nDone after the provider wait.\n')
 /// once that it is sleeping, then prints nothing until the wait ends, and the
 /// ticket resumes in the same run once it does. §FS-rhei-run.5.1 §FS-rhei-run.3.3
 #[test]
-#[ignore = "red until #681: a held ticket opens a pass every 500 ms slice of the sleep; implement removes this"]
 fn a_session_limit_wait_opens_no_pass_while_the_run_sleeps() {
     let fixture = ProviderFixture::new(
         "quiet-session-limit",
@@ -69,7 +68,6 @@ fn a_session_limit_wait_opens_no_pass_while_the_run_sleeps() {
 /// minute, and the run sleeps through it without a pass. §FS-rhei-run.3.3
 /// §FS-rhei-agents.2.5 §FS-rhei-run.5.1
 #[test]
-#[ignore = "red until #681: an outage's wait opens a pass every 500 ms slice of the sleep; implement removes this"]
 fn an_outage_wait_opens_no_pass_while_the_run_sleeps() {
     let fixture = Outage::pi(gave_up()).fixture("quiet-outage");
     let mut run = start_text_run(&fixture, "run", &[]);
@@ -88,7 +86,6 @@ fn an_outage_wait_opens_no_pass_while_the_run_sleeps() {
 /// are held, the pool's run sleeps as quietly as the sequential one.
 /// §FS-rhei-run.5.1 §FS-rhei-run.3.3
 #[test]
-#[ignore = "red until #681: under --parallel 2 held tickets open a pass every 500 ms slice; implement removes this"]
 fn held_tickets_in_the_worker_pool_open_no_pass_while_the_run_sleeps() {
     let fixture = ProviderFixture::new(
         "quiet-worker-pool",
@@ -117,7 +114,6 @@ fn held_tickets_in_the_worker_pool_open_no_pass_while_the_run_sleeps() {
 /// other ticket: the free arm spawns, and then the run sleeps without a pass.
 /// §FS-rhei-run.3 §FS-rhei-run.5.1
 #[test]
-#[ignore = "red until #681: a fan-out left with only its held arm opens a pass every 500 ms slice; implement removes this"]
 fn a_fan_out_left_with_only_its_held_arm_opens_no_pass() {
     let fixture = ProviderFixture::new(
         "quiet-fan-out",
@@ -149,7 +145,6 @@ result('## Result\n\nDone.\n')
 /// §FS-rhei-run.3.2
 #[cfg(unix)]
 #[test]
-#[ignore = "red until #681: a run started onto a persisted wait opens a pass every 500 ms slice; implement removes this"]
 fn a_run_started_onto_a_persisted_wait_sleeps_without_a_pass() {
     let fixture = ProviderFixture::new(
         "quiet-restart",

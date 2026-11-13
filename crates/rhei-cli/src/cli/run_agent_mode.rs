@@ -235,6 +235,13 @@ fn run_agent_mode(
             find_runnable_tasks_with_options(&loaded.rhei, &machines.set, &spawns, &HashSet::new()),
             &rhei_scope,
         );
+        // A provider-held ticket is not ready, so the sleep below opens no pass for it. Only the
+        // continuous run sleeps; the others keep the scan. §FS-rhei-run.3 step 2 §FS-rhei-run.5.1
+        let ready = if opts.dry_run() || opts.until_idle() {
+            ready
+        } else {
+            without_provider_held_tickets(ready, &loaded, settings, &rhei_scope, &spawns)
+        };
         if ready.is_empty() {
             if !opts.dry_run() {
                 // Interactive TUI: stay alive only when human gates are the
@@ -463,8 +470,7 @@ fn run_agent_mode(
                     &current_state,
                     state_def,
                     invocations,
-                    &sink,
-                    &live.machines.reset,
+                    Some((&sink, &live.machines.reset)),
                 );
 
                 if pending.is_empty() {

@@ -37,8 +37,14 @@ path = "fixtures/mcp_config_fixture.rs"
 name = "mcp-surface-fixture"
 path = "fixtures/mcp_surface_fixture.rs"
 
+[[bin]]
+name = "codex-mcp-fixture"
+path = "fixtures/codex_mcp_fixture.rs"
+
 [dependencies]
 serde_json = "1"
+# Parse the native configuration handed to the provider-free Codex stand-in.
+toml = "=0.8.19"
 
 [dev-dependencies]
 fs2 = "0.4.3"

@@ -86,6 +86,8 @@ mod cancelled_prior_tests;
 mod changeset_review_equivalence_tests;
 mod codex_config_fallback_support;
 mod codex_config_fallback_tests;
+mod codex_mcp_support;
+mod codex_mcp_tests;
 mod codex_workspace_profile_tests;
 mod codex_writable_roots_isolation_tests;
 mod codex_writable_roots_support;

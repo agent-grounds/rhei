@@ -42,13 +42,24 @@ mod agent_family {
             serde_json::json!({ "family": "codex", "command": ["wrapper"] }),
         );
         assert_eq!(profile.command, vec!["wrapper".to_string()]);
-        assert_eq!(profile.mcp_flag.as_deref(), Some("--mcp"));
+        assert_eq!(profile.mcp_flag, built_in_agents()["codex"].mcp_flag);
         assert_eq!(profile.model_flag.as_deref(), Some("--model"));
         // The roster reports the resolved profile, so an inherited field is in
         // its field set beside the written ones. §FS-rhei-agents.1.1.7
         assert!(supplied.contains("family"));
         assert!(supplied.contains("command"));
         assert!(supplied.contains("mcp_flag"));
+    }
+
+    /// Native attachment is inherited with the other Codex profile fields.
+    /// §FS-rhei-agents.1.1.2.1
+    #[test]
+    #[ignore = "red until #666: Codex inherits native -c attachment; implement removes this"]
+    fn codex_mcp_catalogue_and_family_select_native_config() {
+        let (profile, _) = resolve("cdx", serde_json::json!({ "family": "codex" }));
+        assert_eq!(built_in_agents()["codex"].mcp_flag.as_deref(), Some("-c"));
+        assert_eq!(profile.mcp_flag.as_deref(), Some("-c"));
+        assert_eq!(profile.mcp_config_flag, None);
     }
 
     /// Presence is read from the document, so a written `false` overrides an

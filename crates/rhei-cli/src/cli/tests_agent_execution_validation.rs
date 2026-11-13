@@ -664,9 +664,15 @@ for line in sys.stdin:
 
     #[test]
     fn appends_mcp_flag_per_resolved_server() {
-        let profile = built_in_agents().remove("codex").expect("codex");
+        // Keep the generic custom adapter distinct from Codex's native configuration.
+        // §FS-rhei-agents.1.1.2
+        let profile = CustomAgentProfile {
+            command: vec!["custom-agent".to_string()],
+            mcp_flag: Some("--mcp".to_string()),
+            ..Default::default()
+        };
         let resolved = ResolvedAgent {
-            agent: AgentConfig::from("codex"),
+            agent: AgentConfig::from("custom-agent"),
             profile,
             mode: None,
             target: None,

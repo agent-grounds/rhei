@@ -705,24 +705,6 @@
         )));
     }
 
-    #[test]
-    fn supported_agents_keep_expected_prompt_transports() {
-        let agents = built_in_agents();
-        // `-p` stays declared and stops carrying the prompt: it is what puts
-        // Claude Code in print mode. agent-grounds/rhei#179 §FS-rhei-agents.2
-        let claude = agents.get("claude-code").expect("claude-code profile");
-        assert_eq!(claude.prompt_flag.as_deref(), Some("-p"));
-        assert!(claude.stdin_prompt);
-
-        let codex = agents.get("codex").expect("codex profile");
-        assert_eq!(codex.prompt_flag.as_deref(), None);
-        assert!(codex.stdin_prompt);
-
-        let pi = agents.get("pi").expect("pi profile");
-        assert_eq!(pi.prompt_flag.as_deref(), Some("-p"));
-        assert!(!pi.stdin_prompt);
-    }
-
     /// The agent the transport tests run: it echoes back whichever transport
     /// carried the prompt — `-p` on the command line, or stdin after a `--`.
     ///

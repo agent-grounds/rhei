@@ -3,13 +3,14 @@
 //! `Argument list too long`, and the help sent the user to `PATH` for a binary
 //! that was plainly there.
 //!
-//! Both tests drive a registered agent rather than the built-in `claude-code`,
-//! because reaching that one needs a stub `claude` on `PATH` and
-//! §REQ-cross-platform.4 keeps a shell script out of a fixture. That the
-//! built-in uses the stdin transport is pinned in the CLI's own unit tests; what
-//! is pinned here is that the transport survives the size, and that the agents
-//! still bounded by it say so.
+//! The first two tests drive a registered agent, and pin that the stdin
+//! transport survives the size and that the agents still bounded by it say so.
+//! The third reaches a built-in: agent-grounds/rhei#659, a state on the built-in
+//! `pi` whose prompt was past the limit. It puts a compiled stand-in on `PATH` as
+//! `pi` — compiled, because §REQ-cross-platform.4 keeps a shell script out of a
+//! fixture — and leaves `HOME` empty, so the built-in profile is what spawns it.
 
+use std::ffi::OsString;
 use std::fs;
 
 use super::*;
@@ -179,4 +180,85 @@ fn an_argv_agent_past_the_limit_blames_the_prompt_size_not_the_path() {
         "the failure states the composed prompt's size; found {sizes:?} in:\n{}",
         run.stderr
     );
+}
+
+/// One state on the built-in `pi`, with no settings to replace it.
+const PI_MACHINE: &str = r#"name: oversized-prompt-pi
+version: 1
+states:
+  work:
+    initial: true
+    description: Carry the brief
+    target: pi:provider:model
+    agent_timeout: 60s
+    instructions: |
+      Read the brief and finish.
+  completed:
+    final: true
+    description: Done
+transitions:
+  - from: work
+    to: completed
+"#;
+
+/// Linux refuses any single argument of this many bytes at `execve`
+/// (§FS-rhei-errors.7.1), the cap agent-grounds/rhei#659 ran into.
+const LINUX_ARGUMENT_CAP: u64 = 131_072;
+
+/// agent-grounds/rhei#659: the built-in `pi` passed the whole prompt as the value
+/// of `-p`, so a brief past the platform's cap never started pi; and the one
+/// stdin route a settings entry offered ended in a `--` that pi refuses. The
+/// stand-in refuses `--` exactly as pi does, so a fix that moves the prompt to
+/// stdin but keeps the separator fails here too.
+// §FS-rhei-agents.2.2.2 §FS-rhei-agents.2
+#[test]
+#[ignore = "red until #659: the built-in pi passes the prompt in argv and fails to spawn; implement removes this"]
+fn a_brief_past_every_platform_limit_starts_the_builtin_pi_on_stdin() {
+    let dir = unique_temp_dir("oversized-prompt-builtin-pi");
+    let bin = dir.join("bin");
+    fs::create_dir_all(&bin).expect("create stand-in directory");
+    fs::copy(
+        env!("CARGO_BIN_EXE_pi-stdin-fixture"),
+        bin.join(format!("pi{}", std::env::consts::EXE_SUFFIX)),
+    )
+    .expect("copy the compiled pi stand-in");
+
+    let plan_path = write_fixture_file(&dir, "plan.rhei.md", &oversized_plan());
+    let machine_path = write_fixture_file(&dir, "states.yaml", PI_MACHINE);
+
+    let home = dir.join("home");
+    let mut paths = vec![bin];
+    paths.extend(std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default()));
+    let path: OsString = std::env::join_paths(paths).expect("join stand-in PATH");
+    let mut cmd = rhei_command(&home);
+    cmd.env("PATH", path)
+        .env("XDG_CONFIG_HOME", home.join(".config"))
+        .arg("--state-machine")
+        .arg(&machine_path)
+        .arg("run")
+        .arg(&plan_path)
+        .args(["--no-tui", "--no-callbacks"]);
+    let run = CliRun::from(&cmd.output().expect("run the built-in pi"));
+    assert_success(&run);
+
+    let record = dir.join("runtime/pi-stdin/delivery.json");
+    let delivered: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&record).expect("delivery record"))
+            .expect("delivery record json");
+    let argv = delivered["argv"].as_array().expect("argv");
+    assert!(
+        !argv.iter().any(|arg| arg.as_str().is_some_and(|arg| arg.contains(MARKER))),
+        "no argument carries the prompt: {argv:?}"
+    );
+    let largest = delivered["largest_arg_bytes"].as_u64().expect("largest_arg_bytes");
+    assert!(
+        largest < LINUX_ARGUMENT_CAP,
+        "no argument reaches the per-argument cap: {largest} bytes"
+    );
+    let arrived = delivered["stdin_bytes"].as_u64().expect("stdin_bytes") as usize;
+    assert!(
+        arrived >= OVERSIZED_BODY_BYTES,
+        "the whole brief arrives on stdin: {arrived} bytes of at least {OVERSIZED_BODY_BYTES}"
+    );
+    assert_task_state(&plan_path, &machine_path, "1", "completed");
 }

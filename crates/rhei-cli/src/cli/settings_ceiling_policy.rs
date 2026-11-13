@@ -71,12 +71,21 @@ fn refuse_clamp_projects_in_project(
     let machine = machine
         .map(|path| path.display().to_string())
         .unwrap_or_else(|| "~/.config/rhei/settings.json".to_string());
+    // A template's rendering is named as the template's file, and one that is gone
+    // is fixed there and instantiated again. §FS-rhei-errors.4.1
+    let origin = rendered_origin(found_in);
+    let rendering = origin.as_ref().map(|origin| format!(", {}", origin.rendering));
+    let remove = "Only the machine that pays may delegate its count ceilings; remove the key";
+    let help = match origin.filter(|origin| origin.discarded) {
+        Some(_) => format!("{remove} {RENDERING_RETRY}"),
+        None => format!("{remove} from the project settings file."),
+    };
     Err(miette!(
-        help = "Only the machine that pays may delegate its count ceilings; remove the key \
-                from the project settings file.",
+        help = help,
         "`defaults.clamp_projects` may only be set in the machine settings file\n       \
-         found in:  {}\n       \
+         found in:  {}{}\n       \
          set it in: {machine}",
-        settings_file_as_read(found_in).display()
+        settings_file_as_read(found_in).display(),
+        rendering.unwrap_or_default()
     ))
 }

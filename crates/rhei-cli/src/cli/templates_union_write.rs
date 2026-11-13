@@ -108,8 +108,10 @@
         // not travel beside the rhei: a member resolves the project's, so a
         // copy here would be read by nothing. §FS-rhei-templates.6.2
         let hoist = host.project.as_deref().and_then(|project| {
-            resolve_rhei_home_file(part_root, WORKSPACE_SETTINGS_FILE)
-                .map(|found| (found.into_path(), project))
+            let found = resolve_rhei_home_file(part_root, WORKSPACE_SETTINGS_FILE)?.into_path();
+            // Still the rendering, by its path in the part. §FS-rhei-errors.4.1
+            let rendered = found.strip_prefix(part_root).ok()?.to_path_buf();
+            Some((found, rendered, project))
         });
         let mut entries: Vec<PathBuf> = fs::read_dir(part_root)
             .map_err(|err| file_io_report(part_root, "failed to read the rendered template", err))?
@@ -134,7 +136,7 @@
     fn copy_bundled_path(
         src: &Path,
         dst: &Path,
-        hoist: Option<&(PathBuf, &Path)>,
+        hoist: Option<&(PathBuf, PathBuf, &Path)>,
         writes: &mut UnionWrites,
     ) -> MietteResult<()> {
         if src.is_dir() {
@@ -150,9 +152,9 @@
             }
             return Ok(());
         }
-        if let Some((source, project)) = hoist {
+        if let Some((source, rendered, project)) = hoist {
             if same_path(src, source) {
-                return hoist_settings_into_project(src, project, writes);
+                return hoist_settings_into_project(src, rendered, project, writes);
             }
         }
         if dst.exists() {

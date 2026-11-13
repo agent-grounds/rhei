@@ -171,6 +171,8 @@ mod instantiate_rendered_refusal_routes_tests;
 mod instantiate_rendered_refusal_support;
 #[cfg(unix)]
 mod instantiate_rendered_refusal_tests;
+#[cfg(unix)]
+mod instantiate_rendered_settings_tests;
 mod into_flow_style_tests;
 mod into_identity_tests;
 mod into_placement_tests;

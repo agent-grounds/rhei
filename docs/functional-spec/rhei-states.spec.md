@@ -415,7 +415,7 @@ Both names are available only on transitions whose `from` state declares
 ### 2.4. Interaction with other state features
 
 - **`agent` / `program`.** `poll` works for both. The attempt is one subprocess invocation whose exit code / outputs drive transition matching as usual.
-- **`all_targets` / `all_models`.** Fanout composes: each per-target or per-model execution tracks its own `stateVisits.<state-name>` entry (same scoping as `visits`). Slot release applies per fanout invocation.
+- **`all_targets` / `all_models`.** Fanout composes: each per-target or per-model execution tracks its own `stateVisits.<state-name>` entry (same scoping as `visits`). The arms share their task's one `--parallel` slot rather than each taking one ([§FS-rhei-run.5.3](rhei-run.spec.md#53-what---parallel-counts)).
 - **`concurrent`.** Independent: a `concurrent: true` poll state may have multiple tasks in flight simultaneously, each with its own `pollNextAttemptAt`.
 - **`agent_timeout` / `program_timeout`.** Bound one attempt's duration; they do not bound the total polling wall-clock time. Combine with `max_attempts` to bound the total.
 

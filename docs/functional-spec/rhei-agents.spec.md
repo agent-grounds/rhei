@@ -2196,7 +2196,7 @@ rhei run <RHEI_PLAN> [--dry-run] [--no-callbacks] [--no-agent] [--no-program]
 | `--agent <AGENT>` | | Override the agent transport for this run |
 | `--model <MODEL>` | | Override the model profile id for this run |
 | `--continue-on-error` | false | Continue to the next task when an agent or program exits non-zero |
-| `--parallel <N>` | 1 | Maximum number of agents/programs to run concurrently. `0` means unlimited. |
+| `--parallel <N>` | 1 | Maximum number of tasks to run concurrently; each task's `all_targets` / `all_models` arms run alongside it, so a `k`-arm state can have `N × k` agents in flight. `0` means unlimited. See [§FS-rhei-run.5.3](rhei-run.spec.md#53-what---parallel-counts). |
 | `--program-timeout <DURATION>` | | Override program timeout for this run (e.g., `10m`, `1h`). See [Program States Specification](rhei-programs.spec.md#4-timeout-handling). |
 
 ### 5.2. Execution Loop
@@ -2260,7 +2260,7 @@ is unchanged: poll states do not receive this visit-budget recovery advice.
    a. Re-read the plan.
    b. Process the result using the same rules as sequential mode: if an external actor already changed the task state, respect it; otherwise, on exit `0`, let `rhei run` evaluate and execute the next matching forward transition; on non-zero exit, apply the error path.
    c. Scan for newly claimable tasks (dependencies may have been unblocked).
-   d. If new tasks are claimable and the pool is below N, spawn agents for them.
+   d. If new tasks are claimable and fewer than N tasks are in flight, spawn every invocation of each newly scheduled task ([§FS-rhei-run.5.3](rhei-run.spec.md#53-what---parallel-counts)).
    A recognized provider limit releases the reporting slot immediately. The
    refill scan excludes queued invocations with the same active provider-limit
    identity, but may fill the slot with unrelated work. Workers already

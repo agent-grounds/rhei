@@ -261,6 +261,7 @@ mod operator_recovery_tests;
 mod operator_unwritable_state_home_tests;
 mod panta_bare_index_tests;
 mod parallel_target_override_tests;
+mod parallel_task_cap_tests;
 mod parent_prior_children_tests;
 mod poll_budget_result_tests;
 mod poll_resume_program_tests;

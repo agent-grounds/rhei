@@ -304,6 +304,7 @@ mod reset_remedy_messages_tests;
 mod reset_remedy_support;
 mod reset_remedy_tests;
 mod reset_task_scope_panta_tests;
+mod reset_task_scope_pattern_tests;
 mod reset_task_scope_supervision_tests;
 mod reset_task_scope_support;
 mod reset_task_scope_tests;

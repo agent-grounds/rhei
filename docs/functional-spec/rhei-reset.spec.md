@@ -203,11 +203,21 @@ substituted (`{state}`, `{visit_count}`, `{model}`, …) are matched by the
 literal prefix up to the first remaining placeholder, so `auth.1` never matches
 `auth.10`.
 
+That prefix carries the ticket id only when `{task_id}` comes before every other
+placeholder. A path with a placeholder **before** `{task_id}`, such as
+`runtime/{state}/{task_id}.md` or `runtime/{rhei_id}/{task_id}.md`, is matched one
+path component at a time instead: each unresolved placeholder stands for any part
+of one component and never for a `/`, and the ticket id has to stand where
+`{task_id}` stands. So `--task paper.2` removes `runtime/review/paper.2.md` and
+leaves `runtime/` itself, and every other ticket's files in it, where they are. A
+reset never removes a path in which the ticket id does not stand where `{task_id}`
+stands in the declared path.
+
 This list is the one both narrowings remove, `--rhei` and `--task`
 ([§FS-rhei-reset.2.5](rhei-reset.spec.md#25-ticket-scope---task)). A file matched by prefix — a log, a spawn record, a report, a
-snapshot session, a capture, or a `{task_id}` artifact's literal prefix — belongs
-to the **longest** ticket id in the project whose prefix it matches, and goes only
-when that ticket is in scope. A `{task_id}-{state}` path leaves `x.build-` as the
+snapshot session, a capture, or a `{task_id}` artifact's literal prefix or
+component pattern — belongs to the **longest** ticket id in the project whose
+prefix or pattern it matches, and goes only when that ticket is in scope. A `{task_id}-{state}` path leaves `x.build-` as the
 prefix, which `x.build-docs-review.md` matches too; that file is
 `x.build-docs`'s, so `--task x.build` leaves it.
 
@@ -473,7 +483,8 @@ producer in `**Prior:**` ([§FS-rhei-plan-language.3.12.1](rhei-plan-language.sp
 added, so `--task paper.3` leaves `paper.2` completed with its result.
 
 A ticket in scope that already stands in its authored state is counted and
-loses its runtime files, but is not listed as a move. A ticket reached twice is
+loses its runtime files, but is not listed as a move; where it loses any, its
+supervisor is held for it all the same ([§FS-rhei-reset.2.5.3](rhei-reset.spec.md#253-the-held-supervisor)). A ticket reached twice is
 listed once, by the first edge that reached it in plan order.
 
 #### 2.5.2. Finished Ancestors
@@ -489,10 +500,17 @@ no recorded state to go back to and still gets the refusal of [§FS-rhei-reset.2
 Reopening a step deletes its brief, which is declared under the step's id, and a
 `released` supervisor wakes only on a checkpoint. So the reset holds the nearest
 supervising ancestor the scope leaves out — the one a transition would checkpoint
-([§FS-rhei-supervision.2.2](rhei-supervision.spec.md#22-nearest-in-scope-supervising-ancestor)) — and records each reopened ticket as a checkpoint on it, marked as
-a reset ([§FS-rhei-supervision.3.3](rhei-supervision.spec.md#33-supervision-metadata)). The supervisor's state line, counted suffix, result
-and history stay as they are. A supervisor the scope reopens itself returns with
-no supervision block, which is already held, and is not held a second time.
+([§FS-rhei-supervision.2.2](rhei-supervision.spec.md#22-nearest-in-scope-supervising-ancestor)) — and records a checkpoint on it, marked as a reset
+([§FS-rhei-supervision.3.3](rhei-supervision.spec.md#33-supervision-metadata)), for each ticket it owns that the reset reopens **or** whose
+records the reset removes: anything [§FS-rhei-reset.2.1](rhei-reset.spec.md#21-narrowed-reset---rhei) lists for it, ledger rows
+included. A ticket that already stands in its authored state still loses its brief
+([§FS-rhei-reset.2.5.1](rhei-reset.spec.md#251-the-closure)). It is in scope because something it reads changed, so a
+brief written before the reset is not one to trust, and its checkpoint, from its
+state to the same state, is what asks the supervisor for a new one. A ticket that
+neither moves nor loses anything adds no checkpoint, and a supervisor with no
+checkpoint to record is not held. The supervisor's state line, counted suffix,
+result and history stay as they are. A supervisor the scope reopens itself returns
+with no supervision block, which is already held, and is not held a second time.
 
 #### 2.5.4. Resolving the Ids
 

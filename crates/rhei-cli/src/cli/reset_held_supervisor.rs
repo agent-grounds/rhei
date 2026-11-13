@@ -8,7 +8,8 @@
 // §AR-source-file-size.3 §FS-rhei-reset.2.5.3
 
 /// A supervisor a `--task` reset holds: where its metadata lives, and one reset
-/// checkpoint for each ticket it owns that the reset moves. §FS-rhei-reset.2.5.3
+/// checkpoint for each ticket it owns that the reset moves or removes records of.
+/// §FS-rhei-reset.2.5.3
 struct HeldSupervisor {
     /// Project-qualified, as the preview names it.
     task_id: String,
@@ -18,11 +19,12 @@ struct HeldSupervisor {
     checkpoints: Vec<SupervisionCheckpoint>,
 }
 
-/// The supervisors a ticket scope leaves out that own a ticket it moves, in id
-/// order. A ticket in scope that stands where it was authored is no reopening, so
-/// a supervisor owning only such tickets is not held. A whole-rhei reset holds
-/// none: it reaches every supervisor its tickets have. §FS-rhei-reset.2.5.3
-/// §FS-rhei-supervision.3.3
+/// The supervisors a ticket scope leaves out that own a ticket it moves or removes
+/// records of, in id order. A ticket in scope that stands where it was authored
+/// still loses its brief, so its checkpoint runs from its state to the same one;
+/// one that loses nothing either is no checkpoint, and a supervisor owning only
+/// such tickets is not held. A whole-rhei reset holds none: it reaches every
+/// supervisor its tickets have. §FS-rhei-reset.2.5.3 §FS-rhei-supervision.3.3
 fn held_supervisors(
     loaded: &LoadedPlan,
     input: &Path,
@@ -36,14 +38,22 @@ fn held_supervisors(
     for (supervisor, owned) in &tickets.supervisors {
         let checkpoints: Vec<SupervisionCheckpoint> = owned
             .iter()
-            .filter_map(|id| moves.get(id.as_str()))
-            .map(|mv| SupervisionCheckpoint {
-                task: loaded.task_route(&mv.task_id, input).local_id,
-                from: mv.from.clone(),
-                to: mv.to.clone(),
-                // The reset cleared its counts: `to` was entered by no counted visit.
-                visit: 0,
-                reset: true,
+            .filter_map(|id| {
+                let (from, to) = match moves.get(id.as_str()) {
+                    Some(mv) => (mv.from.clone(), mv.to.clone()),
+                    None => {
+                        let state = authored.emptied_in_place.get(id)?;
+                        (state.clone(), state.clone())
+                    }
+                };
+                Some(SupervisionCheckpoint {
+                    task: loaded.task_route(id, input).local_id,
+                    from,
+                    to,
+                    // The reset cleared its counts: `to` was entered by no counted visit.
+                    visit: 0,
+                    reset: true,
+                })
             })
             .collect();
         if checkpoints.is_empty() {

@@ -158,6 +158,11 @@ fn checkpoint_source_outputs(
 const RESET_CHECKPOINT_NOTE: &str = "`rhei reset --task` returned this ticket to its authored \
      state and removed its results; its worker made no move.";
 
+/// The same for a ticket the reset left where it stood but removed the records of,
+/// whose checkpoint runs from its state to the same one. §FS-rhei-supervision.3.3
+const RESET_IN_PLACE_CHECKPOINT_NOTE: &str = "`rhei reset --task` left this ticket in its \
+     authored state and removed its runtime files, its brief among them; brief it again.";
+
 /// The descendants that moved since the supervisor's last visit, each carrying
 /// what that step left behind. Omitted on a visit with no checkpoints — the
 /// first one, where the supervisor's job is to brief the first step.
@@ -186,9 +191,14 @@ fn render_supervision_checkpoints(
         let title = descendant.map(|task| task.title.as_str()).unwrap_or("(no longer in the plan)");
         if checkpoint.reset {
             // §FS-rhei-reset.2.5.3: a reset reopened it and left nothing behind to show.
+            let note = if checkpoint.from == checkpoint.to {
+                RESET_IN_PLACE_CHECKPOINT_NOTE
+            } else {
+                RESET_CHECKPOINT_NOTE
+            };
             out.push_str(&format!(
                 "\n### Task {}: {} \u{2014} {} \u{2192} {} (reset)\n\n{}\n",
-                qualified, title, checkpoint.from, checkpoint.to, RESET_CHECKPOINT_NOTE
+                qualified, title, checkpoint.from, checkpoint.to, note
             ));
             continue;
         }

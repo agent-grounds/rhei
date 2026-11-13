@@ -131,6 +131,10 @@ impl ResetDirectoryCheck {
                     Ok(paths) => paths.iter().filter(|path| path.exists()).for_each(|path| self.removal(path)),
                     Err(err) => self.unlistable(dir, err),
                 },
+                ScopedTarget::Pattern(pattern) => match removals.owners.pattern_entries(pattern) {
+                    Ok(paths) => paths.iter().filter(|path| path.exists()).for_each(|path| self.removal(path)),
+                    Err((dir, err)) => self.unlistable(&dir, err),
+                },
             }
         }
         for (root, ids) in &removals.ledgers {

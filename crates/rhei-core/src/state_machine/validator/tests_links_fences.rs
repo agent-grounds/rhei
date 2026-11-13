@@ -16,7 +16,7 @@
                      ## Tasks\n\n\
                      ### Task 1: Do it\n**State:** pending\n";
         let rhei = parse(input).expect("parse ok");
-        let report = Validator::new(sample_machine()).validate_with_base(&rhei, Some(dir.path()));
+        let report = Validator::new(sample_machine()).validate_with_base(&rhei, Some(LinkBase::plan_directory(dir.path())));
 
         assert!(!report.has_errors(), "fenced example should not be checked: {:?}", report.errors);
     }
@@ -34,7 +34,7 @@
                      See [the design note](docs/design.md).\n\
                      ```\n";
         let rhei = parse(input).expect("parse ok");
-        let report = Validator::new(sample_machine()).validate_with_base(&rhei, Some(dir.path()));
+        let report = Validator::new(sample_machine()).validate_with_base(&rhei, Some(LinkBase::plan_directory(dir.path())));
 
         assert!(!report.has_errors(), "fenced example should not be checked: {:?}", report.errors);
     }
@@ -53,7 +53,7 @@
                      ## Tasks\n\n\
                      ### Task 1: Do it\n**State:** pending\n";
         let rhei = parse(input).expect("parse ok");
-        let report = Validator::new(sample_machine()).validate_with_base(&rhei, Some(dir.path()));
+        let report = Validator::new(sample_machine()).validate_with_base(&rhei, Some(LinkBase::plan_directory(dir.path())));
 
         let joined = report.errors.join("\n");
         assert!(joined.contains("nonexistent.md"), "prose link should fail; got:\n{joined}");
@@ -72,7 +72,7 @@
                      See [an example](docs/example.md).\n\n\
                      And [another](docs/other.md).\n";
         let rhei = parse(input).expect("parse ok");
-        let report = Validator::new(sample_machine()).validate_with_base(&rhei, Some(dir.path()));
+        let report = Validator::new(sample_machine()).validate_with_base(&rhei, Some(LinkBase::plan_directory(dir.path())));
 
         assert!(!report.has_errors(), "unclosed fence should swallow both: {:?}", report.errors);
     }

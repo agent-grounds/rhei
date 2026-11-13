@@ -62,7 +62,6 @@ fn assert_refused_as_escaping(run: &CliRun, case: &str) {
 /// outside file present, and with the same words when it is absent.
 /// §FS-rhei-plan-language.3.6
 #[test]
-#[ignore = "red until #684: an escaping task link is accepted when its target exists; implement removes this"]
 fn an_escaping_task_link_is_refused_whether_or_not_its_target_exists() {
     let (_present, run) = escape_workspace("link-escape-task-present", true, true);
     assert_refused_as_escaping(&run, "task link, outside file present");
@@ -72,7 +71,6 @@ fn an_escaping_task_link_is_refused_whether_or_not_its_target_exists() {
 
 /// The same link in `index.rhei.md`'s Overview section. §FS-rhei-plan-language.3.6
 #[test]
-#[ignore = "red until #684: an escaping section link is accepted when its target exists; implement removes this"]
 fn an_escaping_section_link_is_refused_whether_or_not_its_target_exists() {
     let (_present, run) = escape_workspace("link-escape-section-present", false, true);
     assert_refused_as_escaping(&run, "section link, outside file present");
@@ -161,7 +159,6 @@ fn panta_project(prefix: &str, ws_escapes: bool) -> (TestDir, CliRun) {
 /// Through the per-task bases the workspace rhei's escaping link is refused while
 /// the single-file rhei's `../` is not. §FS-rhei-plan-language.3.6
 #[test]
-#[ignore = "red until #684: a Panta workspace rhei's escaping link is accepted; implement removes this"]
 fn a_panta_project_holds_each_link_to_its_own_rheis_rule() {
     let (_dir, run) = panta_project("link-escape-panta", true);
     assert_refused_as_escaping(&run, "panta workspace rhei");

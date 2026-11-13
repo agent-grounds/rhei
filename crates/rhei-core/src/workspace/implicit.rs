@@ -78,7 +78,9 @@ pub fn wrap_rhei_as_implicit_panta(
     let rhei_titles = HashMap::from([(id.clone(), rhei.title.clone())]);
     let rhei_plans: HashMap<String, PathBuf> =
         rhei_plan_file(entry).into_iter().map(|plan| (id.clone(), plan)).collect();
-    let content_section_roots = vec![root; rhei.content_sections.len()];
+    let content_section_roots = vec![root.clone(); rhei.content_sections.len()];
+    // §FS-rhei-plan-language.3.6: a wrapped Directory Workspace keeps its containment.
+    let workspace_roots = workspace_dir(entry).map(|_| root).into_iter().collect();
     // The implicit Panta has no manifest: the single rhei's machine resolves
     // from its own root like any member's. §AR-rhei-panta.2
     Ok(PantaProject {
@@ -87,6 +89,7 @@ pub fn wrap_rhei_as_implicit_panta(
         task_sources,
         task_roots,
         content_section_roots,
+        workspace_roots,
         rhei_ids,
         rhei_roots,
         rhei_titles,

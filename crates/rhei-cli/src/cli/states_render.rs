@@ -405,6 +405,8 @@ struct LoadedPlan {
     task_roots: HashMap<String, PathBuf>,
     /// For Panta projects: link bases for merged content sections, in section order.
     content_section_roots: Vec<PathBuf>,
+    /// Rhei roots that are Directory Workspace roots, held to link containment. §FS-rhei-plan-language.3.6
+    workspace_roots: std::collections::HashSet<PathBuf>,
     /// For Panta projects: rhei ids in load order (`basin` last when present).
     rhei_ids: Vec<String>,
     /// Execution root of each rhei, keyed by rhei id. §AR-rhei-panta.4
@@ -1004,6 +1006,7 @@ fn implicit_loaded_plan(
         task_sources: project.task_sources,
         task_roots: project.task_roots,
         content_section_roots: project.content_section_roots,
+        workspace_roots: project.workspace_roots,
         rhei_ids: project.rhei_ids,
         rhei_roots: project.rhei_roots,
         rhei_titles: project.rhei_titles,
@@ -1020,6 +1023,7 @@ fn panta_loaded_plan(project: rhei_core::workspace::PantaProject) -> LoadedPlan 
         task_sources: project.task_sources,
         task_roots: project.task_roots,
         content_section_roots: project.content_section_roots,
+        workspace_roots: project.workspace_roots,
         rhei_ids: project.rhei_ids,
         rhei_roots: project.rhei_roots,
         rhei_titles: project.rhei_titles,
@@ -1290,23 +1294,26 @@ fn validation_pass_for_loaded(
     let resolved = resolve_state_machines_for_loaded_plan(input, &loaded, state_machine)?;
     let machines = resolved.validator_set();
     let normalized_input = normalize_workspace_input(input);
-    let base_path = if normalized_input.is_dir() {
-        normalized_input.as_path()
+    // A directory input is a Directory Workspace (or a Panta project, whose
+    // rheis carry their own kind); a file is a Single-File Plan. §FS-rhei-plan-language.3.6
+    let base = if normalized_input.is_dir() {
+        rhei_validator::LinkBase::workspace_root(normalized_input.as_path())
     } else {
-        normalized_input.parent().unwrap_or(Path::new("."))
+        rhei_validator::LinkBase::plan_directory(normalized_input.parent().unwrap_or(Path::new(".")))
     };
     let mut report = if loaded.is_panta_project() {
         // Panta task links validate against each ticket's owning rhei root. §AR-rhei-panta.5
-        rhei_validator::validate_with_machine_set_and_link_bases(
-            &loaded.rhei,
-            &machines,
-            base_path,
-            &loaded.task_roots,
-            &loaded.content_section_roots,
-        )
+        // The project directory is no rhei, so its manifest's links are not contained.
+        let bases = rhei_validator::LinkBases {
+            default: rhei_validator::LinkBase::plan_directory(base.dir),
+            tasks: &loaded.task_roots,
+            sections: &loaded.content_section_roots,
+            workspace_roots: &loaded.workspace_roots,
+        };
+        rhei_validator::validate_with_machine_set_and_link_bases(&loaded.rhei, &machines, &bases)
     } else {
         let mut report = rhei_validator::Validator::with_machines(machines.clone())
-            .validate_with_base(&loaded.rhei, Some(base_path));
+            .validate_with_base(&loaded.rhei, Some(base));
         report.warnings.dedup();
         report
     };

@@ -69,7 +69,7 @@ See [the spec](specs/nonexistent.md) for details.
 "#;
         let rhei = parse(input).expect("parse ok");
         let sm = sample_machine();
-        let report = Validator::new(sm).validate_with_base(&rhei, Some(dir.path()));
+        let report = Validator::new(sm).validate_with_base(&rhei, Some(LinkBase::plan_directory(dir.path())));
 
         assert!(report.has_errors(), "expected missing link error");
         let joined = report.errors.join("\n");
@@ -98,7 +98,7 @@ See [the spec](specs/real.md) for details.
 "#;
         let rhei = parse(input).expect("parse ok");
         let sm = sample_machine();
-        let report = Validator::new(sm).validate_with_base(&rhei, Some(dir.path()));
+        let report = Validator::new(sm).validate_with_base(&rhei, Some(LinkBase::plan_directory(dir.path())));
 
         assert!(!report.has_errors(), "unexpected errors: {:?}", report.errors);
     }
@@ -117,7 +117,7 @@ See [docs](https://example.com/docs) and [anchor](#overview) for info.
 "#;
         let rhei = parse(input).expect("parse ok");
         let sm = sample_machine();
-        let report = Validator::new(sm).validate_with_base(&rhei, Some(dir.path()));
+        let report = Validator::new(sm).validate_with_base(&rhei, Some(LinkBase::plan_directory(dir.path())));
 
         assert!(!report.has_errors(), "external links should not be checked: {:?}", report.errors);
     }
@@ -137,7 +137,7 @@ See [section](guide.md#usage) for details.
 "#;
         let rhei = parse(input).expect("parse ok");
         let sm = sample_machine();
-        let report = Validator::new(sm).validate_with_base(&rhei, Some(dir.path()));
+        let report = Validator::new(sm).validate_with_base(&rhei, Some(LinkBase::plan_directory(dir.path())));
 
         assert!(
             !report.has_errors(),
@@ -164,7 +164,7 @@ Also see [gone](also-gone.md).
 "#;
         let rhei = parse(input).expect("parse ok");
         let sm = sample_machine();
-        let report = Validator::new(sm).validate_with_base(&rhei, Some(dir.path()));
+        let report = Validator::new(sm).validate_with_base(&rhei, Some(LinkBase::plan_directory(dir.path())));
 
         assert!(report.has_errors());
         let joined = report.errors.join("\n");
@@ -211,7 +211,7 @@ See [missing](nowhere.md) for context.
 "#;
         let rhei = parse(input).expect("parse ok");
         let sm = sample_machine();
-        let report = Validator::new(sm).validate_with_base(&rhei, Some(dir.path()));
+        let report = Validator::new(sm).validate_with_base(&rhei, Some(LinkBase::plan_directory(dir.path())));
 
         assert!(report.has_errors(), "expected result block lifecycle error");
         let joined = report.errors.join("\n");

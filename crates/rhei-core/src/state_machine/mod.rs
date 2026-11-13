@@ -41,6 +41,7 @@ include!("validator/validator_prior_states.rs");
 include!("validator/validator_entry.rs");
 include!("validator/validator_tree_coherence.rs");
 include!("validator/validator_links.rs");
+include!("validator/link_containment.rs");
 
 #[cfg(test)]
 mod tests {
@@ -54,6 +55,7 @@ mod tests {
     include!("validator/tests_task_tooling.rs");
     include!("validator/tests_withhold_task_tooling.rs");
     include!("validator/tests_links_fences.rs");
+    include!("validator/tests_link_containment.rs");
     include!("validator/tests_profiles.rs");
     include!("validator/tests_machine_only.rs");
     include!("validator/tests_dead_end_states.rs");

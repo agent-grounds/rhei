@@ -124,9 +124,14 @@ impl Validator {
         self.validate_with_base(rhei, None)
     }
 
-    /// Validate a parsed rhei, optionally resolving markdown links relative
-    /// to `base_path` (the directory containing the plan file).
-    pub fn validate_with_base(&self, rhei: &Rhei, base_path: Option<&Path>) -> ValidationReport {
+    /// Validate a parsed rhei, optionally resolving markdown links against
+    /// `link_base`: a Single-File Plan's directory, or a Directory Workspace
+    /// root that links must stay inside. §FS-rhei-plan-language.3.6
+    pub fn validate_with_base(
+        &self,
+        rhei: &Rhei,
+        link_base: Option<LinkBase<'_>>,
+    ) -> ValidationReport {
         let mut report = ValidationReport::ok();
 
         let index = build_task_index(rhei);
@@ -146,7 +151,7 @@ impl Validator {
         validate_assignee_nonempty(rhei, &mut report);
         validate_result_blocks(rhei, &self.machines, &mut report);
 
-        if let Some(base) = base_path {
+        if let Some(base) = link_base {
             validate_markdown_links(rhei, base, &mut report);
         }
         validate_consumes_advisory(&index, &mut report);
@@ -171,35 +176,31 @@ pub fn validate_with_machine_set(rhei: &Rhei, machines: &MachineSet) -> Validati
 pub fn validate_with_machine_set_and_link_bases(
     rhei: &Rhei,
     machines: &MachineSet,
-    default_base: &Path,
-    task_bases: &HashMap<String, PathBuf>,
-    section_bases: &[PathBuf],
+    bases: &LinkBases<'_>,
 ) -> ValidationReport {
     let mut report = Validator::with_machines(machines.clone()).validate_with_base(rhei, None);
-    validate_markdown_links_with_task_bases(rhei, default_base, task_bases, section_bases, &mut report);
+    validate_markdown_links_with_task_bases(rhei, bases, &mut report);
     report
 }
 
 /// Validate a parsed rhei using an already-loaded [`StateMachine`], resolving
-/// markdown links relative to `base_path`.
+/// markdown links against `link_base`. §FS-rhei-plan-language.3.6
 pub fn validate_with_machine_and_base(
     rhei: &Rhei,
     machine: &StateMachine,
-    base_path: &Path,
+    link_base: LinkBase<'_>,
 ) -> ValidationReport {
-    Validator::new(machine.clone()).validate_with_base(rhei, Some(base_path))
+    Validator::new(machine.clone()).validate_with_base(rhei, Some(link_base))
 }
 
 /// Validate a parsed rhei using per-task markdown link bases. §AR-rhei-panta.5
 pub fn validate_with_machine_and_link_bases(
     rhei: &Rhei,
     machine: &StateMachine,
-    default_base: &Path,
-    task_bases: &HashMap<String, PathBuf>,
-    section_bases: &[PathBuf],
+    bases: &LinkBases<'_>,
 ) -> ValidationReport {
     let mut report = Validator::new(machine.clone()).validate_with_base(rhei, None);
-    validate_markdown_links_with_task_bases(rhei, default_base, task_bases, section_bases, &mut report);
+    validate_markdown_links_with_task_bases(rhei, bases, &mut report);
     report
 }
 

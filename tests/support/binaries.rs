@@ -103,13 +103,101 @@ fn verify_rhei_binary(
 
 /// The binary every subprocess use runs, once `build` has verified its output.
 ///
-/// Today it is the profile directory's own `rhei`, the path Cargo unlinks and
-/// relinks whenever any freshness build replaces it, so a spawn that lands in
-/// that gap fails with NotFound (agent-grounds/rhei#689). It must be a binary no
-/// later build can pull out from under a running test, kept under `build`'s own
-/// target directory and still named `rhei` for the platform. §AR-ci-release.1
+/// Not the profile directory's own `rhei`: Cargo unlinks and relinks that path
+/// whenever any freshness build replaces it, so a spawn landing in that gap fails
+/// with NotFound (agent-grounds/rhei#689). This is a copy no build touches, under
+/// `build`'s own profile directory at `rhei-test-bins/<identity>/rhei[.exe]`, still
+/// named `rhei` for the platform. §AR-ci-release.1
+///
+/// The copy is keyed by the verified binary's identity (its size and modification
+/// time) and shared by every harness process that verified the same build - a
+/// parent and the children that re-run its test binary among them. It is laid
+/// under a temporary name, a hard link where the filesystem allows and a byte copy
+/// where it does not, then renamed into place, so no process ever sees it absent or
+/// half-written; a rename over a copy another process laid first is atomic and
+/// replaces it with the same bytes. Copies of other builds are pruned once nothing
+/// has resolved them for a day, which bounds the directory without removing a copy
+/// a live suite may still spawn.
 fn spawnable_binary(build: &FreshnessBuild) -> PathBuf {
-    build.binary.clone()
+    let profile_dir = build.binary.parent().expect("the binary sits in a profile directory");
+    let file_name = build.binary.file_name().expect("the binary has a file name");
+    let bins = profile_dir.join("rhei-test-bins");
+    let (key, copy_dir) = retry_while_relinked(|| {
+        let metadata = std::fs::metadata(&build.binary)?;
+        let modified = metadata
+            .modified()?
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|since| since.as_nanos())
+            .unwrap_or_default();
+        let key = format!("{}-{modified}", metadata.len());
+        Ok((key.clone(), bins.join(key)))
+    })
+    .unwrap_or_else(|err| panic!("read {}: {err}", build.binary.display()));
+    std::fs::create_dir_all(&copy_dir)
+        .unwrap_or_else(|err| panic!("create {}: {err}", copy_dir.display()));
+    // Marks the copy as in use, so a process verifying another build leaves it be.
+    let stamp = copy_dir.join(".resolved");
+    std::fs::write(&stamp, std::process::id().to_string())
+        .unwrap_or_else(|err| panic!("write {}: {err}", stamp.display()));
+
+    let copy = copy_dir.join(file_name);
+    if !copy.is_file() {
+        let staged = copy_dir.join(format!(".rhei-{}.tmp", std::process::id()));
+        let _ = std::fs::remove_file(&staged);
+        retry_while_relinked(|| {
+            std::fs::hard_link(&build.binary, &staged)
+                .or_else(|_| std::fs::copy(&build.binary, &staged).map(drop))
+        })
+        .unwrap_or_else(|err| {
+            panic!("copy {} to {}: {err}", build.binary.display(), staged.display())
+        });
+        if let Err(err) = std::fs::rename(&staged, &copy) {
+            // Windows refuses to replace a binary another process is running; that
+            // copy is already the one this process wants.
+            let _ = std::fs::remove_file(&staged);
+            assert!(copy.is_file(), "rename {} to {}: {err}", staged.display(), copy.display());
+        }
+    }
+    prune_stale_copies(&bins, &key);
+    copy
+}
+
+/// Runs `op` again while it fails with NotFound: the uplift path it reads may be
+/// between Cargo's unlink and link, the gap a later read no longer lands in.
+fn retry_while_relinked<T>(mut op: impl FnMut() -> std::io::Result<T>) -> std::io::Result<T> {
+    let mut attempts = 0;
+    loop {
+        match op() {
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound && attempts < 50 => {
+                attempts += 1;
+                std::thread::sleep(std::time::Duration::from_millis(20));
+            }
+            result => return result,
+        }
+    }
+}
+
+/// Removes the copies of builds other than `keep` that no harness process has
+/// resolved for a day. Best effort: a copy another process removes first, or one
+/// still running on a platform that refuses the removal, is left alone.
+fn prune_stale_copies(bins: &Path, keep: &str) {
+    const STALE: std::time::Duration = std::time::Duration::from_secs(24 * 60 * 60);
+    let Ok(entries) = std::fs::read_dir(bins) else { return };
+    for entry in entries.flatten() {
+        if entry.file_name() == keep {
+            continue;
+        }
+        let dir = entry.path();
+        let stamp = dir.join(".resolved");
+        let last_resolved = std::fs::metadata(&stamp)
+            .or_else(|_| std::fs::metadata(&dir))
+            .and_then(|m| m.modified());
+        let stale =
+            last_resolved.ok().and_then(|at| at.elapsed().ok()).is_some_and(|age| age > STALE);
+        if stale {
+            let _ = std::fs::remove_dir_all(&dir);
+        }
+    }
 }
 
 // §AR-ci-release.1
@@ -265,7 +353,6 @@ mod tests {
     /// that spawns it in that gap still runs it. agent-grounds/rhei#689
     /// §AR-ci-release.1
     #[test]
-    #[ignore = "red until #689: a relink of target/<profile>/rhei removes the binary a test spawns; implement removes this"]
     fn spawnable_binary_survives_a_relink_of_the_profile_binary() {
         let profile_dir = scratch_profile_dir("relink");
         let scratch = profile_dir.parent().expect("the scratch target directory").to_path_buf();

@@ -62,18 +62,30 @@ fn remove_outer_rhei_identity(cmd: &mut std::process::Command) {
     }
 }
 
+/// How a `stdin_prompt` command line ends, after its last tooling flag, for
+/// the resolved family: `--` then `-` for `codex`, which reads a piped prompt
+/// only when its PROMPT is `-` (a `fork <id>` with none starts no turn and
+/// exits 0); nothing for `pi`, which has no separator; `--` for every other
+/// family. The one place the ending is decided. §FS-rhei-agents.2.2.2
+fn stdin_command_line_ending(family: &str) -> &'static [&'static str] {
+    match family {
+        "codex" => &["--", "-"],
+        "pi" => &[],
+        _ => &["--"],
+    }
+}
+
 /// Build a `Command` for the resolved agent.
 ///
 /// Flag order:
 /// `<command...> <mode flags...> <autonomous_args...> <effort args...> <accounting flags...>
 ///  <prompt_flag> <prompt>? <model_flag> <model>? <snapshot_args...>
-///  <strict MCP option?> <mcp/skill flags...> --?`
-/// `--` is appended last when `stdin_prompt` is `true` and the resolved family
-/// takes a separator (§FS-rhei-agents.2.2.2), to match
-/// `codex exec --`-style invocations that expect stdin: past a separator a flag
-/// is prompt text, so everything rhei has to say to the agent — the snapshot,
-/// MCP and skill flags included — is emitted before it
-/// (§FS-rhei-agents.2.2). A prompt flag declared alongside
+///  <strict MCP option?> <mcp/skill flags...> <the family's stdin ending?>`
+/// The ending is appended last when `stdin_prompt` is `true`: `--` for most
+/// families, `-- -` for `codex`, nothing for `pi` (§FS-rhei-agents.2.2.2).
+/// Past a separator a flag is prompt text, so everything rhei has to say to
+/// the agent — the snapshot, MCP and skill flags included — is emitted before
+/// it (§FS-rhei-agents.2.2). A prompt flag declared alongside
 /// `stdin_prompt` is emitted with no value, because the flag says the agent is
 /// non-interactive and the value is the prompt: two different questions
 /// (§FS-rhei-agents.1.1.2). `intervene_stdin` also
@@ -226,8 +238,8 @@ fn build_agent_command(
     // Last, after everything rhei has to say to the agent: past a separator a
     // flag is prompt text, which the agent neither applies nor complains about.
     // §FS-rhei-agents.2.2 The family decides, as for `--strict-mcp-config`. §FS-rhei-agents.2.2.2
-    if profile.stdin_prompt && resolved.family() != "pi" {
-        cmd.arg("--");
+    if profile.stdin_prompt {
+        cmd.args(stdin_command_line_ending(resolved.family()));
     }
 
     cmd.env("RHEI_CHECKOUT_ROOT", checkout_root)

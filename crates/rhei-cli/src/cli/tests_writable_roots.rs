@@ -497,7 +497,8 @@ mod writable_roots_tests {
             argv.windows(4).any(|w| w == ["--sandbox", "workspace-write", "--add-dir", "~/.cargo"]),
             "mode tokens pass through literally: {argv:?}"
         );
-        assert_eq!(argv.last().map(String::as_str), Some("--"));
+        // A codex-family stdin line ends `-- -`. §FS-rhei-agents.2.2.2
+        assert_eq!(argv[argv.len() - 2..], ["--", "-"], "{argv:?}");
 
         // The same profile with no grant gets no root arguments at all.
         let mut bare = resolved.clone();

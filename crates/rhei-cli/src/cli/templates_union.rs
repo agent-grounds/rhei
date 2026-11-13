@@ -15,20 +15,9 @@
         inputs: BTreeMap<String, serde_json::Value>,
         /// The rendered workspace, which is an ordinary rhei.
         root: PathBuf,
-    }
-
-    /// Everything a placement would write, kept until the whole union
-    /// validates. There is no staging directory, so a refusal leaves the target
-    /// byte-identical without a rollback path to get wrong.
-    /// §AR-rhei-library.5
-    #[derive(Default)]
-    struct UnionWrites {
-        /// Whole new contents for a file the target owns.
-        files: Vec<(PathBuf, String)>,
-        /// Files copied beside the rhei's own, under rule 1.
-        copies: Vec<(PathBuf, PathBuf)>,
-        /// Lines the summary prints about what the union decided.
-        notes: Vec<String>,
+        /// That workspace as the template's rendering, which is what a refusal of
+        /// a file placed from it names. §FS-rhei-errors.4.1
+        rendering: RenderingAttribution,
     }
 
     /// Place one rendered template into `host`, writing nothing until the
@@ -46,7 +35,7 @@
         // machine names states its parts bring, so it is a fragment until
         // every entry has joined it. §FS-rhei-library.6 §AR-rhei-library.5
         if mode != UnionMode::Compose {
-            validate_union(host, &writes)?;
+            validate_union(host, part, &writes)?;
             // Diagnose the completed target plus part only after validation;
             // nested and partial includes never emit it. §FS-rhei-library.7.2.3
             if let Some((_, text)) = writes.files.iter().find(|(path, _)| path == &host.machine) {
@@ -400,8 +389,9 @@
             )
         })?;
         let part_root = scratch.path().join(&manifest.name);
+        let builtin = resolved.is_builtin();
         let part =
-            render_part(template_dir, resolved.is_builtin(), &manifest, &values, &part_root, None)?;
+            render_part(template_dir, template, builtin, &manifest, &values, &part_root, None)?;
         let mode = if dry_run { UnionMode::DryRun } else { UnionMode::Place };
         union_into_host(&host, &part, mode, ArtifactSides::Placement)
     }

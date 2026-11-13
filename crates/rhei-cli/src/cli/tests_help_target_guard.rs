@@ -51,7 +51,7 @@ mod help_target_guard {
             "names the kind of charge an edge is, and runs nothing",
         ),
         (
-            "error_guidance.rs",
+            "state_machine_shape_help.rs",
             "rhei states",
             "re-checks the machine file it names and nothing else; a plan on the line could refuse first",
         ),

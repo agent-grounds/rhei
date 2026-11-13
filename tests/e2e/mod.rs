@@ -166,6 +166,8 @@ mod instantiate_project_validation_support;
 mod instantiate_project_validation_tests;
 // The reading takes a template path by its `/` spelling. §FS-rhei-errors.4.1
 #[cfg(unix)]
+mod instantiate_rendered_refusal_routes_tests;
+#[cfg(unix)]
 mod instantiate_rendered_refusal_support;
 #[cfg(unix)]
 mod instantiate_rendered_refusal_tests;

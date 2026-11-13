@@ -450,8 +450,10 @@ plan or task file that does not parse, or any other error located in one — the
 rendered copy is not a file the reader can fix: under `--dry-run` it is scratch,
 for a project member it is hidden staging, and a failed real run removes it. So
 the refusal is about the template. This holds however the rendering was laid:
-the default `--output`, `--into` a Panta project, or a member of a project
-template ([§FS-rhei-templates.6.4](rhei-templates.spec.md#64-laying-a-panta-project)).
+the default `--output`, `--into` a Panta project, a member of a project
+template or that project template's own files ([§FS-rhei-templates.6.4](rhei-templates.spec.md#64-laying-a-panta-project)), or
+`--into` a rhei, where the files the placement adds are the rendering and the
+target's own files stay themselves ([§FS-rhei-library.2](rhei-library.spec.md#2---into-placing-a-template-into-a-plan-or-a-project)).
 
 1. **The template file is named.** The refusal names the file the rendered file
    was rendered from — the file at the same template-relative path in the

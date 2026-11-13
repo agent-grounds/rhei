@@ -365,6 +365,7 @@ node_policy:
     /// One rendered task file, as `read_part_tickets` produces it.
     fn ticket_file(slug: &str, body: &str) -> PartTickets {
         PartTickets {
+            source: PathBuf::new(),
             slug: slug.to_owned(),
             body: body.to_owned(),
             metadata: BTreeMap::new(),

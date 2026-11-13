@@ -2,6 +2,24 @@
     // the validation that happens before any of it lands, and the diff
     // `--dry-run` prints instead. §FS-rhei-library.2 §AR-rhei-library.5
 
+    /// Everything a placement would write, kept until the whole union
+    /// validates. There is no staging directory, so a refusal leaves the target
+    /// byte-identical without a rollback path to get wrong.
+    /// §AR-rhei-library.5
+    #[derive(Default)]
+    struct UnionWrites {
+        /// Whole new contents for a file the target owns.
+        files: Vec<(PathBuf, String)>,
+        /// Files copied beside the rhei's own, under rule 1.
+        copies: Vec<(PathBuf, PathBuf)>,
+        /// Each new file in `files` written from the template's rendering, with
+        /// the rendered file it came from, relative to the template's root.
+        /// §FS-rhei-errors.4.1
+        rendered: Vec<(PathBuf, PathBuf)>,
+        /// Lines the summary prints about what the union decided.
+        notes: Vec<String>,
+    }
+
     /// Place a template's tickets in a single-file rhei: under the parent's
     /// subtree, or at the end of `## Tasks`, which is the end of the file.
     /// §FS-rhei-new.3.1
@@ -39,6 +57,8 @@
             let mut number = next_task_number(host_files);
             for file in tickets {
                 let path = host.root.join("tasks").join(format!("{number:03}-{}.md", file.slug));
+                // A new file of the target's, rendered by the template. §FS-rhei-errors.4.1
+                writes.rendered.push((path.clone(), file.source.clone()));
                 writes.files.push((path, file.body.clone()));
                 number += 1;
             }
@@ -170,7 +190,11 @@
     /// member the union never read. Neither is the placement's to refuse.
     /// Refusals describe the unwritten placement using the original files.
     /// §AR-rhei-library.5 §FS-rhei-library.7.5
-    fn validate_union(host: &UnionHost, writes: &UnionWrites) -> MietteResult<()> {
+    fn validate_union(
+        host: &UnionHost,
+        part: &RenderedPart,
+        writes: &UnionWrites,
+    ) -> MietteResult<()> {
         let scratch = tempfile::tempdir().map_err(|err| {
             miette!(
                 help = "a union is validated in a temp directory before it is written. Check \
@@ -202,6 +226,15 @@
             mirror.clone()
         };
         let inherited = union_validation_errors(&entrypoint);
+        // What the placement adds is the template's rendering, never written when
+        // refused; the target's own files stay themselves. §FS-rhei-errors.4.1
+        let copied = writes.copies.iter().filter_map(|(src, dst)| {
+            Some((dst.clone(), src.strip_prefix(&part.root).ok()?.to_path_buf()))
+        });
+        let added = writes.rendered.iter().cloned().chain(copied).filter_map(|(dst, src)| {
+            Some((dst.strip_prefix(scope).ok()?.to_path_buf(), src))
+        });
+        let _rendering = enter_rendering(part.rendering.clone().placed(&mirror, added.collect()));
         for (path, contents) in &writes.files {
             write_mirrored(scope, &mirror, path, contents.as_bytes())?;
         }

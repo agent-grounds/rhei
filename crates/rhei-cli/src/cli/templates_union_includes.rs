@@ -171,6 +171,7 @@
             let part_root = scratch.path().join(&included.name);
             let part = render_part(
                 included_dir,
+                entry.template(),
                 resolved.is_builtin(),
                 &included,
                 values,
@@ -211,6 +212,7 @@
     /// what joins a host is always a whole rhei. §FS-rhei-library.6
     fn render_part(
         template_dir: &Path,
+        template_ref: &str,
         builtin: bool,
         manifest: &TemplateManifest,
         values: &BTreeMap<String, serde_json::Value>,
@@ -236,6 +238,14 @@
             source: SourceIdentity::of(template_dir, builtin, &[]).fence_fields(),
             inputs,
             root: root.to_path_buf(),
+            rendering: RenderingAttribution::new(
+                root,
+                template_dir,
+                template_ref,
+                builtin,
+                RenderingFate::Proposed,
+            )
+            .including(!manifest.includes.is_empty()),
         })
     }
 

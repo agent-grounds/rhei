@@ -349,6 +349,18 @@
         // A refusal names the project the caller asked for, not its staging, nor
         // the scratch `--dry-run` lays it in. §FS-rhei-errors.4
         let respellings = copy_respellings(&staged, output_dir);
+        // The project's own files are the project template's rendering, never
+        // published unless kept below; a member's own scope sits inside. §FS-rhei-errors.4.1
+        let kept = keep_on_error && !lay.dry_run;
+        let fate = if kept { RenderingFate::Kept } else { RenderingFate::Proposed };
+        let rendering = RenderingAttribution::new(
+            &staged,
+            lay.template_dir,
+            lay.template_ref,
+            lay.builtin,
+            fate,
+        );
+        let project_rendering = enter_rendering(rendering.including(!lay.members.is_empty()));
         let laid = lay_project_staged(lay, &rendered, output_dir, &staged).map_err(|err| {
             if lay.dry_run {
                 respell_report(err, &respellings)
@@ -356,9 +368,10 @@
                 respell_staging(err, &staged, output_dir)
             }
         });
+        drop(project_rendering);
         let summary = match laid {
             Ok(summary) => summary,
-            Err(err) if lay.dry_run || !keep_on_error => {
+            Err(err) if !kept => {
                 let _ = remove_path(&staged, false);
                 return Err(err);
             }

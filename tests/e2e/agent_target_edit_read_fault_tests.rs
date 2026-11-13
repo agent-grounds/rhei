@@ -58,21 +58,18 @@ fn check_transient(site: &str, order: &str) {
 
 // §FS-rhei-agent-visit-pairing.5.1
 #[test]
-#[ignore = "red until #695: a refused c_succeeded() read escapes as PermissionError; implement removes this"]
 fn a_refused_scheduler_read_of_cs_record_still_dispatches_d() {
     check_transient("scheduler", "c-first");
 }
 
 // §FS-rhei-agent-visit-pairing.5.1
 #[test]
-#[ignore = "red until #695: a refused poll of c's record escapes d as PermissionError; implement removes this"]
 fn a_refused_poll_of_cs_record_still_reaches_ds_deliberate_exit() {
     check_transient("poll", "d-first");
 }
 
 // §FS-rhei-agent-visit-pairing.5.1
 #[test]
-#[ignore = "red until #695: a refused snapshot read leaves no c-at-d-exit.json; implement removes this"]
 fn a_refused_snapshot_read_still_records_c_at_ds_exit() {
     check_transient("snapshot", "d-first");
 }
@@ -141,7 +138,6 @@ fn permanent_problems(site: &str, order: &str) -> Vec<String> {
 
 // §FS-rhei-agent-visit-pairing.5.1
 #[test]
-#[ignore = "red until #695: a permanent refusal escapes at once rather than expiring at 5s; implement removes this"]
 fn a_permanent_refusal_of_any_read_expires_naming_the_path_and_last_error() {
     let problems: Vec<String> =
         SITES.iter().flat_map(|(site, order)| permanent_problems(site, order)).collect();

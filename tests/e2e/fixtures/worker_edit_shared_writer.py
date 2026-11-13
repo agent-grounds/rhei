@@ -4,21 +4,12 @@ The authoritative pathname read happens after writer acquisition, and the
 sidecar stays held through same-directory replacement. This preserves the
 sibling's terminal finalization as well as its state. §FS-rhei-run.3.7.3
 §AR-agent-orchestrator-workflow.3.3.1
+
+Refusals are classified by shared_access_refused.py, included before this file.
 """
 import contextlib
 import errno
 import tempfile
-
-
-def _shared_access_refused(error):
-    """Classify access/sharing/lock refusals for polling and publication.
-
-    Other I/O errors propagate. §FS-rhei-run.3.7.3.1
-    §AR-agent-orchestrator-workflow.3.3.1.1
-    """
-    return isinstance(error, PermissionError) or (
-        os.name == 'nt' and getattr(error, 'winerror', None) in (5, 32, 33)
-    )
 
 
 def _try_shared_writer_lock(handle):

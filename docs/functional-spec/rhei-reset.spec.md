@@ -160,6 +160,11 @@ run-orchestrated logs and captures land there even for tickets owned by a
 subdirectory rhei:
 
 - `runtime/results/<ticket-id>.md`
+- the exact `runtime/exports/<ticket-id>/` directory and everything inside it,
+  independently of any state-machine `inputs:`/`outputs:` declaration. These
+  plan-level `**Provides:**` exports must be written anew after reset: a
+  previous run's export must not satisfy the next completion check
+  ([§FS-rhei-plan-language.3.12.3](rhei-plan-language.spec.md#3123-producer-completion-obligation))
 - `runtime/logs/task-<ticket-id>-*`, and the spawn records beside them in
   `runtime/spawns/task-<ticket-id>-*`
 - `runtime/reports/task-<ticket-id>-*`, the session reports rendered from those
@@ -192,6 +197,13 @@ Artifact paths that still carry unresolved placeholders after `{task_id}` is
 substituted (`{state}`, `{visit_count}`, `{model}`, …) are matched by the
 literal prefix up to the first remaining placeholder, so `auth.1` never matches
 `auth.10`.
+
+The export directory is matched by its complete ticket id, never by a prefix:
+resetting `auth.1` does not remove `runtime/exports/auth.10/`. Pre-qualification
+export directories named by a rhei-local id follow the same guarded legacy
+sweep as other ticket-owned runtime records: remove them only at an execution
+root whose every rhei is in scope; keep ambiguous shared-root local ids
+([§FS-rhei-panta.6.4](rhei-panta.spec.md#64-reset-validate-list-viz)).
 
 Reset is not the only command that deletes ticket-owned runtime files:
 `rhei remove` does too, but only empty residue of a ticket that has no history

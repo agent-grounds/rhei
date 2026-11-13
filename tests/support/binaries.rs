@@ -101,6 +101,17 @@ fn verify_rhei_binary(
     Ok(())
 }
 
+/// The binary every subprocess use runs, once `build` has verified its output.
+///
+/// Today it is the profile directory's own `rhei`, the path Cargo unlinks and
+/// relinks whenever any freshness build replaces it, so a spawn that lands in
+/// that gap fails with NotFound (agent-grounds/rhei#689). It must be a binary no
+/// later build can pull out from under a running test, kept under `build`'s own
+/// target directory and still named `rhei` for the platform. §AR-ci-release.1
+fn spawnable_binary(build: &FreshnessBuild) -> PathBuf {
+    build.binary.clone()
+}
+
 // §AR-ci-release.1
 pub fn rhei_binary() -> PathBuf {
     static RHEI_BINARY: OnceLock<PathBuf> = OnceLock::new();
@@ -117,7 +128,7 @@ pub fn rhei_binary() -> PathBuf {
                     .success()
             });
             match result {
-                Ok(()) => build.binary,
+                Ok(()) => spawnable_binary(&build),
                 Err(BinaryVerificationError::BuildFailed) => {
                     panic!("cargo build -p rhei-cli failed")
                 }
@@ -134,7 +145,7 @@ mod tests {
     use std::ffi::{OsStr, OsString};
     use std::path::{Path, PathBuf};
 
-    use super::{verify_rhei_binary, BinaryVerificationError, FreshnessBuild};
+    use super::{spawnable_binary, verify_rhei_binary, BinaryVerificationError, FreshnessBuild};
 
     /// A profile directory under a target directory of the shape a caller gives
     /// with `--target-dir`. Built from components, so the assertions read the
@@ -223,5 +234,75 @@ mod tests {
         let result = verify_rhei_binary(&existing, || false);
 
         assert_eq!(result, Err(BinaryVerificationError::BuildFailed));
+    }
+
+    /// A profile directory of its own under the running test binary's target
+    /// directory: the same filesystem as the live one, so a hard link works,
+    /// but never the live `target/<profile>/rhei` a running suite spawns.
+    fn scratch_profile_dir(name: &str) -> PathBuf {
+        let exe = std::env::current_exe().expect("current test binary");
+        let target = exe.ancestors().nth(3).expect("the running test binary's target directory");
+        target
+            .join("rhei-test-scratch")
+            .join(format!("{name}-{}", std::process::id()))
+            .join("debug")
+    }
+
+    /// Stands in for the uplift path: any runnable program that exits 0 on
+    /// every platform. The running test binary is one: `--list` with a filter
+    /// that matches nothing prints an empty list and exits 0.
+    fn lay_stand_in_binary(at: &Path) {
+        let exe = std::env::current_exe().expect("current test binary");
+        std::fs::create_dir_all(at.parent().expect("a profile directory"))
+            .expect("create the scratch profile directory");
+        if std::fs::hard_link(&exe, at).is_err() {
+            std::fs::copy(&exe, at).expect("copy the stand-in binary");
+        }
+    }
+
+    /// A relink of the profile directory's own `rhei` - Cargo's unlink, then
+    /// link - does not take away the binary the harness already resolved: a test
+    /// that spawns it in that gap still runs it. agent-grounds/rhei#689
+    /// §AR-ci-release.1
+    #[test]
+    #[ignore = "red until #689: a relink of target/<profile>/rhei removes the binary a test spawns; implement removes this"]
+    fn spawnable_binary_survives_a_relink_of_the_profile_binary() {
+        let profile_dir = scratch_profile_dir("relink");
+        let scratch = profile_dir.parent().expect("the scratch target directory").to_path_buf();
+        let _ = std::fs::remove_dir_all(&scratch);
+        let build = FreshnessBuild::for_profile_dir(&profile_dir);
+        lay_stand_in_binary(&build.binary);
+
+        let resolved = spawnable_binary(&build);
+        // The first half of Cargo's uplift; the second half links a new inode in.
+        std::fs::remove_file(&build.binary).expect("unlink the profile binary");
+        let spawned = std::process::Command::new(&resolved)
+            .args(["--list", "no-test-is-named-this-689"])
+            .output();
+        lay_stand_in_binary(&build.binary);
+        let respawned = std::process::Command::new(&resolved)
+            .args(["--list", "no-test-is-named-this-689"])
+            .output();
+        let _ = std::fs::remove_dir_all(&scratch);
+
+        let spawned = spawned.unwrap_or_else(|err| {
+            panic!("spawning {} after the profile binary was unlinked: {err:?}", resolved.display())
+        });
+        assert!(spawned.status.success(), "{} exited {}", resolved.display(), spawned.status);
+        let respawned = respawned.unwrap_or_else(|err| {
+            panic!("spawning {} after the profile binary was relinked: {err:?}", resolved.display())
+        });
+        assert!(respawned.status.success(), "{} exited {}", resolved.display(), respawned.status);
+        assert_eq!(
+            resolved.file_name(),
+            build.binary.file_name(),
+            "the spawned binary keeps the platform's `rhei` name"
+        );
+        assert!(
+            resolved.starts_with(&scratch),
+            "{} is not under the build's target directory {}",
+            resolved.display(),
+            scratch.display()
+        );
     }
 }

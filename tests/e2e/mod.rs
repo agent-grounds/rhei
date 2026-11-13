@@ -98,6 +98,7 @@ mod codex_writable_roots_isolation_tests;
 mod codex_writable_roots_support;
 mod codex_writable_roots_tests;
 mod complete_result_input_tests;
+mod completion_environment_tests;
 mod completions_tests;
 mod consumes_advisory_tests;
 mod cost_accounting_tests;

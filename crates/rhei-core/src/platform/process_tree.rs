@@ -160,9 +160,16 @@ pub fn signal_group(pgid: i32, signal: GroupSignal) -> io::Result<()> {
     }
 }
 
-/// Whether no process is left in the group `pgid`.
+/// Whether no process is left in the group `pgid`: signalling it with signal
+/// `0` fails with `ESRCH`. `EPERM`, an unreaped zombie still in the group and
+/// any other error all answer `false`, so an id that names another group by now
+/// can keep a worker refused but never pass for one that is gone.
+///
+/// The one test of an empty group, whether the grace of a stop asks it or a
+/// run asks whether the group a killed run left is gone.
+// §FS-rhei-transitions.4.10 §FS-rhei-evidence.11.2
 #[cfg(unix)]
-fn group_is_empty(pgid: i32) -> bool {
+pub fn group_is_empty(pgid: i32) -> bool {
     use nix::errno::Errno;
     use nix::sys::signal::killpg;
     use nix::unistd::Pid;

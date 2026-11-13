@@ -246,6 +246,7 @@ Raise it.
                 code: Some(0),
                 ending: "exited".into(),
                 unavailable: 0,
+                killed: 0,
                 signal: None,
                 reverted: None,
             };

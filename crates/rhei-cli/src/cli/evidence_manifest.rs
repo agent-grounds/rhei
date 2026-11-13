@@ -34,7 +34,10 @@ fn evidence_contents(root: &Path, run_dir: &Path) -> EvidenceContents {
             entries
                 .filter_map(Result::ok)
                 .filter_map(|entry| entry.file_name().to_str().map(str::to_string))
-                .filter(|name| name.ends_with(".start.json") || name.ends_with(".end.json"))
+                // Group records too, which only a run's death makes read. §FS-rhei-evidence.3.4
+                .filter(|name| {
+                    [".start.json", ".end.json", ".group.json"].iter().any(|end| name.ends_with(end))
+                })
                 .collect()
         })
         .unwrap_or_default();

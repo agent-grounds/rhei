@@ -47,16 +47,9 @@ fn spawn_parallel_program_work_item(
         task.state.as_str(),
         machine,
     );
-    let plan = plan_named_spawn(
-        machine,
-        &task_workspace_root,
-        &task_runtime_dir,
-        &item.task_id_str,
-        &item.current_state,
-        visit_count,
-        None,
-        &machines.reset,
-    );
+    let site = SpawnSite { machine, task, loaded: &loaded, settings, reset: &machines.reset };
+    let state = item.current_state.as_str();
+    let plan = site.plan(&task_workspace_root, &task_runtime_dir, state, visit_count, None, "");
     // Refused before it runs; `Skipped` is the pool's stall. §FS-rhei-agents.8.1
     let plan = match spawn_refusals.observe(
         &item.task_id_str, &item.current_state, None, plan, sink,

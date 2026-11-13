@@ -83,16 +83,9 @@ fn run_sequential_program_work_items(
             progress.stalled_tasks.insert(task_id_str.clone());
             continue;
         }
-        let plan = plan_named_spawn(
-            machine,
-            &task_workspace_root,
-            &task_runtime_dir,
-            task_id_str,
-            current_state,
-            visit_count,
-            None,
-            &machines.reset,
-        );
+        let site = SpawnSite { machine, task, loaded: &loaded, settings, reset: &machines.reset };
+        let plan =
+            site.plan(&task_workspace_root, &task_runtime_dir, current_state, visit_count, None, "");
         let plan = match progress.spawn_refusals.observe(
             task_id_str, current_state, None, plan, sink,
         ) {

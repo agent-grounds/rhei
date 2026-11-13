@@ -178,7 +178,17 @@ fn summary_spawn(task: &str, worker: &str, started: &str, ended: &str) -> Unreco
         worker: worker.to_string(),
         started: started.to_string(),
         ended: ended.to_string(),
+        killed: false,
     }
+}
+
+/// A killed spawn's `ended` is when the next run learned of the kill, so it has
+/// no duration, however far apart its timestamps are. §FS-rhei-summary.2.2
+#[test]
+fn a_killed_spawn_has_no_elapsed_time() {
+    let ended = summary_spawn("1", "mock", "2026-05-20T10:00:00Z", "2026-05-20T10:05:00Z");
+    assert_eq!(ended.elapsed_ms(), Some(300_000));
+    assert_eq!(UnrecordedSpawn { killed: true, ..ended }.elapsed_ms(), None);
 }
 
 #[test]

@@ -63,6 +63,10 @@ struct SpawnRecord {
     /// as `0`, and further attempts carry it forward. §FS-rhei-agents.8.4
     #[serde(default, skip_serializing_if = "is_zero")]
     unavailable: u64,
+    /// This visit's attempts killed together with their run, charged or not;
+    /// absent reads as `0`. §FS-rhei-agents.8.4 §FS-rhei-agents.3.2.3
+    #[serde(default, skip_serializing_if = "is_zero")]
+    killed: u64,
     /// pi's `finalError`, on a `provider_unavailable` record. §FS-rhei-agents.8.4
     #[serde(default, skip_serializing_if = "Option::is_none")]
     signal: Option<String>,
@@ -121,6 +125,7 @@ impl SpawnRecord {
         match (self.ending.as_str(), self.code) {
             ("timed out", _) => format!("timed out after {}", self.duration),
             ("interrupted", _) => "was interrupted by a run shutdown".to_string(),
+            (KILLED_ENDING, _) => "was killed together with its run".to_string(),
             (WITHHELD_ENDING, _) => {
                 "exited 0 and met its completion condition, and the engine withheld its release \
                  edge because the visit released nothing"
@@ -494,14 +499,17 @@ fn resolve_attempt_budget(
     if let Some(budget) = state_def.and_then(poll_attempt_budget) {
         return budget;
     }
-    AttemptBudget::Visit(
-        state_def
-            .and_then(|def| def.attempts)
-            .or(settings.defaults.attempts)
-            .map(u64::from)
-            .unwrap_or(DEFAULT_ATTEMPT_BUDGET)
-            .max(1),
-    )
+    AttemptBudget::Visit(configured_attempts(state_def, settings))
+}
+
+/// The configured `attempts:` of a state, poll or not: what one `rhei retry`
+/// grants, and in a poll state what its kill halt offers. §FS-rhei-retry.2
+fn configured_attempts(
+    state_def: Option<&rhei_validator::StateDef>,
+    settings: &RheiSettings,
+) -> u64 {
+    let configured = state_def.and_then(|def| def.attempts).or(settings.defaults.attempts);
+    configured.map(u64::from).unwrap_or(DEFAULT_ATTEMPT_BUDGET).max(1)
 }
 
 /// A `poll:` state's budget, its own `poll.max_attempts`: no setting reaches

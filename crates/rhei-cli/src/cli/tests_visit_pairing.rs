@@ -39,6 +39,7 @@ mod visit_pairing {
             code,
             ending: ending.into(),
             unavailable: 0,
+            killed: 0,
             signal: None,
             reverted: None,
         }

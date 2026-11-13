@@ -23,6 +23,9 @@ struct SpawnRecordFacts {
     worker: String,
     started: String,
     ended: String,
+    /// Why it stopped; absent in a record too old to say. §FS-rhei-agents.8.4
+    #[serde(default)]
+    ending: String,
     /// The record's file name under `runtime/spawns/`, which is what tells two
     /// spawns of one fanned-out state apart. §FS-rhei-summary.6.1
     #[serde(skip)]
@@ -42,6 +45,9 @@ struct UnrecordedSpawn {
     worker: String,
     started: String,
     ended: String,
+    /// Killed together with its run: its `ended` is when the next run learned
+    /// of the kill, not when it stopped. §FS-rhei-summary.2.2
+    killed: bool,
 }
 
 impl UnrecordedSpawn {
@@ -55,6 +61,7 @@ impl UnrecordedSpawn {
             worker: spawn.worker,
             started: spawn.started,
             ended: spawn.ended,
+            killed: spawn.ending == KILLED_ENDING,
         }
     }
 
@@ -63,9 +70,13 @@ impl UnrecordedSpawn {
         epoch_secs(rhei_tui::parse_rfc3339(&self.started)?)
     }
 
-    /// `ended - started`, or nothing when either will not parse.
+    /// `ended - started`, or nothing when either will not parse or the spawn
+    /// was killed, so the gap before the next run is never run time.
     /// §FS-rhei-summary.2.2
     fn elapsed_ms(&self) -> Option<u64> {
+        if self.killed {
+            return None;
+        }
         let started = rhei_tui::parse_rfc3339(&self.started)?;
         let ended = rhei_tui::parse_rfc3339(&self.ended)?;
         ended.duration_since(started).ok().map(|elapsed| elapsed.as_millis() as u64)

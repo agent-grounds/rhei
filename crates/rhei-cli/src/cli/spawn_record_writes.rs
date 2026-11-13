@@ -49,6 +49,7 @@ impl SpawnPlan {
             ending: ended.ending.to_string(),
             // One count per visit, charged or not. §FS-rhei-agents.8.4
             unavailable: self.previous.as_ref().map_or(0, |previous| previous.unavailable),
+            killed: self.previous.as_ref().map_or(0, |previous| previous.killed),
             signal: None,
             reverted: None,
         };
@@ -57,6 +58,7 @@ impl SpawnPlan {
             if let Some(stored) = stored.filter(|stored| stored.moves == self.moves) {
                 record.charged = stored.charged + u64::from(attempt_charged);
                 record.unavailable = stored.unavailable;
+                record.killed = stored.killed;
                 record.grants = stored.grants;
             } else if let Some(previous) = &self.previous {
                 // Legacy unsuffixed records may supply this entry's previous attempt.

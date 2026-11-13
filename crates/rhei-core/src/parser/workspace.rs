@@ -1,6 +1,7 @@
 use crate::ast::{ContentSection, Metadata, Structure, Task};
 use crate::fence::FenceTracker;
 use crate::header::{header_regex, PANTA_HEADER, RHEI_HEADER};
+use crate::tokens::TASK_METADATA_FIELDS;
 use regex::Regex;
 
 use super::task_file_metadata::{
@@ -129,6 +130,22 @@ fn parse_manifest(input: &str, header_name: &str, frontmatter_kind: &str) -> Res
             return Err(ParseError::new(
                 format!(
                     "YAML frontmatter must appear after the `# {header_name}:` header. Move the `---` block below the header."
+                ),
+                Some(line_number),
+            ));
+        }
+
+        // Both manifests refuse task metadata outside YAML and fences, even before the header.
+        // §FS-rhei-plan-language.1.2 §FS-rhei-plan-language.1.5
+        if let Some(field) = TASK_METADATA_FIELDS.iter().find(|field| line.starts_with(**field)) {
+            let task_files = if header_name == PANTA_HEADER {
+                "a rhei's task files or basin/ task files"
+            } else {
+                "a task file under tasks/"
+            };
+            return Err(ParseError::new(
+                format!(
+                    "{frontmatter_kind} file must not contain task metadata ({field}); move the task into {task_files}"
                 ),
                 Some(line_number),
             ));

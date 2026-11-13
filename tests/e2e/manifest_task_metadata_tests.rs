@@ -36,11 +36,14 @@ fn assert_index_refused(index: &str, metadata_line: usize) {
             "{command} must name the offending source path: {said}"
         );
         let line = metadata_line.to_string();
+        let gutter = format!("{line}|");
         assert!(
             said.contains(&format!("line {line}:"))
+                || said.contains(&format!("line {line} when"))
                 || said.contains(&format!(":{line}:"))
-                || said.contains(&format!("{line} │"))
-                || said.contains(&format!("{line} |")),
+                || said.contains(&format!(" {line} │"))
+                || said.contains(&format!(" {line} |"))
+                || said.split_whitespace().any(|word| word == gutter),
             "{command} must identify metadata at original line {line}: {said}"
         );
         assert!(said.contains("tasks/"), "{command} must direct the author to task files: {said}");
@@ -48,13 +51,16 @@ fn assert_index_refused(index: &str, metadata_line: usize) {
 }
 
 #[test]
-#[ignore = "red until #696: readers silently drop a task before index sections; implement removes this"]
+fn readers_refuse_task_metadata_before_index_header() {
+    assert_index_refused("### Task 1: Book\n**State:** pending\n\n# Rhei: WS\n", 2);
+}
+
+#[test]
 fn readers_refuse_task_metadata_before_index_sections() {
     assert_index_refused("# Rhei: WS\n\n### Task 1: Book\n**State:** pending\n", 4);
 }
 
 #[test]
-#[ignore = "red until #696: readers absorb an index task into Notes; implement removes this"]
 fn readers_refuse_task_metadata_inside_index_notes() {
     assert_index_refused(
         "# Rhei: WS\n\n## Notes\n\nSome notes.\n\n### Task 1: Book\n**State:** pending\n",

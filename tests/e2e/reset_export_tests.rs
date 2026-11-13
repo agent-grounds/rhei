@@ -77,7 +77,6 @@ fn assert_missing_export(world: &RemedyWorld) {
 /// beta and an exact-id neighbour must survive, and fresh output permits retry.
 /// §FS-rhei-reset.2.1 §FS-rhei-reset.3 §FS-rhei-plan-language.3.12.3
 #[test]
-#[ignore = "red until #703: narrowed reset removes stale exports; implement removes this"]
 fn narrowed_reset_exports_require_fresh_completion_output() {
     let control = project("rhei-703-reset-export-control");
     assert_missing_export(&control);
@@ -115,7 +114,6 @@ fn narrowed_reset_exports_require_fresh_completion_output() {
 /// unambiguous because beta owns the project root and is outside the scope.
 /// §FS-rhei-reset.2.1 §FS-rhei-panta.6.4
 #[test]
-#[ignore = "red until #703: reset removes exports at both execution roots; implement removes this"]
 fn narrowed_reset_exports_sweep_owning_and_project_roots() {
     let world = project("rhei-703-reset-export-roots");
     fs::remove_file(world.root.join("alpha.rhei.md")).unwrap();
@@ -155,7 +153,6 @@ fn narrowed_reset_exports_sweep_owning_and_project_roots() {
 /// this cleans old residue without changing the export reader's rename hint.
 /// §FS-rhei-panta.6.4 §FS-rhei-reset.2.1
 #[test]
-#[ignore = "red until #703: reset sweeps exports under guarded legacy ids; implement removes this"]
 fn narrowed_reset_exports_guard_shared_root_legacy_ids() {
     let world = project("rhei-703-reset-export-legacy");
     world.write("runtime/exports/1/summary.md", "ambiguous legacy output\n");

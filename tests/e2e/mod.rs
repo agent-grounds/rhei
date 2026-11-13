@@ -201,6 +201,9 @@ mod laid_output_root_tests;
 mod list_ready_tests;
 mod list_task_metadata_tests;
 mod live_checkpoint_validation_tests;
+mod live_gate_budget_liveness_tests;
+#[cfg(target_os = "linux")]
+mod live_gate_budget_publication_linux_tests;
 mod live_gate_budget_support;
 mod live_gate_budget_tests;
 mod live_member_admission_tests;

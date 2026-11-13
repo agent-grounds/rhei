@@ -55,6 +55,19 @@ agent-grounds/rhei#553 is that failure: a helper parsed a pid file its writer ha
 only just created, and the test reported a lock that was never taken, with the
 helper's traceback left in the job log rather than in the failure.
 
+A fixture that edits a machine while a run can reload it publishes a complete
+replacement: write a temporary file in the machine's directory, then replace
+the destination. Never truncate the live machine before filling it. The reader
+must see a complete old or new document; strict production validation need not
+tolerate an empty or partially written fixture. Issue #702 exposed this writer
+race while raising a live run's visits budget.
+
+A fixture wait whose prerequisite is a live run rejects an observed child exit
+before accepting its gate, visits, or other readiness predicate, even when that
+predicate remains true on disk. Its failure reports the exit status and captured
+scheduler stdout and stderr. Waiting for successful completion is a separate
+operation: a terminal run cannot establish readiness for a live interaction.
+
 ## 5. Paths Are Data
 
 Code never builds a path from `/`-joined strings, never compares two spellings

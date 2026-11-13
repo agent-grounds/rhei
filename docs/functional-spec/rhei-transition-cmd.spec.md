@@ -380,6 +380,15 @@ accounting, machine adoption, and strict-input guarantees
 ([§FS-rhei-seal.8.6](rhei-seal.spec.md#86-admission)) unchanged. Run-side output alone does not satisfy this
 transition-command diagnostic.
 
+Verification of descriptor-unavailable recovery covers both standalone and
+project runs with descriptor publication obstructed. Raising the fixture's
+visits budget must preserve the active run through complete machine publication
+([§REQ-cross-platform.4.1](../requirements/cross-platform.md#41-a-reader-waits-for-the-content-not-for-the-file));
+gate and visit records left by an exited run do not establish that prerequisite.
+The successful release must retain its ordinary stdout and exit status, and its
+advisory must give foreground interruption and fresh-run recovery. This does not
+extend the advisory to inactive runs or relax strict machine validation.
+
 ## 4. Compare-and-Swap Conflicts
 
 Two agents that race on the same task both specify the same `--from`. The first call to acquire the lock rewrites the state. The second call re-reads under the lock, sees the actual state no longer matches `--from`, and fails non-zero with:

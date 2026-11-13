@@ -1733,7 +1733,7 @@ a project's member too, and [§FS-rhei-panta.6](rhei-panta.spec.md#6-project-sco
 | a plan with no budget fields | validates and runs exactly as today, under the three built-in defaults, which `rhei validate` and the run print with source `built_in` |
 | `agent_timeout`, `attempts:`, `visits:`, `poll.max_attempts` | untouched, and not clamped |
 | `rhei reset` | still deletes `runtime/` and restores authored state; the account is not under `runtime/` and survives, and so does the ticket's budget identity ([§FS-rhei-reset.2](rhei-reset.spec.md#2-behavior)) |
-| `rhei reset --rhei` | removes what is keyed by an in-scope ticket id and **no receipts**: a narrowed reset that dropped a ticket's travel would make `--rhei` the faucet ([§FS-rhei-reset.2.1](rhei-reset.spec.md#21-narrowed-reset---rhei)) |
+| `rhei reset --rhei`, `rhei reset --task` | removes what is keyed by an in-scope ticket id and **no receipts**: a narrowed reset that dropped a ticket's travel would make `--rhei` or `--task` the faucet ([§FS-rhei-reset.2.1](rhei-reset.spec.md#21-narrowed-reset---rhei), [§FS-rhei-reset.2.5](rhei-reset.spec.md#25-ticket-scope---task)) |
 | `rhei remove` | deletes an untouched ticket's definition and residue and retires its id; it appends, rewrites and refunds nothing in the account, and a retired identity is never rebound ([§FS-rhei-remove.5.2](rhei-remove.spec.md#52-what-a-retired-id-forbids)) |
 | `rhei run --rhei` | narrows candidates only. One account, one balance, whatever the selection ([§FS-rhei-run.2.5](rhei-run.spec.md#25-project-scope---rhei)) |
 | `rhei run --dry-run` | reports the bounds and what the pass would cost, and spends nothing |

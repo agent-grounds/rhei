@@ -285,6 +285,7 @@ fn run_agent_worker_pool(
             accounting_recorded,
             accounting_warning,
             slot: _,
+            budget_arm,
         } = completion;
         // §FS-rhei-cost-accounting.11: Parallel accounting failures still warn.
         if let Some(warning) = accounting_warning {
@@ -320,6 +321,7 @@ fn run_agent_worker_pool(
                         spawn_record,
                         accounting_recorded,
                         outcome,
+                        budget_arm,
                     },
                     input,
                     &live.machines,

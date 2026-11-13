@@ -240,8 +240,8 @@ fn spawn_and_wait_agent(
     }
     // The ancestry descriptor this invocation's descendants draw on: two
     // variables together, because a reservation that does not say whose it is
-    // refuses every nested run of another project. §FS-rhei-budgets.7.1
-    if let Some((reservation, account)) = budget_ancestry_token(task_id) {
+    // refuses every nested run of another project; this arm's own. §FS-rhei-budgets.7.1
+    if let Some((reservation, account)) = budget_ancestry_token(task_id, plan.budget_arm.as_deref()) {
         cmd.env(PARENT_RESERVATION_ENV, reservation);
         cmd.env(PARENT_ACCOUNT_ENV, account);
     }

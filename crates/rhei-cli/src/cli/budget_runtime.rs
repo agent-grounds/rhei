@@ -33,7 +33,11 @@ enum BudgetAdmission {
     /// `note` is the one thing an admitted spawn may still owe an operator: the
     /// descriptor this run inherited was minted elsewhere, so the run charges
     /// its own account and says so once. §FS-rhei-budgets.7.2
-    Admitted { bounds: Vec<rhei_tui::BoundReport>, note: Option<String> },
+    ///
+    /// `arm` is the reservation this spawn was admitted on: the name every later
+    /// receipt of *this* arm is written against, so a fanout's sibling arms never
+    /// stand in for each other. §FS-rhei-budgets.6.2.1
+    Admitted { bounds: Vec<rhei_tui::BoundReport>, note: Option<String>, arm: Option<String> },
     /// A bound, or an account that cannot be trusted, refused the spawn. The
     /// text is the whole halt of §FS-rhei-budgets.8, ready to print, and the
     /// record carries the same facts in a form a reader can route on.
@@ -58,32 +62,48 @@ enum BudgetAdmission {
 /// halves of a visit sit in different places: a parallel arm is admitted on the
 /// scheduler's thread and completes on a worker's, and a travel unit has to
 /// survive that hand-off to be applied or released by whoever ends the visit.
+///
+/// A fanout's arms share the one claim — and its one travel unit — but each
+/// keeps its own entry, settled at its own exit; the claim ends with its last
+/// live arm. §FS-rhei-budgets.6.2.1 §FS-rhei-budgets.4.2
 struct HeldClaim {
     travel: Option<String>,
-    arms: Vec<String>,
+    /// The arms still live, each under the reservation it was admitted on.
+    arms: Vec<HeldArm>,
     /// The account this claim was admitted against, so that the descriptor
     /// handed to a descendant can say whose its reservation is. Kept beside the
     /// arms rather than re-resolved at the spawn: the two halves must name the
     /// same admission or the child would compare against an account nothing
     /// minted. §FS-rhei-budgets.7.1
     account: String,
-    /// Whether a start has been recorded for this claim. Until one has, the
-    /// engine's own knowledge that it never spawned *is* the proof of
-    /// non-start; after one has, nothing refunds it. §FS-rhei-budgets.6.2
-    started: bool,
-    /// What this claim's invocations turned out to cost, one per accounting
-    /// record that landed, in the order they landed.
-    ///
-    /// An arm with none is charged the reserve as `unmeasurable`, which is
-    /// what makes an agent with no accounting extractor visible rather than
-    /// free — that class writes no record at all, so a settle-side fallback
-    /// would never run for it. §FS-rhei-budgets.6.2
-    measured: Vec<Measurement>,
     /// The ticket's account identity and the bounds it was admitted under, so
     /// the account read after each later receipt reports the same lines the
     /// admission did. §FS-rhei-run-json.2.1
     ticket: String,
     bounds: CountBounds,
+}
+
+/// One admitted arm of a claim, from its admission to its own settle.
+/// §FS-rhei-budgets.6.2.1
+struct HeldArm {
+    reservation: String,
+    /// Whether a start has been recorded for this arm. Until one has, the
+    /// engine's own knowledge that it never spawned *is* the proof of
+    /// non-start; after one has, nothing refunds it. §FS-rhei-budgets.6.2
+    started: bool,
+    /// What this arm's invocation turned out to cost, from its own record.
+    ///
+    /// An arm with none is charged the reserve as `unmeasurable`, which is
+    /// what makes an agent with no accounting extractor visible rather than
+    /// free — that class writes no record at all, so a settle-side fallback
+    /// would never run for it. §FS-rhei-budgets.6.2
+    measured: Option<Measurement>,
+}
+
+impl HeldClaim {
+    fn arm_mut(&mut self, reservation: &str) -> Option<&mut HeldArm> {
+        self.arms.iter_mut().find(|arm| arm.reservation == reservation)
+    }
 }
 
 fn held_claims() -> &'static std::sync::Mutex<BTreeMap<String, HeldClaim>> {
@@ -387,17 +407,21 @@ fn budget_admit_spawn(
                     travel: None,
                     arms: Vec::new(),
                     account: account.uuid().to_string(),
-                    started: false,
-                    measured: Vec::new(),
                     ticket: ticket.clone(),
                     bounds: bounds.clone(),
                 });
                 if claim.travel.is_none() {
                     claim.travel = group.travel_reservation_id.clone();
                 }
-                claim.arms.extend(group.reservation_ids.clone());
+                claim.arms.extend(group.reservation_ids.iter().map(|reservation| HeldArm {
+                    reservation: reservation.clone(),
+                    started: false,
+                    measured: None,
+                }));
             });
-            Ok(BudgetAdmission::Admitted { bounds: reports, note })
+            // One arm per admission, so its one reservation names it. §FS-rhei-budgets.6.2.1
+            let arm = group.reservation_ids.first().cloned();
+            Ok(BudgetAdmission::Admitted { bounds: reports, note, arm })
         }
         Err(refusal) => Ok(BudgetAdmission::Refused {
             halt: budget_halt_text(&refusal, &bounds, &journal),
@@ -422,19 +446,21 @@ fn budget_project_label(project_root: &Path) -> String {
         .unwrap_or_else(|| project_root.display().to_string())
 }
 
-/// The descriptor a spawn's own descendants are handed: the arm this visit was
-/// admitted on, and the account that minted it.
+/// The descriptor a spawn's own descendants are handed: the arm this spawn was
+/// admitted on — its own, not a sibling's — and the account that minted it.
 ///
 /// A descriptor rather than a capability — the ledger decides whether the name
 /// buys anything, and a child that cannot be placed under a live ancestor of
 /// this very project refuses rather than opening a balance of its own. Both
 /// halves or neither, because a reservation without its account is read as this
 /// project's and that is only true of the account that minted it.
-/// §FS-rhei-budgets.7 §FS-rhei-budgets.7.1 §AR-neural-admission.6
-fn budget_ancestry_token(task_id_str: &str) -> Option<(String, String)> {
+/// §FS-rhei-budgets.7 §FS-rhei-budgets.7.1 §AR-neural-admission.6 §FS-rhei-budgets.6.2.1
+fn budget_ancestry_token(task_id_str: &str, arm: Option<&str>) -> Option<(String, String)> {
+    let arm = arm?;
     with_claims(|claims| {
-        let claim = claims.get(task_id_str)?;
-        Some((claim.arms.first()?.clone(), claim.account.clone()))
+        let claim = claims.get_mut(task_id_str)?;
+        let account = claim.account.clone();
+        Some((claim.arm_mut(arm)?.reservation.clone(), account))
     })
 }
 
@@ -443,27 +469,28 @@ fn budget_ancestry_token(task_id_str: &str) -> Option<(String, String)> {
 /// Appended *immediately before* the spawn call with `confirmed: false`, and
 /// refined after it returns. A crash between the two can never refund the
 /// invocation; confirmation only refines what was already consumed.
-/// §FS-rhei-budgets.6.2
+///
+/// Only for `arm`, the one being spawned or returned: a fanout sibling's
+/// return confirms nothing of an arm still running. §FS-rhei-budgets.6.2.1
 fn budget_record_start(
     workspace_root: &Path,
     task_id_str: &str,
+    arm: Option<&str>,
     confirmed: bool,
     sink: &Arc<dyn rhei_tui::EventSink>,
 ) {
+    let Some(arm) = arm else { return };
     let held = with_claims(|claims| {
-        claims.get_mut(task_id_str).map(|claim| {
-            claim.started = true;
-            (claim.arms.clone(), claim.ticket.clone(), claim.bounds.clone())
-        })
+        let claim = claims.get_mut(task_id_str)?;
+        claim.arm_mut(arm)?.started = true;
+        Some((claim.ticket.clone(), claim.bounds.clone()))
     });
-    let Some((arms, ticket, bounds)) = held else { return };
+    let Some((ticket, bounds)) = held else { return };
     let Ok(audit) = budget_audit("record a neural start") else { return };
     let project_root = budget_project_root(workspace_root);
     let Ok(Some(account)) = Account::locate(&project_root) else { return };
     let Ok(mut journal) = account.open(true) else { return };
-    for arm in &arms {
-        let _ = journal.record_start(arm, confirmed, &audit);
-    }
+    let _ = journal.record_start(arm, confirmed, &audit);
     emit_budget_account(sink, &journal, &ticket, &bounds);
 }
 

@@ -169,7 +169,10 @@ fn run_sequential_agent_invocation(
     )? {
         // Both counts on screen before any of this visit's capacity is spent.
         // §FS-rhei-budgets.9
-        BudgetAdmission::Admitted { bounds, note } => {
+        BudgetAdmission::Admitted { bounds, note, arm } => {
+            // Every receipt of this visit names the arm it was admitted on.
+            // §FS-rhei-budgets.6.2.1
+            plan.budget_arm = arm;
             sink.emit(RunEvent::BudgetSnapshot { bounds });
             // Nothing is wrong, so it is a note and not a warning.
             // §FS-rhei-budgets.7.2
@@ -242,7 +245,7 @@ fn run_sequential_agent_invocation(
             progress.unpromptable_tasks.insert(task_id_str.clone());
             // Nothing was spawned, so the units this visit reserved go back.
             // §FS-rhei-budgets.6.2
-            budget_settle_visit(workspace_root, task_id_str, sink);
+            budget_settle_visit(workspace_root, task_id_str, plan.budget_arm.as_deref(), sink);
             return Ok(());
         }
     };
@@ -313,7 +316,7 @@ fn run_sequential_agent_invocation(
     let spawn_resolved = agent_with_path_adapters(resolved, &exclusions, launch, sink);
     // Ambiguity is recorded *before* the capability is transferred: a crash
     // from here on can never refund the invocation. §FS-rhei-budgets.6.2
-    budget_record_start(workspace_root, task_id_str, false, sink);
+    budget_record_start(workspace_root, task_id_str, plan.budget_arm.as_deref(), false, sink);
     let recovery = visit_halt_recovery(budget, machine, loaded.rhei.metadata.as_ref(), task);
     let lease = begin_worker_region(&loaded, input, task_id_str, current_state, plan.effective_budget(budget)).with_recovery(recovery);
     let spawn_result = spawn_and_wait_agent(
@@ -350,7 +353,7 @@ fn run_sequential_agent_invocation(
     // The process returned, so the start that was ambiguous is now confirmed.
     // Confirmation refines the record; it never refunds it.
     // §FS-rhei-budgets.6.2
-    budget_record_start(workspace_root, task_id_str, true, sink);
+    budget_record_start(workspace_root, task_id_str, plan.budget_arm.as_deref(), true, sink);
     let duration_ms = started_at.elapsed().as_millis() as u64;
     let finished_wall = SystemTime::now();
     let (outcome, exit_code) = slot_outcome(&spawn_result);
@@ -423,6 +426,7 @@ fn run_sequential_agent_invocation(
         Ok(Some(usage)) => {
             budget_record_spend(
                 task_id_str,
+                plan.budget_arm.as_deref(),
                 Some(&usage),
                 opts.price_book(),
                 &opts.price_book_origin(),
@@ -468,6 +472,6 @@ fn run_sequential_agent_invocation(
     // After the completion has had its chance to apply an edge: a travel unit
     // still held is one no edge was applied against, and it goes back.
     // §FS-rhei-budgets.4.1
-    budget_settle_visit(workspace_root, task_id_str, sink);
+    budget_settle_visit(workspace_root, task_id_str, plan.budget_arm.as_deref(), sink);
     completion
 }

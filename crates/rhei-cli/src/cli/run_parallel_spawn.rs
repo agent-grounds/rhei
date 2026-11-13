@@ -126,7 +126,7 @@ fn spawn_parallel_agent_work_item(
         return Ok(ParallelAgentSpawnOutcome::Skipped);
     }
     // The same bound at the same point as the sequential path. §FS-rhei-run.3.4
-    if !admit_parallel_agent_spawn(
+    let Some(budget_arm) = admit_parallel_agent_spawn(
         item,
         input,
         &loaded,
@@ -137,9 +137,12 @@ fn spawn_parallel_agent_work_item(
         opts,
         budget_run,
         sink,
-    )? {
+    )?
+    else {
         return Ok(ParallelAgentSpawnOutcome::Skipped);
-    }
+    };
+    // Named by every receipt this arm writes. §FS-rhei-budgets.6.2.1
+    plan.budget_arm = budget_arm;
     // Bound while both roots still have their own names: the rebind below
     // shadows the project root, and the two differ only in a Panta project.
     // §FS-rhei-snapshots.7
@@ -220,6 +223,9 @@ fn spawn_parallel_agent_work_item(
             if !opts.continue_on_error() {
                 return Err(err);
             }
+            // Nothing was spawned, so this arm's units go back at its own exit, as
+            // on the sequential path. §FS-rhei-budgets.6.2.1
+            budget_settle_visit(workspace_root, &item.task_id_str, plan.budget_arm.as_deref(), sink);
             return Ok(ParallelAgentSpawnOutcome::Unpromptable(item.task_id_str.clone()));
         }
     };
@@ -315,6 +321,7 @@ fn spawn_parallel_agent_work_item(
     let from_for_thread = from_state;
     let to_for_thread = item.current_state.clone();
     let tid_for_spend = item.task_id_str.clone();
+    let budget_arm_for_thread = plan.budget_arm.clone();
     let tid_for_event = item.task_id_str.clone();
     let runtime_dir_for_thread = agent_runtime_dir;
     // Read before the plan moves into the worker: only here are the plan and
@@ -356,7 +363,8 @@ fn spawn_parallel_agent_work_item(
     // Ambiguity is recorded *before* the worker is handed the spawn, on this
     // thread, so a crash between here and the process can never refund the
     // invocation. §FS-rhei-budgets.6.2
-    budget_record_start(workspace_root, &item.task_id_str, false, sink);
+    let arm = budget_arm_for_thread.as_deref();
+    budget_record_start(workspace_root, &item.task_id_str, arm, false, sink);
     let lease = begin_worker_region(&loaded, input, &item.task_id_str, &item.current_state, plan_for_thread.effective_budget(budget)).with_recovery(recovery);
     let handle = std::thread::spawn(move || {
         inherit_run_owner(run_owner);
@@ -458,6 +466,7 @@ fn spawn_parallel_agent_work_item(
                 Ok(Some(usage)) => {
                     budget_record_spend(
                         &tid_for_spend,
+                        budget_arm_for_thread.as_deref(),
                         Some(&usage),
                         &price_book_for_thread,
                         &price_book_origin_for_thread,
@@ -483,6 +492,7 @@ fn spawn_parallel_agent_work_item(
                 accounting_recorded,
                 accounting_warning,
                 slot,
+                budget_arm: budget_arm_for_thread,
             })
         }));
         let message = thread_result.unwrap_or(ParallelAgentThreadMessage::Panicked {

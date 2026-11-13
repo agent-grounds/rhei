@@ -8,6 +8,38 @@
 
 // §AR-source-file-size.3 §FS-rhei-run.3 §FS-rhei-agents.3.2
 
+/// A parallel agent that ran to completion, handed to the post-exit handling
+/// that decides what its exit means. Split out of `ParallelAgentCompletion`
+/// because the interrupted and spawn-failure arms answer for themselves.
+struct ParallelAgentExit {
+    task_id_str: String,
+    state_name: String,
+    started_at: std::time::SystemTime,
+    /// Carried on from the completion, still unemitted: this is the path that
+    /// selects the transition telling a wait from a failure.
+    // §FS-rhei-states.2.2
+    release: PendingSlotRelease,
+    resolved: ResolvedAgent,
+    log: PathBuf,
+    snapshot_preload: SnapshotPreload,
+    visit_count: u64,
+    /// Whether the visit this invocation belongs to has an attempt left after
+    /// it. Decided at the spawn, where the budget is resolved, and read where
+    /// the run says what it will do next.
+    // §FS-rhei-agents.3.2.1 §FS-rhei-agents.3.2.3
+    retry_outlook: RetryOutlook,
+    /// The supervisor's subtree as this spawn found it, for a supervising
+    /// state; `None` for every other. §FS-rhei-supervision.3.6
+    subtree_before: Option<SubtreeShape>,
+    /// Where this spawn recorded itself, so a withheld release edge can give
+    /// back the attempt it was charged. §FS-rhei-agents.3.2.3
+    spawn_record: PathBuf,
+    accounting_recorded: bool,
+    outcome: AgentSpawnOutcome,
+    /// Carried from the completion. §FS-rhei-budgets.6.2.1
+    budget_arm: Option<String>,
+}
+
 #[allow(clippy::too_many_arguments)]
 fn handle_parallel_agent_exit(
     exit: ParallelAgentExit,
@@ -42,7 +74,10 @@ fn handle_parallel_agent_exit(
         spawn_record,
         accounting_recorded,
         outcome,
+        budget_arm,
     } = exit;
+    // Every budget receipt below is this arm's alone. §FS-rhei-budgets.6.2.1
+    let arm = budget_arm.as_deref();
     let AgentSpawnOutcome {
         status, timed_out, timeout_secs, provider_limit, provider_unavailable, ..
     } = outcome;
@@ -52,7 +87,7 @@ fn handle_parallel_agent_exit(
     let machine = machines.for_task_str(&task_id_str);
     // The process returned, so the start that was ambiguous is now confirmed.
     // §FS-rhei-budgets.6.2
-    budget_record_start(workspace_root, &task_id_str, true, sink);
+    budget_record_start(workspace_root, &task_id_str, arm, true, sink);
     *progress.agents_spawned += 1;
     let target_id = parse_task_id(&task_id_str);
     let reloaded = reload_after_worker_exit(input, &mut release, &spawn_record)?;
@@ -84,7 +119,7 @@ fn handle_parallel_agent_exit(
         )?;
         progress.stalled_tasks.insert(task_id_str.clone());
         drop(release);
-        budget_settle_visit(workspace_root, &task_id_str, sink);
+        budget_settle_visit(workspace_root, &task_id_str, arm, sink);
         return Ok(());
     }
     let task_after = find_task_by_id(&reloaded.rhei.tasks, &target_id);
@@ -105,7 +140,7 @@ fn handle_parallel_agent_exit(
         // A provider limit gives the *attempt* back and never the invocation:
         // the process ran. The travel unit goes back because no edge was
         // applied. §FS-rhei-budgets.4.2 §FS-rhei-agents.3.2.3
-        budget_settle_visit(workspace_root, &task_id_str, sink);
+        budget_settle_visit(workspace_root, &task_id_str, arm, sink);
         return Ok(());
     }
     let mut missing_required_outputs = Vec::new();
@@ -526,6 +561,6 @@ fn handle_parallel_agent_exit(
     // The visit is over and whatever edge it was going to apply has been
     // applied: a travel unit still held is one nothing moved against, and it
     // goes back. §FS-rhei-budgets.4.1
-    budget_settle_visit(workspace_root, &task_id_str, sink);
+    budget_settle_visit(workspace_root, &task_id_str, arm, sink);
     Ok(())
 }

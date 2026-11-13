@@ -282,12 +282,14 @@ names the unpriced pairs and their book wherever the halt does.
 
 `rhei run` intercepts stdout and stderr for built-in autonomous agents through a shared subprocess capture path:
 
-| Agent id | Prompt transport | Output capture |
-|----------|------------------|----------------|
-| `claude-code` | `-p <prompt>` | stdout/stderr are piped, logged, and emitted as `AgentOutput` |
-| `codex` | stdin, followed by `--` separator | stdout/stderr are piped, logged, and emitted as `AgentOutput` |
-| `pi` | `-p <prompt>` | stdout/stderr are piped, logged, and emitted as `AgentOutput` |
+| Agent id | Output capture |
+|----------|----------------|
+| `claude-code` | stdout/stderr are piped, logged, and emitted as `AgentOutput` |
+| `codex` | stdout/stderr are piped, logged, and emitted as `AgentOutput` |
+| `pi` | stdout/stderr are piped, logged, and emitted as `AgentOutput` |
 
+How each agent's prompt reaches it is stated once, with its profile, in
+[§FS-rhei-agents.2](rhei-agents.spec.md#2-known-agent-profiles).
 Agent-specific behavior belongs only to command construction and prompt delivery. Traffic interception is transport-agnostic once the child process has been spawned.
 
 The TUI keeps a bounded recent traffic buffer per active slot and may drop display events if the render channel is full. Dropped display events do not affect `runtime/logs/*`: the log writer remains the durable sink and receives every captured line unless the filesystem write itself fails. Long or control-sequence-heavy lines may be sanitized and truncated for rendering. The log preserves every captured line, decoding a built-in structured result envelope to its human-readable result text before writing it.

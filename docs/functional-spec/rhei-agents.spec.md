@@ -209,7 +209,7 @@ agent's `command`, flags, and modes are declared.
 | `command` | string array | Yes, unless `family` | Base command and fixed arguments |
 | `prompt_flag` | string | No | Flag that carries the prompt (e.g., `--prompt`, `-p`) — or, with `stdin_prompt`, the flag that puts the agent in non-interactive mode, emitted with no value. Omit when the agent needs neither. |
 | `model_flag` | string | No | Flag to pass the concrete provider model name. Omit if the agent doesn't support model selection. |
-| `stdin_prompt` | boolean | No | When `true`, the prompt is piped to stdin instead of being passed as the `prompt_flag` value, `prompt_flag` is still emitted if present, a `--` is appended last, and stdin is closed unless `intervene_stdin` is also true. Default: `false`. |
+| `stdin_prompt` | boolean | No | When `true`, the prompt is piped to stdin instead of being passed as the `prompt_flag` value, `prompt_flag` is still emitted if present, a `--` is appended last unless the resolved family takes none ([§FS-rhei-agents.2.2.2](rhei-agents.spec.md#222-the-pi-family-gets-no-separator)), and stdin is closed unless `intervene_stdin` is also true. Default: `false`. |
 | `intervene_stdin` | boolean | No | When `true`, `rhei run --dashboard` keeps the child stdin pipe open after the initial prompt so live dashboard interventions can be written to it. Use only for agents that start work without waiting for stdin EOF. Default: `false`. |
 | `timeout` | string | No | Default timeout for this agent (e.g., `30m`). Overridden by state-level `agent_timeout`. |
 | `mcp_flag` | string | No | Flag used to attach one MCP server per occurrence. `rhei run` emits the flag once per resolved server with a launch spec as its value. Mutually exclusive with `mcp_config_flag`. |
@@ -331,8 +331,9 @@ profile's own id when it declares none. That is the usage extractor and the
 launch arguments it requires, and whether an invocation record is written at all
 ([§FS-rhei-cost-accounting.4](rhei-cost-accounting.spec.md#4-extraction-flow),
 [§FS-rhei-cost-accounting.3.2](rhei-cost-accounting.spec.md#32-extraction-status)),
-the stream-json stdin transport below, and which session-report stream a log is
-([§FS-rhei-session-reports.6.2](rhei-session-reports.spec.md#62-claude-code-stream)).
+the stream-json stdin transport below, which session-report stream a log is
+([§FS-rhei-session-reports.6.2](rhei-session-reports.spec.md#62-claude-code-stream)),
+and whether a stdin prompt is closed with `--` ([§FS-rhei-agents.2.2.2](rhei-agents.spec.md#222-the-pi-family-gets-no-separator)).
 A profile that declares no `family` resolves to itself, so every built-in and
 every existing custom profile takes the arm it takes today.
 
@@ -912,7 +913,7 @@ historically the agent's default.
 | `gemini` | `gemini` | `--prompt <prompt>` | `--model <m>` | unsupported | unsupported | `--approval-mode yolo` |
 | `cursor` | `cursor-agent` | `--print <prompt>` | `--model <m>` | unsupported | unsupported | `--force` |
 | `kilocode` | `kilo` | positional via `--auto <prompt>` | `--model <m>` | unsupported | unsupported | `--yolo` |
-| `pi` | `pi` | `-p <prompt>` | `--model <m>` | unsupported | `--skill <path>` | (no modes — pi has no permission layer; isolate at the sandbox/container level) |
+| `pi` | `pi` | stdin, under a bare `-p`; no separator ([§FS-rhei-agents.2.2.2](rhei-agents.spec.md#222-the-pi-family-gets-no-separator)) | `--model <m>` | unsupported | `--skill <path>` | (no modes — pi has no permission layer; isolate at the sandbox/container level) |
 
 **The built-in `codex` profile declares a second mode, `workspace`,** after
 `yolo`: `--sandbox workspace-write --skip-git-repo-check -c
@@ -931,9 +932,12 @@ line may carry — Linux at 131072 bytes for any single argument, Windows at 327
 characters for the whole line, macOS at roughly a megabyte in total — so an
 agent known to read its prompt from stdin is declared that way rather than left
 to fail at spawn once a plan has run long enough to compose a large brief.
-`claude-code` and `codex` are the built-ins that read stdin. The rest carry the
-prompt in `argv`, are bounded by the platform's cap, and say so when they reach
-it ([§FS-rhei-errors.7](rhei-errors.spec.md#7-a-spawn-failure-the-command-lines-size-explains)).
+`claude-code`, `codex` and `pi` are the built-ins that read stdin. The rest
+carry the prompt in `argv`, are bounded by the platform's cap, and say so when
+they reach it ([§FS-rhei-errors.7](rhei-errors.spec.md#7-a-spawn-failure-the-command-lines-size-explains)). pi needs 0.65.1 or later, the first
+release that keeps its `--mode json` events when the prompt arrives on stdin;
+an older pi still receives the prompt, but its runs go unmeasured. Rhei does not
+check the version.
 
 The agent IDs match those used by `rhei install-skills --agent`.
 
@@ -1041,12 +1045,13 @@ agent, the resolved mode's flags are appended right after the base
   <model_flag> <model>?
   <snapshot strategy flags...>
   <strict MCP option?> <mcp flags...> <skill flags...>
-  --
+  --?
 ```
 
 The prompt value is present only when `stdin_prompt` is `false`; the flag itself
-is emitted either way. The `--` is emitted only when `stdin_prompt` is `true`,
-and it is the **last** argument rhei composes. Past a separator an argument is
+is emitted either way. The `--` is emitted only when `stdin_prompt` is `true`
+and the resolved family takes a separator ([§FS-rhei-agents.2.2.2](rhei-agents.spec.md#222-the-pi-family-gets-no-separator)), and it is
+then the **last** argument rhei composes. Past a separator an argument is
 positional text rather than a flag, so everything rhei has to say to the agent —
 the snapshot strategy flags
 ([§FS-rhei-snapshots.10.1](rhei-snapshots.spec.md#101-spawn-time-preload)), the
@@ -1135,6 +1140,29 @@ grants alone do not establish fixture ownership. A deliberately misdirected
 launch with sufficient grants must record a refusal, make no commit, and leave
 the outside repository's HEAD unchanged. Tests of that refusal own the outside
 repository too, so a failing guard cannot write into a developer's repository.
+
+#### 2.2.2. The `pi` Family Gets No Separator
+
+**The `pi` family gets no `--`, because pi has none.** pi reads `--` as an
+option it does not know, reports `Unknown option: --`, and exits 1 before it
+starts a session. So a profile whose resolved family is `pi`
+([§FS-rhei-agents.1.1.2](rhei-agents.spec.md#112-agents)) and that sets `stdin_prompt` ends at its last tooling
+flag: the prompt is piped to stdin under a bare `-p`, and nothing follows. This
+is the one place the rule is stated; the `pi` row of [§FS-rhei-agents.2](rhei-agents.spec.md#2-known-agent-profiles) and the
+`stdin_prompt` field of [§FS-rhei-agents.1.1.2](rhei-agents.spec.md#112-agents) cite it.
+
+Without a separator nothing rhei composes for pi is misread. Every flag the
+profile emits — `--mode`, `--thinking`, `--model`, `--session-dir`, `--fork`,
+`--skill` — takes at most one value; pi reads the argument after `-p` as a
+prompt only when it starts with neither `-` nor `@`, and after a bare `-p` rhei
+puts one of those flags or nothing; and the prompt is not on the line.
+
+The family decides, as it does for `--strict-mcp-config`, so the built-in `pi`,
+a `family: pi` wrapper, and a same-id `agents.pi` entry with `"stdin_prompt":
+true` all start pi. A pi-family entry that writes `"stdin_prompt": false`
+carries the prompt as `-p <prompt>` and gets no separator either way. A custom
+entry that runs pi but declares no `family` stands on its own and keeps the
+`--`. Every other family keeps the separator where [§FS-rhei-agents.2.2](rhei-agents.spec.md#22-modes) puts it.
 
 ### 2.3. Recognized Provider Refusals
 

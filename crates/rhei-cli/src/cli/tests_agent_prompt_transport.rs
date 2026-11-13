@@ -233,4 +233,140 @@ mod agent_prompt_transport_tests {
             AgentStdinFormat::PlainLine
         );
     }
+
+    #[test]
+    #[ignore = "red until #659: the built-in pi still has stdin_prompt false; implement removes this"]
+    fn supported_agents_keep_expected_prompt_transports() {
+        let agents = built_in_agents();
+        // `-p` stays declared and stops carrying the prompt: it is what puts
+        // Claude Code in print mode. agent-grounds/rhei#179 §FS-rhei-agents.2
+        let claude = agents.get("claude-code").expect("claude-code profile");
+        assert_eq!(claude.prompt_flag.as_deref(), Some("-p"));
+        assert!(claude.stdin_prompt);
+
+        let codex = agents.get("codex").expect("codex profile");
+        assert_eq!(codex.prompt_flag.as_deref(), None);
+        assert!(codex.stdin_prompt);
+
+        // The prompt moves to stdin under a bare `-p`, the print flag pi keeps.
+        // agent-grounds/rhei#659 §FS-rhei-agents.2 §FS-rhei-agents.2.2.2
+        let pi = agents.get("pi").expect("pi profile");
+        assert_eq!(pi.prompt_flag.as_deref(), Some("-p"));
+        assert!(pi.stdin_prompt);
+    }
+
+    /// A pi-family profile laid over the built-in the way settings lay it: the
+    /// fields the entry writes win, the rest are the built-in's.
+    fn pi_family(id: &str, entry: serde_json::Value) -> CustomAgentProfile {
+        let mut agents = built_in_agents();
+        let mut fields = agents
+            .iter()
+            .map(|(id, p)| (id.clone(), built_in_agent_fields(p)))
+            .collect::<BTreeMap<_, _>>();
+        agents.insert(id.to_string(), serde_json::from_value(entry.clone()).expect("profile"));
+        fields.insert(id.to_string(), raw_object_keys(&entry));
+        apply_agent_family_inheritance(&mut agents, &mut fields);
+        agents.remove(id).expect("resolved profile")
+    }
+
+    fn skill_tooling() -> ResolvedTooling {
+        ResolvedTooling {
+            skills: vec![ResolvedSkillEntry {
+                id: "review".to_string(),
+                optional: false,
+                definition: Some(SkillProfile {
+                    path: "/skills/review".to_string(),
+                    description: None,
+                }),
+            }],
+            ..Default::default()
+        }
+    }
+
+    /// agent-grounds/rhei#659: the built-in `pi` carried the whole prompt as the
+    /// value of `-p`, past Linux's per-argument cap. It now pipes it, under a
+    /// bare `-p`, and ends with no separator, which pi refuses.
+    /// §FS-rhei-agents.2 §FS-rhei-agents.2.2.2
+    #[test]
+    #[ignore = "red until #659: the built-in pi puts the prompt in argv; implement removes this"]
+    fn builtin_pi_pipes_its_prompt_under_a_bare_p_and_ends_with_no_separator() {
+        let argv = composed(&resolved(builtin("pi"), "pi", None), &skill_tooling(), &[]);
+
+        assert!(
+            !argv.iter().any(|arg| arg.contains(PROMPT)),
+            "the prompt must travel on stdin, not in argv: {argv:?}"
+        );
+        assert!(
+            argv.windows(2).any(|pair| pair == ["-p", "--model"]),
+            "-p is emitted with no value, directly ahead of the model flag: {argv:?}"
+        );
+        assert!(
+            argv.windows(2).any(|pair| pair == ["--skill", "review"]),
+            "the skill flag keeps its slot: {argv:?}"
+        );
+        assert!(!argv.iter().any(|arg| arg == "--"), "pi refuses a `--`: {argv:?}");
+    }
+
+    /// The family decides, so a wrapper of pi inherits the stdin transport and
+    /// is spared the separator too. §FS-rhei-agents.2.2.2
+    #[test]
+    #[ignore = "red until #659: a family pi wrapper gets the prompt in argv; implement removes this"]
+    fn a_pi_family_wrapper_pipes_its_prompt_with_no_separator() {
+        let wrapper = pi_family("pi-wrap", serde_json::json!({"family": "pi", "command": ["wrapper"]}));
+        let argv = composed(&resolved(wrapper, "pi-wrap", None), &ResolvedTooling::default(), &[]);
+
+        assert!(!argv.iter().any(|arg| arg.contains(PROMPT)), "prompt on stdin: {argv:?}");
+        assert!(!argv.iter().any(|arg| arg == "--"), "pi refuses a `--`: {argv:?}");
+    }
+
+    /// The help's own remedy: a same-id `agents.pi` entry that replaces the
+    /// built-in wholesale and turns on `stdin_prompt`. Its family is still its
+    /// own id, `pi`, so it gets no separator and starts. §FS-rhei-agents.2.2.2
+    #[test]
+    #[ignore = "red until #659: a same-id pi entry with stdin_prompt still ends in `--`; implement removes this"]
+    fn a_same_id_pi_entry_with_stdin_prompt_ends_with_no_separator() {
+        let entry = CustomAgentProfile {
+            command: vec!["pi".to_string()],
+            prompt_flag: Some("-p".to_string()),
+            model_flag: Some("--model".to_string()),
+            stdin_prompt: true,
+            ..Default::default()
+        };
+        let argv = composed(&resolved(entry, "pi", None), &ResolvedTooling::default(), &[]);
+
+        assert!(!argv.iter().any(|arg| arg.contains(PROMPT)), "prompt on stdin: {argv:?}");
+        assert!(
+            argv.windows(2).any(|pair| pair == ["-p", "--model"]),
+            "-p is emitted with no value: {argv:?}"
+        );
+        assert!(!argv.iter().any(|arg| arg == "--"), "pi refuses a `--`: {argv:?}");
+    }
+
+    /// A written `"stdin_prompt": false` wins over the inherited `true`, so a
+    /// pi-family entry can still carry the prompt as `-p <prompt>`, with no
+    /// separator either way. §FS-rhei-agents.2.2.2 §FS-rhei-agents.1.1.2
+    #[test]
+    fn a_pi_family_entry_that_turns_stdin_off_carries_the_prompt_after_p() {
+        let entry = pi_family(
+            "pi-argv",
+            serde_json::json!({"family": "pi", "command": ["pi"], "stdin_prompt": false}),
+        );
+        let argv = composed(&resolved(entry, "pi-argv", None), &ResolvedTooling::default(), &[]);
+
+        assert!(
+            argv.windows(2).any(|pair| pair == ["-p", PROMPT]),
+            "the prompt is the value of -p: {argv:?}"
+        );
+        assert!(!argv.iter().any(|arg| arg == "--"), "no separator: {argv:?}");
+    }
+
+    /// The exception is the `pi` family's alone: every other stdin profile still
+    /// closes its command line with `--`. §FS-rhei-agents.2.2
+    #[test]
+    fn builtin_claude_code_and_codex_still_end_at_the_separator() {
+        for id in ["claude-code", "codex"] {
+            let argv = composed(&resolved(builtin(id), id, None), &skill_tooling(), &[]);
+            assert_eq!(argv.last().map(String::as_str), Some("--"), "{id}: {argv:?}");
+        }
+    }
 }

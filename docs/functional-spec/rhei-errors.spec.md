@@ -524,7 +524,7 @@ prompt delivery:
   │ the composed prompt is 214016 bytes and this agent passes it as one
   │ command-line argument, past this platform's 131072-byte limit
   help: use an agent that delivers the prompt on stdin ('claude-code',
-        'codex'), or register a custom agent with "stdin_prompt": true
+        'codex', 'pi'), or register a custom agent with "stdin_prompt": true
 ```
 
 The answer is yes only when the prompt is what the platform refused. A line can
@@ -539,7 +539,10 @@ replaces that profile wholesale
 `stdin_prompt` on `gemini`" would paste back as a different failure — a partial
 profile with no session layout — which [§FS-rhei-errors.1.2](rhei-errors.spec.md#12-help) rules out. The help therefore names
 the agents that already deliver on stdin and the shape of a custom entry that
-does.
+does. That list is derived from the built-in profiles that declare
+`stdin_prompt` ([§FS-rhei-agents.2](rhei-agents.spec.md#2-known-agent-profiles)), in their id order, rather than written out,
+so the help cannot name an agent that no longer delivers on stdin or leave out
+one that now does.
 
 The size is stated, not implied. A user cannot see the composed prompt, so the
 byte count and the platform's limit are what turn "too long" into a decision

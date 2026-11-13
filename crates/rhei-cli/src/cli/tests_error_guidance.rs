@@ -423,6 +423,27 @@ mod error_guidance_tests {
             }
         }
 
+        /// The help's list of stdin agents is the built-ins that declare
+        /// `stdin_prompt`, so it cannot fall out of step with them again:
+        /// agent-grounds/rhei#659 left `pi` off it. §FS-rhei-errors.7
+        #[test]
+        #[ignore = "red until #659: the help's stdin list is hand-written and lacks 'pi'; implement removes this"]
+        fn the_oversized_prompt_help_names_every_builtin_that_reads_stdin() {
+            let help = oversized_prompt_help().to_string();
+            for id in ["claude-code", "codex", "pi"] {
+                assert!(help.contains(&format!("'{id}'")), "the help names '{id}': {help}");
+            }
+            let agents = built_in_agents();
+            for (id, profile) in &agents {
+                let quoted = format!("'{id}'");
+                assert_eq!(
+                    help.contains(&quoted),
+                    profile.stdin_prompt,
+                    "the help names {quoted} exactly when that built-in reads stdin: {help}"
+                );
+            }
+        }
+
         #[test]
         fn an_oversized_prompt_is_named_as_the_cause() {
             let said = spawn_failure_guidance(

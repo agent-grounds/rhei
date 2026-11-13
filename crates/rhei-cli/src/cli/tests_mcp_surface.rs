@@ -239,6 +239,7 @@ mod mcp_surface {
     }
 
     #[test]
+    #[ignore = "red until #659: a family pi wrapper still gets `-p <prompt>`; implement removes this"]
     fn mcp_surface_other_families_keep_existing_arguments() {
         let dir = tempfile::tempdir().expect("root");
         for family in ["codex", "gemini", "cursor", "kilocode", "pi"] {
@@ -254,7 +255,8 @@ mod mcp_surface {
                 "gemini" => vec!["--prompt", "fixture prompt"],
                 "cursor" => vec!["--print", "fixture prompt"],
                 "kilocode" => vec!["--auto", "fixture prompt"],
-                "pi" => vec!["--mode", "json", "-p", "fixture prompt"],
+                // Stdin, and no separator: agent-grounds/rhei#659 §FS-rhei-agents.2.2.2
+                "pi" => vec!["--mode", "json", "-p"],
                 _ => unreachable!(),
             };
             assert_eq!(argv, expected, "{family} keeps its existing argv");

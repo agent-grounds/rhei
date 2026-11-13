@@ -26,6 +26,10 @@ name = "effort-fixture"
 path = "fixtures/effort_fixture.rs"
 
 [[bin]]
+name = "pi-stdin-fixture"
+path = "fixtures/pi_stdin_fixture.rs"
+
+[[bin]]
 name = "mcp-config-fixture"
 path = "fixtures/mcp_config_fixture.rs"
 

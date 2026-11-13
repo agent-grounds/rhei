@@ -287,7 +287,7 @@ fn snapshot_cache_benefit_reason(
     if observed_provider != resolved.model_provider.as_deref() {
         return Some("provider mismatch".to_string());
     }
-    if observed_model != resolved.model_name.as_deref().or(resolved.model.as_deref()) {
+    if observed_model != resolved.handed_model() {
         return Some("model mismatch".to_string());
     }
     None

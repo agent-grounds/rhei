@@ -337,7 +337,7 @@ fn snapshot_target_selector(resolved: &ResolvedAgent) -> String {
     resolved.target.as_ref().map(ExecutionTarget::selector).unwrap_or_else(|| {
         let provider = resolved.model_provider.as_deref().unwrap_or_default();
         let model =
-            resolved.model_name.as_deref().or(resolved.model.as_deref()).unwrap_or_default();
+            resolved.handed_model().unwrap_or_default();
         let mut selector = resolved.agent.id().to_string();
         if let Some(mode) = resolved.mode.as_deref() {
             selector.push('[');
@@ -361,7 +361,7 @@ fn snapshot_resolved_target_json(resolved: &ResolvedAgent) -> serde_json::Value 
     if let Some(provider) = resolved.model_provider.as_deref() {
         object.insert("provider".to_string(), serde_json::Value::String(provider.to_string()));
     }
-    if let Some(model) = resolved.model_name.as_deref().or(resolved.model.as_deref()) {
+    if let Some(model) = resolved.handed_model() {
         object.insert("model".to_string(), serde_json::Value::String(model.to_string()));
     }
     serde_json::Value::Object(object)
@@ -392,7 +392,7 @@ fn snapshot_declared_provider(resolved: &ResolvedAgent) -> &str {
 }
 
 fn snapshot_declared_model(resolved: &ResolvedAgent) -> &str {
-    resolved.model_name.as_deref().or(resolved.model.as_deref()).unwrap_or_default()
+    resolved.handed_model().unwrap_or_default()
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {

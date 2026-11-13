@@ -99,7 +99,7 @@ fn profile_price_book(
     let mut pairs: BTreeMap<(String, String), EffectivePricePair> = BTreeMap::new();
     for resolved in invocations {
         let provider = resolved.model_provider.as_deref();
-        let model = resolved.model_name.as_deref().or(resolved.model.as_deref());
+        let model = resolved.handed_model();
         let profile_id = resolved.model_profile_id();
         let profile = profile_id.and_then(|id| settings.models.get(id));
         let profile_prices = profile.and_then(|item| item.prices.as_ref());

@@ -41,7 +41,7 @@ fn price_book_coverage_warning(
         .iter()
         .filter_map(|resolved| {
             let provider = resolved.model_provider.as_deref()?;
-            let model = resolved.model_name.as_deref().or(resolved.model.as_deref())?;
+            let model = resolved.handed_model()?;
             price_entry(book, Some(provider), Some(model))
                 .is_none()
                 .then(|| format!("{provider}/{model}"))

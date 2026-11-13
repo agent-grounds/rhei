@@ -291,7 +291,7 @@ fn agent_template_context(resolved: &ResolvedAgent) -> rhei_viz_model::TemplateC
         target_slug: resolved.target.as_ref().map(ExecutionTarget::slug),
         model: resolved.model.clone(),
         model_provider: resolved.model_provider.clone(),
-        model_name: resolved.model_name.clone().or_else(|| resolved.model.clone()),
+        model_name: resolved.handed_model().map(str::to_string),
         agent: Some(resolved.agent.id().to_string()),
         agent_mode: resolved.mode.clone(),
     }

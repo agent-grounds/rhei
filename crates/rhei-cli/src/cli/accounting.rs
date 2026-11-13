@@ -199,7 +199,7 @@ fn record_agent_accounting_attempt(
     };
     let provider = invocation.resolved.model_provider.clone();
     let model =
-        invocation.resolved.model_name.clone().or_else(|| invocation.resolved.model.clone());
+        invocation.resolved.handed_model().map(str::to_string);
     let pricing =
         price_tokens(invocation.price_book, provider.as_deref(), model.as_deref(), &tokens);
     let target_slug = resolved_agent_target_slug(invocation.resolved);
@@ -647,7 +647,7 @@ fn usage_capture_for_attempt(
         state: state.to_string(),
         agent: resolved.agent.id().to_string(),
         provider: resolved.model_provider.clone(),
-        model: resolved.model_name.clone().or_else(|| resolved.model.clone()),
+        model: resolved.handed_model().map(str::to_string),
         price_book: price_book.clone(),
         slot,
         cli_session: Arc::new(Mutex::new(None)),

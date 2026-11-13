@@ -212,7 +212,7 @@ agent's `command`, flags, and modes are declared.
 | `stdin_prompt` | boolean | No | When `true`, the prompt is piped to stdin instead of being passed as the `prompt_flag` value, `prompt_flag` is still emitted if present, a `--` is appended last unless the resolved family takes none ([§FS-rhei-agents.2.2.2](rhei-agents.spec.md#222-the-pi-family-gets-no-separator)), and stdin is closed unless `intervene_stdin` is also true. Default: `false`. |
 | `intervene_stdin` | boolean | No | When `true`, `rhei run --dashboard` keeps the child stdin pipe open after the initial prompt so live dashboard interventions can be written to it. Use only for agents that start work without waiting for stdin EOF. Default: `false`. |
 | `timeout` | string | No | Default timeout for this agent (e.g., `30m`). Overridden by state-level `agent_timeout`. |
-| `mcp_flag` | string | No | Flag used to attach one MCP server per occurrence. `rhei run` emits the flag once per resolved server with a launch spec as its value. Mutually exclusive with `mcp_config_flag`. |
+| `mcp_flag` | string | No | Flag used to attach one MCP server per occurrence. `rhei run` emits the flag once per resolved server with a launch spec as its value. The Codex native adapter uses configuration overrides instead ([§FS-rhei-agents.1.1.2.1](rhei-agents.spec.md#1121-native-codex-mcp-attachment)). Mutually exclusive with `mcp_config_flag`. |
 | `mcp_config_flag` | string | No | Flag used to attach a generated MCP config file. `rhei run` writes the resolved set to a temporary JSON file, in the shape [§FS-rhei-mcp-config-file](rhei-mcp-config-file.spec.md#fs-rhei-mcp-config-file-the-mcp-config-file-an-agent-is-handed) gives, and passes it with this flag once. Mutually exclusive with `mcp_flag`. |
 | `skill_flag` | string | No | Flag used to enable one skill per occurrence. `rhei run` emits the flag once per resolved skill id. Omit to declare the agent does not support skills. |
 | `deny_read` | object | No | Optional read-denial adapter. In v1 its only field is required `path_flag`: a non-empty string repeated once per resolved excluded absolute path before the profile separator. |
@@ -424,6 +424,49 @@ the initial prompt as a stream-json user message on stdin, and writes every
 intervention as another stream-json user message on the same held-open pipe. It
 must not pass the prompt as the `-p` argument in this mode, because that is a
 one-shot invocation that does not consume follow-up stdin.
+
+##### 1.1.2.1. Native Codex MCP attachment
+
+The built-in `codex` profile declares `mcp_flag: "-c"`. For the resolved
+`codex` family, this value selects native configuration attachment: each
+available MCP server's resolved definition is serialized into Codex
+`mcp_servers.<id>` configuration overrides, each passed as a separate `-c`
+and `key=value` argument before the stdin `--` separator. Rhei never emits
+`--mcp` or a bare server id as a configuration override. The adapter applies
+equally to effective entries from states, tasks, and defaults and to profiles
+inheriting from `codex`. Explicit attachment overrides retain their existing
+meaning; clearing both attachment fields disables support. Standalone custom
+profiles keep their existing attachment contract.
+
+For a command server, `command[0]` becomes native `command`, the remaining
+elements become `args` (including empty arguments), and `env` becomes the
+native environment map after the existing `${VAR}` expansion. A declared
+`working_directory` becomes native `cwd`, resolved from the checkout root
+when relative. The spawn preflight uses that same directory and expanded
+`env.PATH`. Command, arguments, environment keys and values, directory, and
+server id must survive native configuration loading without shell evaluation,
+splitting, or lost quoting, backslashes, Unicode, or newlines. Values are
+serialized as TOML values, not interpolated into shell commands.
+
+Codex supports STDIO and Streamable HTTP MCP connections; the registry's
+remote `sse` and `websocket` transports have no equivalent native mapping.
+They are unavailable for this adapter even if their host accepts a TCP
+connection. Rhei must not silently reinterpret either as Streamable HTTP or
+pass an ignored transport key while reporting availability. No registry
+transport is added. Other configurations that cannot be represented natively
+are likewise unavailable, with the reason named by the existing diagnostics.
+Required entries prevent the spawn and follow `mcp_unavailable` or the
+required-tooling error; optional entries are dropped with a warning, omitted
+from native attachment and `RHEI_MCP_SERVERS`, and report `false` through
+`{mcp.<id>.available}` ([§FS-rhei-agents.6.1](rhei-agents.spec.md#61-required-vs-optional-entries)).
+
+`startup_timeout` retains its registry meaning: it bounds URL TCP preflight
+and bounds nothing for command servers. It is not mapped to Codex's
+`startup_timeout_sec`, which controls native server startup. Rhei checks
+attachability and the existing preflight without starting an MCP server or
+claiming to have completed its protocol handshake
+([§FS-rhei-agents.6.2](rhei-agents.spec.md#62-the-spawn-preflight)). Successfully attached entries
+appear in both native configuration and the existing availability metadata.
 
 #### 1.1.3. `models`
 
@@ -909,7 +952,7 @@ historically the agent's default.
 | Agent ID | Binary | Prompt Delivery | Model Flag | MCP Wiring | Skill Wiring | `yolo` Mode Flags |
 |----------|--------|-----------------|------------|------------|--------------|-------------------|
 | `claude-code` | `claude` | stdin, under a bare `-p`, with `--output-format stream-json --verbose`; with `intervene_stdin`, stream-json stdin as well | `--model <m>` | Always `--strict-mcp-config`; `--mcp-config <path>`, a file shaped as [§FS-rhei-mcp-config-file](rhei-mcp-config-file.spec.md#fs-rhei-mcp-config-file-the-mcp-config-file-an-agent-is-handed) gives, only for a nonempty available selection | `--skill <id>` | `--permission-mode bypassPermissions` |
-| `codex` | `codex exec` | `--` (stdin) | `--model <m>` | `--mcp <spec>` (per server) | unsupported | `--sandbox danger-full-access --skip-git-repo-check -c approval_policy="never"` |
+| `codex` | `codex exec` | `--` (stdin) | `--model <m>` | Native `-c key=value` overrides from resolved definitions ([§FS-rhei-agents.1.1.2.1](rhei-agents.spec.md#1121-native-codex-mcp-attachment)) | unsupported | `--sandbox danger-full-access --skip-git-repo-check -c approval_policy="never"` |
 | `gemini` | `gemini` | `--prompt <prompt>` | `--model <m>` | unsupported | unsupported | `--approval-mode yolo` |
 | `cursor` | `cursor-agent` | `--print <prompt>` | `--model <m>` | unsupported | unsupported | `--force` |
 | `kilocode` | `kilo` | positional via `--auto <prompt>` | `--model <m>` | unsupported | unsupported | `--yolo` |

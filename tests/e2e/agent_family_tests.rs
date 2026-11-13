@@ -120,9 +120,8 @@ fn the_roster_reports_the_resolved_profile_of_a_family() {
     assert_eq!(profile["family"], "codex", "the resolved profile carries its family");
     // Written wins: the wrapper's own command is not the built-in's.
     assert_eq!(profile["command"][0], python_command());
-    // Omitted inherits: `--mcp` is the `codex` built-in's MCP wiring, and the
-    // wrapper never wrote it. §FS-rhei-agents.1.1.2
-    assert_eq!(profile["mcp_flag"], "--mcp");
+    // The wrapper inherits the built-in's attachment adapter. §FS-rhei-agents.1.1.2
+    assert_eq!(profile["mcp_flag"], roster["agents"]["codex"]["mcp_flag"]);
     assert_eq!(profile["modes"]["yolo"][0], "--sandbox");
     // One origin for the whole entry, and no new provenance leaf.
     assert_eq!(roster["provenance"]["agents"][WRAPPED_AGENT], "project");

@@ -31,8 +31,10 @@ fn assert_index_refused(index: &str, metadata_line: usize) {
 
     for (command, run) in runs {
         let said = flattened_output(&run);
+        // Windows separators print as `\`, or as `\\` once `render --format json` escapes them.
+        let said_path = said.replace("\\\\", "/").replace('\\', "/");
         assert!(
-            said.contains("workspace/index.rhei.md") || said.contains("workspace\\index.rhei.md"),
+            said_path.contains("workspace/index.rhei.md"),
             "{command} must name the offending source path: {said}"
         );
         let line = metadata_line.to_string();

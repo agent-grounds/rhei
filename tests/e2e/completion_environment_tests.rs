@@ -85,7 +85,6 @@ fn assert_environment_refusal(dir: &Path, value: &str, args: &[&str]) {
 }
 
 #[test]
-#[ignore = "red until #708: list identifies the COMPLETE environment cause; implement removes this"]
 fn invalid_complete_environment_list_diagnostic() {
     let dir = fixture();
     let control = run(&dir, None, &["list", "plan.rhei.md"]);
@@ -95,14 +94,12 @@ fn invalid_complete_environment_list_diagnostic() {
 }
 
 #[test]
-#[ignore = "red until #708: complete reports the full COMPLETE value and recovery; implement removes this"]
 fn invalid_complete_environment_complete_diagnostic() {
     let dir = fixture();
     assert_environment_refusal(&dir, "plan.1 plan.2", &["complete", "plan.1", "--result", "done"]);
 }
 
 #[test]
-#[ignore = "red until #708: reset reports the full COMPLETE value and recovery; implement removes this"]
 fn invalid_complete_environment_reset_diagnostic() {
     let dir = fixture();
     assert_success(&run(&dir, None, &["complete", "plan.1", "--result", "done"]));

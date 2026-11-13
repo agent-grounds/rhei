@@ -283,7 +283,14 @@ headless, and JSONL surfaces; no new output record family is introduced.
    the deadline holds nothing back ([§FS-rhei-run.5.1](rhei-run.spec.md#51-polling-states)), and the ticket is ready for
    its spawn site to halt ([§FS-rhei-run.3.7.4](rhei-run.spec.md#374-the-charge)). A task with an applicable provider-limit record ([§FS-rhei-run.3.3](rhei-run.spec.md#33-provider-limit-parking)) is also
    excluded until its `nextAttemptAt`; queued work sharing that record's
-   identity is suppressed for the same interval. See [Next Command](rhei-next.spec.md#3-default-behavior-claim-mode)
+   identity is suppressed for the same interval. Exclusion is judged per
+   invocation: a task is excluded while **every** one of its invocations still
+   to be spawned — one that step 3's pre-spawn completion check does not find
+   satisfied — is held by an active wait on its execution identity. One such
+   invocation on a free identity keeps the task ready, and that arm spawns
+   while the held arm waits; an arm already satisfied keeps nothing ready. So a
+   fan-out with one held and one free identity runs its free arm during the
+   wait, and once that arm is done the task waits like any other held task. See [Next Command](rhei-next.spec.md#3-default-behavior-claim-mode)
    for the manual claimability rule and [Polling States](#51-polling-states) for
    the poll scheduling rule.
 
@@ -1463,6 +1470,24 @@ waiting tasks, bounded below by 1 s, and **in the continuous mode** does not
 emit `run_finished` merely because all remaining work is provider-limited —
 under `--until-idle` that is precisely when it does ([§FS-rhei-run.3](rhei-run.spec.md#3-execution-loop) step 9). Poll attempt
 counters, self-loop selection, and exhaustion are unchanged.
+
+**A held ticket opens no pass.** A ticket whose every invocation still to be
+spawned is held by a provider wait is not in the ready set ([§FS-rhei-run.3](rhei-run.spec.md#3-execution-loop)
+step 2), so while every ticket the scan would otherwise return is held, the
+continuous run is in this sleep, not in a pass. It prints the one
+`No ready tasks; sleeping <N>s until the next scheduled attempt.` line and
+then nothing more — no `Pass N:` header, no `Ready:` line, no `pass_started`
+record, no spawn — until the deadline passes, the operator interrupts
+([§FS-rhei-run.3.2](rhei-run.spec.md#32-interruption-and-process-ownership)), or other work becomes ready. The sleep is cut into short slices
+so an interrupt ends it promptly; a slice that ends with every ticket still
+held goes on sleeping and does not begin a pass. This holds for a session
+limit and for an outage's wait alike ([§FS-rhei-run.3.3](rhei-run.spec.md#33-provider-limit-parking)), in the sequential loop
+and in the `--parallel` worker pool, and for a run that starts onto a wait an
+earlier run persisted: that run sleeps the same way and prints no halt report,
+because a held ticket is waiting, not stuck. What the run prints therefore
+grows with the work it does, not with the length of the wait. A ticket with
+one invocation on a free identity is ready, and its pass spawns that arm
+alone.
 
 **The sleep is the continuous mode's.** With `--until-idle`, each site that
 would sleep here returns idle instead, and the deadline scan becomes the

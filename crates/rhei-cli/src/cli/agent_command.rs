@@ -173,8 +173,7 @@ fn build_agent_command(
     // Use the concrete provider model name from the `models` registry when
     // available; fall back to the model id otherwise so untracked literals
     // §FS-rhei-agents.1.1.2 §FS-rhei-agents.1.1.3: Model flag value resolution.
-    let model_flag_value = resolved.model_name.as_deref().or(resolved.model.as_deref());
-    if let (Some(flag), Some(model)) = (&profile.model_flag, model_flag_value) {
+    if let (Some(flag), Some(model)) = (&profile.model_flag, resolved.handed_model()) {
         cmd.arg(flag).arg(model);
     }
 

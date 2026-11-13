@@ -358,6 +358,14 @@ impl ResolvedAgent {
         resolved_agent_family(&self.profile, self.agent.id())
     }
 
+    /// The model rhei hands the agent: the concrete provider model name, or
+    /// the model id when the registry has none. The `model_flag` value and the
+    /// model a `pi` outage wait derives its provider from, so the two cannot
+    /// drift. §FS-rhei-agents.1.1.2 §FS-rhei-agents.2.5
+    fn handed_model(&self) -> Option<&str> {
+        self.model_name.as_deref().or(self.model.as_deref())
+    }
+
     /// The selected named profile, kept distinct from a literal target. For a
     /// named model over a target, `model` is the profile id while the target
     /// carries the final concrete model. §FS-rhei-agents.1.4

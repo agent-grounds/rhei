@@ -323,7 +323,7 @@ fn spawn_snapshot_continue_agent(
     }
     if let (Some(flag), Some(model)) = (
         resolved.profile.model_flag.as_deref(),
-        resolved.model_name.as_deref().or(resolved.model.as_deref()),
+        resolved.handed_model(),
     ) {
         cmd.arg(flag).arg(model);
     }
@@ -674,7 +674,7 @@ fn resolved_agent_target_slug(resolved: &ResolvedAgent) -> Option<String> {
         return Some(target.slug());
     }
     let provider = resolved.model_provider.as_deref()?;
-    let model = resolved.model_name.as_deref().or(resolved.model.as_deref())?;
+    let model = resolved.handed_model()?;
     let mut selector = resolved.agent.id().to_string();
     if let Some(mode) = resolved.mode.as_deref() {
         selector.push('[');

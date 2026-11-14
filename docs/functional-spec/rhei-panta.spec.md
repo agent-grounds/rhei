@@ -139,6 +139,17 @@ command operates on the whole project. Pointed at a single rhei (a `.rhei.md`
 file or a rhei workspace directory) it operates on that rhei alone. `--rhei <id>`
 (repeatable) narrows a project-scoped invocation to named rheis.
 
+**Every spelling of the manifest names the same project.** From inside a
+project, `index.panta.md`, `./index.panta.md`, and the directory `.` name one
+project, and a command reads the same member rheis for each, so `rhei validate`
+refuses the same broken member and `rhei list` lists the same tickets whichever
+spelling it was given. The bare file name has an empty parent, and that empty
+parent is the current directory, `.` spelled ([§FS-rhei-memory.3.4](rhei-memory.spec.md#34--rhei-commands-additions)), never a
+directory holding no rheis. Reading it as one made `rhei validate
+index.panta.md` report success over a project whose members it never read, and
+`rhei list index.panta.md` say the project had no tickets: a green verdict over
+an unread tree, which a pre-commit hook would pass.
+
 **A target that carries no name of its own still names a rhei.** A workspace
 directory reached as `.`, `./`, or `..` from a subdirectory — or named by the
 `index.rhei.md` inside it, with or without a `./` prefix — carries no last

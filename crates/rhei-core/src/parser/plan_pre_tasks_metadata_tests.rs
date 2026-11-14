@@ -1,13 +1,19 @@
 //! A task metadata line above `## Tasks` is refused whichever field it is and
 //! whatever follows its marker, so a task written under a content section is
 //! never absorbed into that section's text and lost (agent-grounds/rhei#719).
-//! §FS-rhei-plan-language.1.1.1
+//! Under a task heading the refusal names the heading and `## Tasks` instead
+//! (agent-grounds/rhei#685). §FS-rhei-plan-language.1.1.1 §FS-rhei-errors.1.7
 
 use super::*;
 
-/// The refusal on `main` today. agent-grounds/rhei#685 rewords it; if that lands
-/// first, this is the one place to retarget.
+/// The refusal of a field with no task heading above it.
 const OUTSIDE_A_TASK: &str = "Metadata field appears outside a task";
+
+/// The refusal of a field under a task heading in a content section above
+/// `## Tasks`: the task is what is misplaced. §FS-rhei-errors.1.7
+const HEADING_ABOVE_TASKS: &str = "Task heading outside the `## Tasks` section: it sits in a \
+                                   content section above `## Tasks`, so the task metadata \
+                                   under it belongs to no task";
 
 /// One valued line per kind of task field. `**State:**` comes first: it is the
 /// control, refused in every shape below before the fix as after it.
@@ -19,7 +25,8 @@ const VALUED_FIELDS: [&str; 5] = [
     "**Skills:** release-notes",
 ];
 
-/// The reporter's plan: a task heading under `## Notes`, its field on line 5.
+/// The reporter's plan: a task heading under `## Notes` on line 4, its field on
+/// line 5.
 fn under_a_misplaced_heading(field: &str) -> String {
     format!(
         "# Rhei: Italy\n\n## Notes\n### Task 1: Misplaced\n{field}\n\n\
@@ -39,9 +46,9 @@ fn before_any_section(field: &str) -> String {
     format!("# Rhei: Italy\n\n{field}\n\n## Tasks\n\n### Task 2: Real\n**State:** pending\n")
 }
 
-/// What went wrong with `input`, or `None` when it is refused as the spec says:
-/// with the refusal above, at `line`.
-fn miss(input: &str, line: usize) -> Option<String> {
+/// What went wrong with `input`, or `None` when it is refused at `line` with a
+/// refusal `expected` accepts.
+fn miss_by(input: &str, line: usize, expected: impl Fn(&ParseError) -> bool) -> Option<String> {
     match parse(input) {
         Ok(plan) => {
             let ids: Vec<String> = plan.tasks.iter().map(|task| task.id.to_string()).collect();
@@ -49,9 +56,17 @@ fn miss(input: &str, line: usize) -> Option<String> {
                 plan.content_sections.iter().map(|section| section.content.as_str()).collect();
             Some(format!("accepted, tasks {ids:?}, section text {text:?}"))
         }
-        Err(err) if err.message == OUTSIDE_A_TASK && err.line == Some(line) => None,
-        Err(err) => Some(format!("refused at line {:?} with {:?}", err.line, err.message)),
+        Err(err) if expected(&err) && err.line == Some(line) => None,
+        Err(err) => {
+            Some(format!("refused at line {:?} with {:?} ({:?})", err.line, err.message, err.kind))
+        }
     }
+}
+
+/// What went wrong with `input`, or `None` when it is refused as the spec says:
+/// with the plain refusal, at `line`.
+fn miss(input: &str, line: usize) -> Option<String> {
+    miss_by(input, line, |err| err.message == OUTSIDE_A_TASK)
 }
 
 fn misses(shape: fn(&str) -> String, line: usize) -> Vec<String> {
@@ -62,10 +77,21 @@ fn misses(shape: fn(&str) -> String, line: usize) -> Vec<String> {
 }
 
 /// The ticket's case: the field under the misplaced heading decides nothing.
+/// Whichever opens the block, the refusal is at the heading, line 4, and says
+/// the heading sits in a content section, so the edit is to move the task.
+/// §FS-rhei-errors.1.7
 #[test]
-fn every_valued_task_field_under_a_misplaced_heading_is_refused_at_its_line() {
-    let missed = misses(under_a_misplaced_heading, 5);
-    assert!(missed.is_empty(), "each must be refused at line 5:\n{}", missed.join("\n"));
+fn every_valued_task_field_under_a_misplaced_heading_is_refused_at_the_heading() {
+    let kind = ParseErrorKind::TaskHeadingAboveTasks { tasks_section_follows: true };
+    let at_the_heading = |err: &ParseError| err.message == HEADING_ABOVE_TASKS && err.kind == kind;
+    let missed: Vec<String> = VALUED_FIELDS
+        .iter()
+        .filter_map(|field| {
+            miss_by(&under_a_misplaced_heading(field), 4, at_the_heading)
+                .map(|why| format!("{field}: {why}"))
+        })
+        .collect();
+    assert!(missed.is_empty(), "each must be refused at line 4:\n{}", missed.join("\n"));
 }
 
 /// The remedy covers a field line with no task heading above it too.

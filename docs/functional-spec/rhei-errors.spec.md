@@ -325,8 +325,9 @@ Before `## Tasks` the same shape (`### Task 1: Book the trains`, at any task
 depth) is content: a content section may carry it as prose, and with no task
 metadata under it the plan parses as it always has.
 
-When task metadata (`**State:**` or any other task field) follows such a
-heading, the nearest heading above the field being node-shaped, the plan is
+When task metadata (`**State:**` or any other task field marker of
+[§FS-rhei-plan-language.1.1.1](rhei-plan-language.spec.md#111-task-metadata-above-the-tasks-section), whatever follows it) follows such a heading, the
+nearest heading above the field being node-shaped, the plan is
 refused, and the refusal names the cause rather than the field. Which plans are
 refused does not change; only what the refusal says does:
 
@@ -345,7 +346,8 @@ refused does not change; only what the refusal says does:
 Every command that loads the plan (`rhei list`, `rhei validate`, `rhei run`)
 reads the same refusal. A task field before `## Tasks` whose nearest heading is
 not node-shaped keeps the plain refusal, "Metadata field appears outside a
-task".
+task", at its own line. [§FS-rhei-plan-language.1.1.1](rhei-plan-language.spec.md#111-task-metadata-above-the-tasks-section) is the rule both cases
+apply: which lines are task fields, and that none is ever absorbed as content.
 
 ## 2. Copy-Paste Safety
 

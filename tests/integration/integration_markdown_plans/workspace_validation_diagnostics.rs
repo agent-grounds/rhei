@@ -215,10 +215,9 @@ fn project_parse_errors_keep_their_line_and_code_frame() {
 }
 
 /// Reaching a plan through its project must not cost the author diagnostics.
-/// Task headings under a content section fail first as "Metadata field appears
-/// outside a task", on a line that is not the mistake; only the structural
-/// diagnostic explains it, and it must survive both scopes.
-// §FS-rhei-validate.4.2: both scopes report every problem in the file.
+/// Task headings sharing a missing Tasks section report that cause once, at the
+/// first affected heading, with the same precise edit in both scopes.
+/// §FS-rhei-errors.1.7 §FS-rhei-validate.4.2
 #[test]
 fn project_scoped_parse_errors_match_file_scoped_ones() {
     let plan = "# Rhei: A\n\n## Overview\n\n### Task 1: one\n\n**State:** pending\n\n\
@@ -230,33 +229,149 @@ fn project_scoped_parse_errors_match_file_scoped_ones() {
         WORKSPACE_STATE_MACHINE,
     );
 
-    let run = |target: &Path| -> String {
-        let output = rhei_command()
-            .arg("validate")
-            .arg(target)
-            .output()
-            .expect("validate command should run");
-        assert!(!output.status.success(), "the malformed plan must fail validation");
-        let stderr: String = String::from_utf8_lossy(&output.stderr)
-            .chars()
-            .filter(|ch| *ch != '│' && *ch != '\n')
-            .collect();
-        normalize_for_assertions(&stderr)
-    };
-
-    let by_project = run(&project);
-    let by_file = run(&project.join("c.rhei.md"));
+    let by_project = validate_parse_error_for_parity(&project);
+    let by_file = validate_parse_error_for_parity(&project.join("c.rhei.md"));
 
     for scope in [&by_project, &by_file] {
-        assert!(scope.contains("(3 problems)"), "every problem must be reported, got:\n{scope}");
         assert!(
-            scope.contains("Tasks section must be the final '##' chapter"),
-            "the structural diagnostic explains the mistake, got:\n{scope}"
+            scope.contains("Task heading outside a `## Tasks` section")
+                && scope.contains("this plan has no `## Tasks` section"),
+            "the diagnostic must name the missing section, got:\n{scope}"
         );
         assert!(
-            scope.contains("line 7:") && scope.contains("line 11:"),
-            "each problem keeps its line, got:\n{scope}"
+            scope.contains("c.rhei.md") && scope.contains("5| ### Task 1: one"),
+            "the diagnostic must keep the source file and heading's line, got:\n{scope}"
         );
+        assert!(
+            scope.contains("help: add a `## Tasks` line above line 5"),
+            "both scopes must offer the precise edit, got:\n{scope}"
+        );
+        assert!(
+            !scope.contains("problems)")
+                && !scope.contains("Metadata field appears outside a task")
+                && !scope.contains("Tasks section must be the final"),
+            "one missing section must not cascade into separate faults, got:\n{scope}"
+        );
+    }
+    assert_eq!(
+        by_project.split(", then re-run:").next(),
+        by_file.split(", then re-run:").next(),
+        "both scopes must render the same diagnostic and edit; retry targets reflect the invocation"
+    );
+}
+
+fn validate_parse_error_for_parity(target: &Path) -> String {
+    let output = rhei_command()
+        .arg("validate")
+        .arg(target)
+        .output()
+        .expect("validate command should run");
+    assert_eq!(output.status.code(), Some(1), "the malformed plan must fail validation");
+    let stderr: String = String::from_utf8_lossy(&output.stderr)
+        .chars()
+        .filter(|ch| *ch != '│' && *ch != '\n')
+        .collect();
+    normalize_for_assertions(&stderr)
+}
+
+/// Recovery preserves independent errors and precise edits in either order and invocation scope.
+/// §FS-rhei-errors.1.7 §FS-rhei-validate.4.2
+#[test]
+fn project_and_file_keep_independent_errors_and_the_tasks_edit() {
+    for (body, heading_line, field_line) in [
+        ("### Task 1: Book\n**State:** pending\n## Notes\n**Prior:** 1\n", 3, 6),
+        ("## Notes\n**Prior:** 1\n### Task 1: Book\n**State:** pending\n", 5, 4),
+    ] {
+        for tasks_section_follows in [false, true] {
+            let mut plan = format!("# Rhei: Italy\n\n{body}");
+            if tasks_section_follows {
+                plan.push_str("\n## Tasks\n\n### Task 2: Pack\n**State:** pending\n");
+            }
+            let project = create_panta_project(
+                "rhei-685-independent-parity",
+                "# Panta: Parity\n",
+                &[("italy.rhei.md", &plan)],
+                WORKSPACE_STATE_MACHINE,
+            );
+            let by_project = validate_parse_error_for_parity(&project);
+            let by_file = validate_parse_error_for_parity(&project.join("italy.rhei.md"));
+            for scope in [&by_project, &by_file] {
+                assert!(scope.contains("(2 problems)"), "{scope}");
+                assert!(scope.contains("italy.rhei.md"), "{scope}");
+                assert!(scope.contains(&format!("{heading_line}| ### Task 1: Book")), "{scope}");
+                assert!(
+                    scope.contains(&format!("line {field_line}: Metadata field appears outside a task"))
+                        && scope.contains(&format!("{field_line}| **Prior:** 1")),
+                    "the independent refusal must keep its line and frame: {scope}"
+                );
+                let help = scope.split_once("help:").expect("the report needs help").1;
+                let edit = if tasks_section_follows {
+                    format!("move the task at line {heading_line} under `## Tasks`")
+                } else {
+                    format!("add a `## Tasks` line above line {heading_line}")
+                };
+                assert!(help.contains(&edit), "the precise edit must survive either error order: {scope}");
+                assert!(!help.contains("check the plan's task metadata"), "{scope}");
+            }
+            assert_eq!(
+                by_project.split(", then re-run:").next(),
+                by_file.split(", then re-run:").next(),
+                "both scopes must preserve the same problems and edit"
+            );
+        }
+    }
+}
+
+/// A retired declaration inside a misplaced task block remains a separate refusal
+/// in either order and scope, alongside the precise structural edit.
+/// §FS-rhei-errors.1.7 §FS-rhei-plan-language.2.2 §FS-rhei-validate.4.2
+#[test]
+fn project_and_file_keep_retired_states_and_the_tasks_edit_in_either_order() {
+    for (fields, states_line) in [
+        ("**State:** pending\n**States:** old\n", 5),
+        ("**States:** old\n**State:** pending\n", 4),
+    ] {
+        for tasks_section_follows in [false, true] {
+            let mut plan = format!("# Rhei: Italy\n\n### Task 1: Book\n{fields}");
+            if tasks_section_follows {
+                plan.push_str("\n## Tasks\n\n### Task 2: Pack\n**State:** pending\n");
+            }
+            let project = create_panta_project(
+                "rhei-685-retired-states-parity",
+                "# Panta: Parity\n",
+                &[("italy.rhei.md", &plan)],
+                WORKSPACE_STATE_MACHINE,
+            );
+            let by_project = validate_parse_error_for_parity(&project);
+            let by_file = validate_parse_error_for_parity(&project.join("italy.rhei.md"));
+            for scope in [&by_project, &by_file] {
+                assert!(scope.contains("(2 problems)"), "{scope}");
+                assert!(scope.contains("italy.rhei.md"), "{scope}");
+                assert!(scope.contains("line 3: Task heading outside"), "{scope}");
+                assert!(scope.contains("3| ### Task 1: Book"), "{scope}");
+                assert!(
+                    scope.contains(&format!("line {states_line}: `**States:**` is no longer"))
+                        && scope.contains("delete this line")
+                        && scope.contains(&format!("{states_line}| **States:** old")),
+                    "the independent retired-line refusal must keep its source line: {scope}"
+                );
+                assert!(!scope.contains("Metadata field appears outside a task"), "{scope}");
+                assert!(!scope.contains("Missing '## Tasks' section"), "{scope}");
+                let help = scope.split_once("help:").expect("the report needs help").1;
+                let edit = if tasks_section_follows {
+                    "move the task at line 3 under `## Tasks`"
+                } else {
+                    "add a `## Tasks` line above line 3"
+                };
+                assert!(help.contains(edit), "the precise structural edit must survive: {scope}");
+                assert!(!help.contains("check the plan's task metadata"), "{scope}");
+            }
+            assert_eq!(
+                by_project.split(", then re-run:").next(),
+                by_file.split(", then re-run:").next(),
+                "both scopes must retain both independent problems and the precise edit"
+            );
+        }
     }
 }
 

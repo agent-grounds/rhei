@@ -183,6 +183,17 @@ fn io_error_help(path: &Path, kind: std::io::ErrorKind) -> String {
     }
 }
 
+/// Help for a plan's parse error: the edit its kind names where it names one, and
+/// the plan-authoring help otherwise. §FS-rhei-errors.1.7
+fn parse_error_help(err: &rhei_core::parser::ParseError) -> String {
+    match err.kind {
+        rhei_core::parser::ParseErrorKind::TaskHeadingAboveTasks { tasks_section_follows } => {
+            task_heading_above_tasks_help(err.line, tasks_section_follows)
+        }
+        rhei_core::parser::ParseErrorKind::Plain => plan_authoring_help(),
+    }
+}
+
 /// The project root `--local` writes into, or the diagnostic for its absence.
 ///
 /// One call, rather than ten copies of the message. §FS-rhei-errors.1.2

@@ -1,31 +1,69 @@
 use crate::ast::Rhei;
 
-use super::{parse, ParseError};
+use super::{plan::parse_recovering, ParseError, ParseErrorKind};
 
 pub fn parse_collect(input: &str) -> (Option<Rhei>, Vec<ParseError>) {
     let mut errors: Vec<ParseError> = Vec::new();
     let mut working = input.to_string();
     let mut line_map: Vec<usize> = (1..=input.lines().count()).collect();
+    let mut missing_tasks_reported = false;
+    let mut reported_headings = Vec::new();
 
     // Safety valve in case a recovery step fails to make progress: cap
     // iterations at a generous multiple of the authored line count.
     let max_iters = input.lines().count().saturating_mul(2).max(16);
 
     for _ in 0..max_iters {
-        match parse(&working) {
+        let working_headings: Vec<usize> = line_map
+            .iter()
+            .enumerate()
+            .filter_map(|(idx, original)| reported_headings.contains(original).then_some(idx + 1))
+            .collect();
+        match parse_recovering(&working, &working_headings) {
             Ok(rhei) => return (Some(rhei), errors),
             Err(err) => {
-                // Only recover from well-understood per-task errors. For
+                // Only recover from well-understood local errors. For
                 // structural issues (missing header, unknown node kind,
                 // depth mismatches) stop immediately — continuing would
                 // produce cascading, misleading error lists.
                 let mut err = err;
                 remap_error_line(&mut err, &line_map);
-                let recoverable = is_recoverable_error(&err.message);
+                // The heading diagnostic already explains the missing section at EOF. §FS-rhei-errors.1.7
+                if missing_tasks_reported
+                    && err.line.is_none()
+                    && matches!(
+                        err.message.as_str(),
+                        "Missing '## Tasks' section"
+                            | "Tasks section must be the final '##' chapter and appear as '## Tasks'"
+                    )
+                {
+                    return (None, errors);
+                }
+                // Deduplicate the missing section, but keep scanning independent sections.
+                // §FS-rhei-errors.1.7 §FS-rhei-validate.4.2
+                let missing_tasks = matches!(
+                    err.kind,
+                    ParseErrorKind::TaskHeadingAboveTasks { tasks_section_follows: false }
+                );
+                let duplicate = missing_tasks && missing_tasks_reported;
+                missing_tasks_reported |= missing_tasks;
+                let recoverable = match err.kind {
+                    ParseErrorKind::TaskHeadingAboveTasks { .. } => true,
+                    ParseErrorKind::Plain => is_recoverable_error(&err.message),
+                };
                 let Some(line) = err.line.filter(|_| recoverable) else {
                     errors.push(err);
                     return (None, errors);
                 };
+                // Keep the block: only its dependent metadata errors are suppressed on the next pass.
+                // Independent refusals still see their source. §FS-rhei-errors.1.7 §FS-rhei-validate.4.2
+                if matches!(err.kind, ParseErrorKind::TaskHeadingAboveTasks { .. }) {
+                    reported_headings.push(line);
+                    if !duplicate {
+                        errors.push(err);
+                    }
+                    continue;
+                }
                 let working_line =
                     line_map.iter().position(|original| *original == line).map(|idx| idx + 1);
                 let Some(working_line) = working_line else {
@@ -62,6 +100,8 @@ fn is_recoverable_error(message: &str) -> bool {
         "**State:** must appear before **Prior:**",
         "**State:** must appear before **Assignee:**",
         "Duplicate **Assignee:**",
+        // The retired declaration is an independent, removable line. §FS-rhei-plan-language.2.2
+        "`**States:**` is no longer part of the plan language",
     ];
     RECOVERABLE_MARKERS.iter().any(|m| message.contains(m))
 }
@@ -138,30 +178,23 @@ fn strip_for_recovery(
         if start == 0 && end == lines.len() {
             return (input.to_string(), line_map.to_vec(), false);
         }
-        let mut kept: Vec<&str> = Vec::with_capacity(lines.len());
-        kept.extend_from_slice(&lines[..start]);
-        kept.extend_from_slice(&lines[end..]);
-        let mut kept_line_map: Vec<usize> = Vec::with_capacity(line_map.len());
-        kept_line_map.extend_from_slice(&line_map[..start]);
-        kept_line_map.extend_from_slice(&line_map[end..]);
-        let mut out = kept.join("\n");
-        if input.ends_with('\n') {
-            out.push('\n');
-        }
-        return (out, kept_line_map, true);
+        return drop_lines(input, &lines, line_map, start..end);
     }
 
     // Default recovery: drop just the offending line.
-    let mut kept: Vec<&str> = Vec::with_capacity(lines.len().saturating_sub(1));
-    kept.extend_from_slice(&lines[..idx]);
-    if idx + 1 < lines.len() {
-        kept.extend_from_slice(&lines[idx + 1..]);
-    }
-    let mut kept_line_map: Vec<usize> = Vec::with_capacity(line_map.len().saturating_sub(1));
-    kept_line_map.extend_from_slice(&line_map[..idx]);
-    if idx + 1 < line_map.len() {
-        kept_line_map.extend_from_slice(&line_map[idx + 1..]);
-    }
+    drop_lines(input, &lines, line_map, idx..idx + 1)
+}
+
+/// The source and line map with `range` of `lines` removed, and `true` for progress.
+/// Used by field and whole-task recovery.
+fn drop_lines(
+    input: &str,
+    lines: &[&str],
+    line_map: &[usize],
+    range: std::ops::Range<usize>,
+) -> (String, Vec<usize>, bool) {
+    let kept: Vec<&str> = [&lines[..range.start], &lines[range.end..]].concat();
+    let kept_line_map: Vec<usize> = [&line_map[..range.start], &line_map[range.end..]].concat();
     let mut out = kept.join("\n");
     if input.ends_with('\n') {
         out.push('\n');

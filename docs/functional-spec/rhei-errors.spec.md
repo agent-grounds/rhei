@@ -318,6 +318,35 @@ collision must name both owners and tell the author which alias, declaration,
 or compatibility mapping to change. It must not surface as a later duplicate
 state, task, path, or parser failure stripped of its mount context.
 
+### 1.7. A Task Heading Above `## Tasks`
+
+Only a node-shaped heading under `## Tasks` is a task ([§FS-rhei-plan-language.1.1](rhei-plan-language.spec.md#11-single-file-plan-1-agent-or-low-concurrency)).
+Before `## Tasks` the same shape (`### Task 1: Book the trains`, at any task
+depth) is content: a content section may carry it as prose, and with no task
+metadata under it the plan parses as it always has.
+
+When task metadata (`**State:**` or any other task field) follows such a
+heading, the nearest heading above the field being node-shaped, the plan is
+refused, and the refusal names the cause rather than the field. Which plans are
+refused does not change; only what the refusal says does:
+
+- **Message.** It names the heading as a task heading outside the `## Tasks`
+  section and names `## Tasks`, rather than calling the field "outside a task"
+  when it plainly sits under a task heading ([§FS-rhei-errors.1.1](rhei-errors.spec.md#11-message)).
+- **Location.** The error is at the heading's line, not the field's.
+- **Help.** The precise edit ([§FS-rhei-errors.1.2](rhei-errors.spec.md#12-help)), never the generic advice to
+  check the task metadata. With no `## Tasks` in the plan it is to add
+  `## Tasks` above line N, the heading's line. With a `## Tasks` later in the
+  file the heading sits in a content section, so it is to move the task under
+  `## Tasks`.
+- **One problem.** `rhei validate` reports it once. The missing `## Tasks`
+  section is its cause, so it is not listed again beside it as a separate fault.
+
+Every command that loads the plan (`rhei list`, `rhei validate`, `rhei run`)
+reads the same refusal. A task field before `## Tasks` whose nearest heading is
+not node-shaped keeps the plain refusal, "Metadata field appears outside a
+task".
+
 ## 2. Copy-Paste Safety
 
 Any command Rhei prints — in an error, a help line, or a success summary — must

@@ -70,7 +70,7 @@ transitions:
         );
         fs::create_dir_all(dir.join("runtime/logs")).expect("logs directory");
         // First entry, first attempt, no fan-out: no identity or number suffix.
-        let log = dir.join("runtime/logs/task-plan.1-work.log");
+        let log = dir.join("runtime").join("logs").join("task-plan.1-work.log");
         fs::write(&log, b"partial output of an earlier visit\n").expect("unaccounted log");
         assert!(!dir.join("runtime/spawns").exists(), "no accounting record");
         // Prove admission succeeds, and initialize the shared CLI root guard
@@ -124,7 +124,7 @@ fn refusal_prediction(kind: &str, parallel: &str, cause: Refusal) {
         ]),
         Refusal::UnreadableLedger => {
             fs::remove_file(&fixture.log).expect("no log conflict in the ledger case");
-            let ledger = fixture.dir.join("runtime/state-transitions.log");
+            let ledger = fixture.dir.join("runtime").join("state-transitions.log");
             // A directory is unreadable as a ledger on every platform, even
             // when tests run with privileges that bypass file permissions.
             fs::create_dir(&ledger).expect("unreadable ledger");

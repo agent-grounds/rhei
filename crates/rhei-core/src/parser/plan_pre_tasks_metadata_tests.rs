@@ -63,8 +63,6 @@ fn misses(shape: fn(&str) -> String, line: usize) -> Vec<String> {
 
 /// The ticket's case: the field under the misplaced heading decides nothing.
 #[test]
-#[ignore = "red until #719: a valued Model, Target, MCP servers or Skills line under a misplaced \
-            task heading is absorbed into the section; implement removes this"]
 fn every_valued_task_field_under_a_misplaced_heading_is_refused_at_its_line() {
     let missed = misses(under_a_misplaced_heading, 5);
     assert!(missed.is_empty(), "each must be refused at line 5:\n{}", missed.join("\n"));
@@ -72,8 +70,6 @@ fn every_valued_task_field_under_a_misplaced_heading_is_refused_at_its_line() {
 
 /// The remedy covers a field line with no task heading above it too.
 #[test]
-#[ignore = "red until #719: a valued Model, Target, MCP servers or Skills line above ## Tasks \
-            with no heading is absorbed into the section; implement removes this"]
 fn every_valued_task_field_above_tasks_is_refused_without_a_heading() {
     let mut missed = misses(in_a_content_section, 4);
     missed.extend(misses(before_any_section, 3));

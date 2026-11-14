@@ -52,6 +52,16 @@ pub const TASK_METADATA_FIELDS: [&str; TOKEN_FIELDS.len() + TOOLING_FIELDS.len()
     fields
 };
 
+/// The [`TASK_METADATA_FIELDS`] marker `line` opens with, whatever follows it.
+/// The one answer to whether a line outside a task is task metadata, for the
+/// single-file plan above `## Tasks` (§FS-rhei-plan-language.1.1.1) and the
+/// Directory Workspace and Panta manifests (§FS-rhei-plan-language.1.2,
+/// §FS-rhei-plan-language.1.5) alike, so a field added to the set is refused in
+/// all of them. The exact marker is matched: `**Target audience:**` is prose.
+pub fn task_metadata_marker(line: &str) -> Option<&'static str> {
+    TASK_METADATA_FIELDS.into_iter().find(|field| line.starts_with(field))
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Token {
     /// Top-level rhei header marker (e.g., "# Rhei: ...").

@@ -5,6 +5,7 @@ use crate::ast::{
 use crate::fence::FenceTracker;
 use crate::header::{header_regex, RHEI_HEADER};
 use crate::text::parse_task_id;
+use crate::tokens::task_metadata_marker;
 use regex::Regex;
 
 use super::builder::{title_case_kind, unwind_to_level, NodeBuilder};
@@ -205,7 +206,10 @@ pub fn parse(input: &str) -> Result<Rhei> {
                 continue;
             }
 
-            if re_state_like.is_match(line)
+            // Every task field marker, whatever follows it, then the malformed spellings the
+            // in-task branches refuse. Never section text. §FS-rhei-plan-language.1.1.1
+            if task_metadata_marker(line).is_some()
+                || re_state_like.is_match(line)
                 || re_prior_like.is_match(line)
                 || re_inherits_like.is_match(line)
                 || re_provides_like.is_match(line)

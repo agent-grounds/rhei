@@ -149,10 +149,11 @@
 
         println!();
         println!("Stopped:");
-        println!(
-            "  {}",
+        for line in
             describe_instantiation_stop(&loaded.rhei, &resolved.machine, &entrypoint, dry_run)
-        );
+        {
+            println!("  {line}");
+        }
 
         Ok(())
     }
@@ -247,27 +248,29 @@
         lines.join("\n")
     }
 
+    /// The `Stopped` lines of the summary, per the list in §FS-rhei-templates.6.1.3: a ready
+    /// task is the stop point and gated tasks are listed beside it, never in its place.
     fn describe_instantiation_stop(
         rhei: &rhei_core::ast::Rhei,
         machine: &rhei_validator::StateMachine,
         entrypoint: &Path,
         dry_run: bool,
-    ) -> String {
+    ) -> Vec<String> {
         let tasks = flatten_tasks(rhei);
         if dry_run {
-            return "dry run stopped after rendering and validation; no files were written to the requested output path.".to_string();
+            return vec!["dry run stopped after rendering and validation; no files were written to the requested output path.".to_string()];
         }
         if tasks.is_empty() {
-            return "instantiation stopped after validation because the rendered workspace has no tasks.".to_string();
+            return vec!["instantiation stopped after validation because the rendered workspace has no tasks.".to_string()];
         }
 
         let terminal =
             tasks.iter().filter(|task| is_terminal_state(task.state.as_str(), machine)).count();
         if terminal == tasks.len() {
-            return format!(
+            return vec![format!(
                 "instantiation stopped with the plan already complete: {terminal}/{} tasks are terminal.",
                 tasks.len()
-            );
+            )];
         }
 
         let gating = tasks
@@ -278,49 +281,58 @@
                 machine.states.get(&state).map(|def| def.gating).unwrap_or(false)
             })
             .collect::<Vec<_>>();
-        if !gating.is_empty() {
-            let labels = gating
-                .iter()
-                .take(3)
-                .map(|task| format_task_summary_line(task))
-                .collect::<Vec<_>>()
-                .join(", ");
-            let suffix = if gating.len() > 3 {
-                format!(" (+{} more)", gating.len() - 3)
-            } else {
-                String::new()
-            };
-            return format!("instantiation stopped at a human gate: {labels}{suffix}.");
-        }
 
         let ready = ready_tasks_from_flat(&tasks, machine);
         if let Some(task) = ready.first() {
             let target = display_path(entrypoint);
-            return format!(
+            let mut lines = vec![format!(
                 "instantiation stopped before execution; next ready task is {}. Run `rhei run {}` or claim it with `rhei next {}`.",
                 format_task_summary_line(task),
                 target.display(),
                 target.display()
-            );
+            )];
+            if !gating.is_empty() {
+                let waits = if gating.len() == 1 { "task waits" } else { "tasks wait" };
+                lines.push(format!(
+                    "{} {waits} on a person at a human gate: {}.",
+                    gating.len(),
+                    first_three_task_labels(&gating)
+                ));
+            }
+            return lines;
+        }
+
+        if !gating.is_empty() {
+            return vec![format!(
+                "instantiation stopped at a human gate: {}.",
+                first_three_task_labels(&gating)
+            )];
         }
 
         let blocked = blocked_tasks_from_flat(&tasks, machine);
         if !blocked.is_empty() {
-            let labels = blocked
-                .iter()
-                .take(3)
-                .map(|task| format_task_summary_line(task))
-                .collect::<Vec<_>>()
-                .join(", ");
-            let suffix = if blocked.len() > 3 {
-                format!(" (+{} more)", blocked.len() - 3)
-            } else {
-                String::new()
-            };
-            return format!("instantiation stopped with tasks blocked by incomplete prerequisites: {labels}{suffix}.");
+            return vec![format!(
+                "instantiation stopped with tasks blocked by incomplete prerequisites: {}.",
+                first_three_task_labels(&blocked)
+            )];
         }
 
-        "instantiation stopped after validation; no claimable task was found.".to_string()
+        vec!["instantiation stopped after validation; no claimable task was found.".to_string()]
+    }
+
+    /// The first three task labels, then ` (+<k> more)` for the rest (§FS-rhei-templates.6.1.3).
+    fn first_three_task_labels(tasks: &[&rhei_core::ast::Task]) -> String {
+        let labels = tasks
+            .iter()
+            .take(3)
+            .map(|task| format_task_summary_line(task))
+            .collect::<Vec<_>>()
+            .join(", ");
+        if tasks.len() > 3 {
+            format!("{labels} (+{} more)", tasks.len() - 3)
+        } else {
+            labels
+        }
     }
 
     fn ready_tasks_from_flat<'a>(

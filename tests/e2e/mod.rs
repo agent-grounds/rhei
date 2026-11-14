@@ -172,6 +172,7 @@ mod instantiate_output_spelling_tests;
 mod instantiate_project_preview_tests;
 mod instantiate_project_validation_support;
 mod instantiate_project_validation_tests;
+mod instantiate_stop_point_tests;
 // The reading takes a template path by its `/` spelling. §FS-rhei-errors.4.1
 #[cfg(unix)]
 mod instantiate_rendered_refusal_routes_tests;

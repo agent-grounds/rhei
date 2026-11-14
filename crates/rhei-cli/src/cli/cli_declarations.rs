@@ -844,6 +844,11 @@ enum Commands {
         /// is its file stem or directory name; default is the whole project
         #[arg(long = "rhei", value_name = "RHEI_ID", add = ArgValueCompleter::new(complete_rhei_id))]
         rhei: Vec<String>,
+        /// Narrow to the named ticket (repeatable), every ticket whose **Prior:**
+        /// reaches it, its descendants, and the finished ancestors over them.
+        /// With it, `--rhei` bounds where a short id resolves, not the reach
+        #[arg(long = "task", value_name = "TASK_ID", add = ArgValueCompleter::new(complete_task_id))]
+        task: Vec<String>,
         /// Report what would be reset and removed without changing anything
         #[arg(long)]
         dry_run: bool,

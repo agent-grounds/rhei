@@ -671,3 +671,14 @@ reason = """
 §3 End-of-Run Console Summary is about 500 of these lines and is a subject of its own, but it cannot leave until it has an FS declaration of its own and every FS-rhei-run-report.3.* citation in the crates, the tests and the sibling specs has been repointed, which is a restructure with its own review. The change that met this budget (agent-grounds/rhei#493) only rewrote one citation.
 Issue #579 adds five non-blank lines to the existing Bounds layout contract. The separate console-summary declaration and citation migration above remain deferred; Attention rendering is deliberately excluded. The measured 805 non-blank lines require the next 900-line step.
 """
+[[exceptions]]
+path = "docs/functional-spec/rhei-reset.spec.md"
+match = "exact"
+rules = ["citable-spec"]
+kind = "deferred"
+max_accepted = { value = 850, unit = "lines" }
+until = "the reset specification is split along its existing sections (scopes, authored state, offering reset as a remedy) into child declarations, with every FS-rhei-reset citation migrated in the same change"
+issue = "agent-grounds/rhei#679"
+reason = """
+agent-grounds/rhei#679 adds the ticket scope as FS-rhei-reset.2.5 beside the rhei scope it shares a removal list, a lock stack and an output with; the remedy rules of FS-rhei-reset.5.1 are the natural second document, but 30 files cite FS-rhei-reset.5.1 and 24 cite FS-rhei-reset.2.1, and moving them in the commit that specifies a behaviour change would hide that change among citation edits.
+"""

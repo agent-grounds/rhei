@@ -13,7 +13,7 @@ reader takes away from this page and it is no longer true of everything.
 ## 1. Usage
 
 ```bash
-rhei reset <RHEI_PLAN_OR_WORKSPACE> [--rhei <RHEI_ID>] [--dry-run] [--yes]
+rhei reset <RHEI_PLAN_OR_WORKSPACE> [--rhei <RHEI_ID>] [--task <TASK_ID>] [--dry-run] [--yes]
 ```
 
 `<RHEI_PLAN_OR_WORKSPACE>` may be a `.rhei.md` file (single-file plan), a directory workspace root (containing `index.rhei.md` and `tasks/`), or a Panta project directory.
@@ -23,11 +23,13 @@ rhei reset <RHEI_PLAN_OR_WORKSPACE> [--rhei <RHEI_ID>] [--dry-run] [--yes]
 | Flag               | Default | Description                                                                    |
 |--------------------|---------|--------------------------------------------------------------------------------|
 | `--rhei <RHEI_ID>` | all     | Narrow the reset to the named rheis (repeatable). See [§FS-rhei-reset.2.1](rhei-reset.spec.md#21-narrowed-reset---rhei). [§FS-rhei-panta.6.4](rhei-panta.spec.md#64-reset-validate-list-viz) |
+| `--task <TASK_ID>` | none    | Narrow the reset to the named tickets and what depends on them (repeatable). See [§FS-rhei-reset.2.5](rhei-reset.spec.md#25-ticket-scope---task) |
 | `--dry-run`        | false   | Report what would be reset and deleted, then exit with every file as it was. What asking the filesystem still costs is in [§FS-rhei-reset.2.3](rhei-reset.spec.md#23-a-reset-validation-would-refuse) |
 | `--yes`, `-y`      | false   | Confirm without prompting; required when stdin is not a terminal. See [§FS-rhei-reset.1.2](rhei-reset.spec.md#12-confirmation)     |
 
 An id that names no rhei in the project is an error listing the available rhei
-ids.
+ids. With `--task`, `--rhei` and a member-rhei target bound where a local id
+resolves rather than how far the reset reaches ([§FS-rhei-reset.2.5](rhei-reset.spec.md#25-ticket-scope---task)).
 
 ### 1.2. Confirmation
 
@@ -73,13 +75,14 @@ Deliberate automation states the intent once with `--yes`.
    in the shared order: sorted and deduplicated metadata paths, then distinct
    task paths, then ledger roots. Leave every replaceable destination unlocked.
    Re-read the current plan and ledger pathnames only after their sidecars are
-   held, and retain the complete stack through preview, confirmation,
+   held, recompute a `--task` scope from what was re-read ([§FS-rhei-reset.2.5](rhei-reset.spec.md#25-ticket-scope---task)), and retain the complete stack through preview, confirmation,
    restoration, scoped pruning or full cleanup, and the success summary.
    Before the preview, refuse with nothing changed a reset whose moves would
    leave a plan validation refuses, or that the filesystem would stop
    ([§FS-rhei-reset.2.3](rhei-reset.spec.md#23-a-reset-validation-would-refuse)).
-3. For every task node in the merged task graph (including all descendants),
-   reading the plan's text by the fence rule, so that a fenced line is none of the
+3. For every task node in the selected scope — the merged task graph (including
+   all descendants), the in-scope rheis' tickets under `--rhei`, or the tickets a
+   `--task` scope reaches ([§FS-rhei-reset.2.5](rhei-reset.spec.md#25-ticket-scope---task)) — reading the plan's text by the fence rule, so that a fenced line is none of the
    lines this step names ([§FS-rhei-reset.2.4](rhei-reset.spec.md#24-fenced-lines)):
    - Recover the task's authored state ([§FS-rhei-reset.2.2](rhei-reset.spec.md#22-authored-state)) and rewrite the task's
      `**State:**` line to it. A task that never moved is already in that state,
@@ -88,6 +91,8 @@ Deliberate automation states the intent once with `--yes`.
      cleared whether or not the state name changes.
    - Remove the `**Assignee:**` line if present.
    - Remove the `> **Result:**` link block from the task body if present.
+     Both removals are made under the in-scope task's own heading, so a ticket
+     outside the scope keeps its claim and its link even in the same file.
    - Clear any counted-visit suffix; `stateVisits` entries and provider-limit
      waits for the task in frontmatter `metadata.tasks.<id>.stateVisits` and
      `metadata.tasks.<id>.providerLimits` are deleted, together with the task's
@@ -193,10 +198,70 @@ movement row are one task-keyed record ([§FS-rhei-complete.3.1](rhei-complete.s
 validates the pair and removes both rows together; it never leaves exceptional
 metadata orphaned or prunes only the movement.
 
-Artifact paths that still carry unresolved placeholders after `{task_id}` is
-substituted (`{state}`, `{visit_count}`, `{model}`, …) are matched by the
-literal prefix up to the first remaining placeholder, so `auth.1` never matches
-`auth.10`.
+A declared artifact path whose only placeholder is `{task_id}` names one file,
+which the reset removes. A path that still carries another placeholder once
+`{task_id}` is substituted (`{state}`, `{visit_count}`, `{rhei_id}`, `{model}`,
+…), before the id or after it, is matched **in full, one path component at a
+time**: each unresolved placeholder stands for any part of one component and
+never for a `/`, the ticket id has to stand where `{task_id}` stands, and the
+literal text around every placeholder, the text after the last one included, has
+to be there too. So under `runtime/{state}/{task_id}.md`, `--task paper.2` removes
+`runtime/review/paper.2.md` and leaves `runtime/` itself, and every other
+ticket's files in it, where they are, and `auth.1` never matches `auth.10`. A
+reset never removes a path in which the ticket id does not stand where
+`{task_id}` stands in the declared path, nor one that does not end as the declared
+path ends. Under `runtime/fix-summary/{task_id}.{visit_count}.md`, the ci-heal
+example's summary, `x.1.1`'s path matches its own `x.1.1.1.md` and never
+`x.1.1.md`, which is `x.1`'s first summary: only the declared `.md` after
+`{visit_count}` tells the two apart, since no id is longer than `x.1.1`. A file
+that only begins as a declared path does, such as `a.build-notes.txt` beside
+`runtime/findings/{task_id}-{visit_count}.md`, is no ticket's declared path, and
+the reset leaves it.
+
+The names rhei writes itself are matched by prefix: logs, spawn records and
+reports as `task-<ticket-id>-`, snapshot sessions and captures as
+`<ticket-id>-`, a capture's id in the form its file name spells it. Rhei always
+writes `-` after the id there, so `auth.1` never matches `auth.10`.
+
+A placeholder reaches files of every naming, not only the declared path's own:
+under `runtime/{state}/{task_id}-{visit_count}.md`, `{state}` reaches
+`runtime/results/` and `runtime/supervise/`, and `{visit_count}` takes `docs`, so
+`x.build`'s path matches `x.build-docs`'s result and brief,
+`runtime/results/x.build-docs.md` and `runtime/supervise/x.build-docs.md`. One
+directory can hold several namings, too: under `runtime/supervise/{task_id}-{state}.md`,
+`x.build`'s path matches `x.build-docs`'s brief `runtime/supervise/x.build-docs.md`,
+and a machine that declares both `runtime/notes/{task_id}.md` and
+`runtime/notes/{task_id}-{state}.md` has `x.build`'s second path match
+`x.build-docs`'s first. So a path a ticket's declared path or prefix matches is
+that ticket's only where **no longer id of a ticket the reset keeps could stand
+where the ticket's id stands** in it: in the component that holds the id, no id
+of a ticket the reset leaves out, qualified or rhei-local, longer than the
+ticket's, may begin where the text before it reads as the text declared before
+the id, and run over the place the ticket's id stands. Nothing after that longer
+id is asked, so while `x.build-docs` is kept, `--task x.build` leaves each of
+those files, and leaves `x.build-docs-review.md` under `runtime/out/{task_id}-{state}.md`.
+
+Such a path is ambiguous, and a kept ticket's claim wins. Under
+`runtime/findings/{task_id}-{visit_count}.md`, `a.build`'s second output
+`a.build-2.md` reads as `a.build-2`'s id as well, so `--task a.build` leaves it
+while `a.build-2` is kept. A ticket the reset reaches stakes no claim against
+another: `--rhei a`, which reaches both, removes `a.build-2.md`, and so does a
+`--task` scope that reaches both. A file one in-scope ticket's path takes where a
+longer in-scope id could stand counts as lost by both tickets
+([§FS-rhei-reset.2.5.3](rhei-reset.spec.md#253-the-held-supervisor)).
+
+From its first placeholder, or from the component that holds the ticket id where
+that comes first, a declared path enters only real directories and never descends
+through a symbolic link, so it cannot lead a reset out of the execution root. A
+link it matches at or below the component that holds the id is the ticket's path:
+it is removed as a link where it resolves, and what it points at is left alone; a
+dangling one satisfies no input and is left where it is. A link above that
+component, at a level every ticket's path passes through, is neither entered nor
+removed.
+
+This list is the one both narrowings remove, `--rhei` and `--task`
+([§FS-rhei-reset.2.5](rhei-reset.spec.md#25-ticket-scope---task)), and the rule above is the one way either attributes a file
+to a ticket: a file goes only when a ticket in scope owns it under that rule.
 
 The export directory is matched by its complete ticket id, never by a prefix:
 resetting `auth.1` does not remove `runtime/exports/auth.10/`. Pre-qualification
@@ -440,6 +505,77 @@ plan even inside a workspace's `tasks/` directory.
 `--dry-run`, the preview and the plan [§FS-rhei-reset.2.3](rhei-reset.spec.md#23-a-reset-validation-would-refuse) judges read a fence the same way,
 because each comes from the same rewrite.
 
+### 2.5. Ticket Scope (`--task`)
+
+`--task <TASK_ID>`, repeatable, narrows a reset below a rhei: the named tickets
+and what the plan's own edges make depend on them go back, and every other ticket
+keeps its `**State:**` line, its `> **Result:**` link, its result file byte for
+byte, its logs and its ledger rows. It removes exactly what [§FS-rhei-reset.2.1](rhei-reset.spec.md#21-narrowed-reset---rhei)
+lists, for its own tickets, and keeps run-scoped output, the note store and the
+seals as `--rhei` does; the line that says so names `--task` as the flag to drop.
+
+#### 2.5.1. The Closure
+
+The scope starts from the named tickets and adds, until nothing more is added:
+every **descendant** of a ticket in scope; every ticket whose `**Prior:**` names a
+ticket in scope, across rheis in a panta, because a cross-rhei prior is one more
+edge of the merged graph ([§AR-rhei-panta.3](../architecture/rhei-panta.spec.md#3-identity-and-id-namespacing)); and every **finished ancestor** of a ticket in scope,
+alone ([§FS-rhei-reset.2.5.2](rhei-reset.spec.md#252-finished-ancestors)). `**Consumes:**` adds nothing: a consumer already names its
+producer in `**Prior:**` ([§FS-rhei-plan-language.3.12.1](rhei-plan-language.spec.md#3121-declaration-integrity)). A named ticket's priors are never
+added, so `--task paper.3` leaves `paper.2` completed with its result.
+
+A ticket in scope that already stands in its authored state is counted and
+loses its runtime files, but is not listed as a move; where it loses any, its
+supervisor is held for it all the same ([§FS-rhei-reset.2.5.3](rhei-reset.spec.md#253-the-held-supervisor)). A ticket reached twice is
+listed once, by the first edge that reached it in plan order.
+
+#### 2.5.2. Finished Ancestors
+
+A finished ancestor over a reopened ticket is a plan validation refuses
+([§FS-rhei-reset.2.3](rhei-reset.spec.md#23-a-reset-validation-would-refuse)), so the scope takes it along, **alone**: it returns to its authored state and loses
+its result, logs and ledger rows, while its other children are not added. Its
+own dependents are, by the closure. A finished ancestor with no ledger rows has
+no recorded state to go back to and still gets the refusal of [§FS-rhei-reset.2.3](rhei-reset.spec.md#23-a-reset-validation-would-refuse).
+
+#### 2.5.3. The Held Supervisor
+
+Reopening a step deletes its brief, which is declared under the step's id, and a
+`released` supervisor wakes only on a checkpoint. So the reset holds the nearest
+supervising ancestor the scope leaves out — the one a transition would checkpoint
+([§FS-rhei-supervision.2.2](rhei-supervision.spec.md#22-nearest-in-scope-supervising-ancestor)) — and records a checkpoint on it, marked as a reset
+([§FS-rhei-supervision.3.3](rhei-supervision.spec.md#33-supervision-metadata)), for each ticket it owns that the reset reopens **or** whose
+records the reset removes: anything [§FS-rhei-reset.2.1](rhei-reset.spec.md#21-narrowed-reset---rhei) lists for it, ledger rows
+included. A ticket that already stands in its authored state still loses its brief
+([§FS-rhei-reset.2.5.1](rhei-reset.spec.md#251-the-closure)). It is in scope because something it reads changed, so a
+brief written before the reset is not one to trust, and its checkpoint, from its
+state to the same state, is what asks the supervisor for a new one. A ticket that
+neither moves nor loses anything adds no checkpoint, and a supervisor with no
+checkpoint to record is not held. The supervisor's state line, counted suffix,
+result and history stay as they are. A supervisor the scope reopens itself returns
+with no supervision block, which is already held, and is not held a second time.
+
+#### 2.5.4. Resolving the Ids
+
+Each id is read as `rhei list --parent` reads one: a qualified id or an
+unambiguous rhei-local shorthand. `--rhei`, or a member-rhei target, bounds where
+a shorthand resolves, as it does on `next`, `transition`, `release` and `remove`;
+it does **not** bound the closure, so `rhei reset panta/<rhei> --task …` works as
+typed and the preview says when the closure leaves that rhei ([§FS-rhei-reset.4](rhei-reset.spec.md#4-output)).
+An unknown id and an ambiguous shorthand are refused before any preview,
+`--dry-run` included, with nothing changed.
+
+#### 2.5.5. Under the Locks
+
+The closure is computed again from the plan re-read under the writer locks of
+[§FS-rhei-reset.2](rhei-reset.spec.md#2-behavior) step 2, and the held stack includes the held supervisor's metadata
+document. A closure that has grown past the held stack between the first read
+and the locks — a dependent added, an ancestor finished — is refused, non-zero
+and with nothing changed, and running the reset again takes the new closure.
+
+Records keyed by a bare rhei-local id are swept only at an execution root where
+every ticket of every rhei sharing it is in scope ([§FS-rhei-panta.6.4](rhei-panta.spec.md#64-reset-validate-list-viz)); anywhere else
+they are kept, and the output says so.
+
 ## 3. Safety
 
 Reset is destructive with respect to runtime state: it deletes results, exports, logs, and the transition ledger. It is not destructive with respect to authored plan content, and that takes two rules, because one task's history cannot see the others'. [§FS-rhei-reset.2.2](rhei-reset.spec.md#22-authored-state) moves a task only to a state that task's own history records, so a reset never invents a state. [§FS-rhei-reset.2.3](rhei-reset.spec.md#23-a-reset-validation-would-refuse) refuses, with nothing changed, a reset whose moves would add up to a plan validation refuses, and one the filesystem would stop. Together they are why a reset can never be worse for the plan than not running it, short of the failure that point says no check can foresee, which a second reset recovers from. `--dry-run` previews both halves ([§FS-rhei-reset.1.1](rhei-reset.spec.md#11-options)) and confirmation gates the rest ([§FS-rhei-reset.1.2](rhei-reset.spec.md#12-confirmation)).
@@ -458,6 +594,16 @@ recovery invocation; reset never repairs or deletes it. With no marker, reset
 holds shared root guards and its ordinary stable file locks, so concurrent
 `rhei next`, `rhei transition`, `rhei complete`, and forced writers run wholly
 before or after its decision snapshot.
+
+An agent may run `rhei reset --task <id> --yes`, and that reopens a finished
+ticket, which `rhei transition --force` forbids it ([§FS-rhei-transition-cmd.6](rhei-transition-cmd.spec.md#6-operator-forced-missing-edge-recovery)). The two are
+not the same power. `--force` crosses an edge the machine does not declare, into
+whatever `--to` names, and keeps the stale results and outputs; a scoped reset
+sends each ticket only where its own ledger says it started, takes its outputs
+and its dependents with it, and must leave a plan validation accepts. It does
+clear the reopened tickets' `stateVisits`, so an agent can use it to restart a
+counted loop. What bounds that is travel, which no reset returns
+([§REQ-bounded-neural-work.4](../requirements/bounded-neural-work.spec.md#4-nothing-creates-capacity)): a ticket reset and rerun converges on its travel bound.
 
 ## 4. Output
 
@@ -585,7 +731,34 @@ A project-scoped invocation prints its resolved scope first:
 Scope: `rhei reset` operates project-wide across <N> rheis: <ids>
 ```
 
-and a narrowed one reports what it deliberately kept after the two summary
+A `--task` scope prints, in a project of more than one rhei, the rheis its
+tickets belong to, and, when `--rhei` or a member-rhei target bounded where its
+ids resolved and the closure reaches past that rhei, the line after it:
+
+```text
+Scope: `rhei reset` narrowed to <N> ticket(s) that --task reaches, in <M> rheis: <ids>
+The tickets --task reaches leave rhei <rhei>, where their ids were resolved: <K> ticket(s) in <ids>.
+```
+
+Each move a `--task` scope lists carries the edge that brought it in, after three
+spaces: nothing for a named ticket, `(prior: <id>)`, `(child of <id>)`, or
+`(finished parent of <id>)`. After the moves come the supervisor it holds and
+the tickets it kept, listed in plan order up to five ids and counted past that,
+then the line for bare-id records, when there are any at a root it did not sweep:
+
+```text
+  Task <id>: <current> → <authored>   (prior: <id>)
+Would hold Task <id>, which supervises them, so its next visit briefs them again.
+Kept <K> task(s) as they stand, with their results and logs: <id>, <id>, <id>, <id>, <id> and <R> more
+Kept records keyed by bare local ids at <root>: only a reset of every ticket there sweeps them.
+```
+
+The summary says `Held` for `Would hold`. A closure that grew while the reset took
+its locks ([§FS-rhei-reset.2.5.5](rhei-reset.spec.md#255-under-the-locks)) is refused with
+`Refusing to reset: the tickets --task reaches changed while the reset took its locks, so nothing was changed.`
+and the help says to run the reset again.
+
+A narrowed one reports what it deliberately kept after the two summary
 lines:
 
 ```text
@@ -640,8 +813,8 @@ report, a log, or another directory:
   leaves the line whole and the terminal soft-wraps it, which copies back as one
   line. This is the exception [§FS-rhei-errors.2](rhei-errors.spec.md#2-copy-paste-safety) allows.
 
-**It says how far it reaches.** `--rhei` is the narrowest scope reset has
-([§FS-rhei-reset.2.1](rhei-reset.spec.md#21-narrowed-reset---rhei)), and a message about one ticket reads as an offer to clear
+**It says how far it reaches.** The message offers `--rhei`
+([§FS-rhei-reset.2.1](rhei-reset.spec.md#21-narrowed-reset---rhei)), not the narrower `--task` ([§FS-rhei-reset.2.5](rhei-reset.spec.md#25-ticket-scope---task)), and a message about one ticket reads as an offer to clear
 one ticket. So the text says "every ticket in that rhei", and a message never
 describes the command as clearing the ticket it is about. Where there is a
 cheaper way out the message can print, it comes first: a refused log name offers

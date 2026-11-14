@@ -5,8 +5,8 @@
 /// Runtime directories a full reset would delete, in report order. A narrowed
 /// reset removes per-ticket artifacts rather than whole trees, so it lists
 /// none and the preview says so in words. §FS-rhei-panta.6.4
-fn reset_runtime_preview(loaded: &LoadedPlan, input: &Path, scope: &RheiScope) -> Vec<PathBuf> {
-    if scope.is_some() {
+fn reset_runtime_preview(loaded: &LoadedPlan, input: &Path, scope: ResetScope<'_>) -> Vec<PathBuf> {
+    if scope.is_narrowed() {
         return Vec::new();
     }
     let mut dirs: Vec<PathBuf> = Vec::new();
@@ -27,17 +27,29 @@ fn reset_runtime_preview(loaded: &LoadedPlan, input: &Path, scope: &RheiScope) -
 /// and summary while the complete writer stack remains held.
 // §FS-rhei-reset.1.2 §FS-rhei-reset.4
 struct ResetDecision {
+    /// The rheis it reaches: the named ones, or those a ticket scope's tickets are in.
     scope: RheiScope,
+    /// The tickets `--task` reaches, when it narrowed the reset. §FS-rhei-reset.2.5
+    tickets: Option<TicketScope>,
     task_count: usize,
     descendant_count: usize,
     authored: AuthoredStates,
     runtime_targets: Vec<PathBuf>,
+    /// What a ticket scope says after its moves. §FS-rhei-reset.4
+    left: TicketScopeLeft,
+}
+
+impl ResetDecision {
+    /// The scope every step of the reset asks.
+    fn reset_scope(&self) -> ResetScope<'_> {
+        ResetScope::of(&self.scope, self.tickets.as_ref())
+    }
 }
 
 fn collect_reset_decision(
     loaded: &LoadedPlan,
     input: &Path,
-    scope: &RheiScope,
+    scope: ResetScope<'_>,
     resolved: &ResolvedMachineSet,
 ) -> MietteResult<ResetDecision> {
     // §FS-rhei-reset.2.1: corrupt pairs refuse before any destructive rewrite.
@@ -59,10 +71,14 @@ fn collect_reset_decision(
         .rhei
         .tasks
         .iter()
-        .filter(|task| task_in_rhei_scope(scope, &task.id.to_string()))
+        .filter(|task| scope.contains(&task.id.to_string()))
         .collect();
-    let task_count = in_scope.len();
-    let total_nodes: usize = in_scope.iter().map(|task| count_nodes(task)).sum();
+    // A ticket scope counts its tickets, at any depth, as the tasks it resets.
+    // §FS-rhei-reset.4
+    let (task_count, total_nodes) = match scope.tickets() {
+        Some(tickets) => (tickets.reached.len(), tickets.reached.len()),
+        None => (in_scope.len(), in_scope.iter().map(|task| count_nodes(task)).sum()),
+    };
 
     let authored = collect_authored_states(loaded, input, scope, machines);
     // A reset that would leave a plan validation refuses is refused here, before any
@@ -75,12 +91,15 @@ fn collect_reset_decision(
     if let Some(refusal) = reset_filesystem_refusal(loaded, input, scope, machines, &authored)? {
         return Err(refusal);
     }
+    let left = TicketScopeLeft::collect(loaded, input, scope, machines, &authored);
     Ok(ResetDecision {
-        scope: scope.clone(),
+        scope: scope.rheis(),
+        tickets: scope.tickets().cloned(),
         task_count,
         descendant_count: total_nodes.saturating_sub(task_count),
         authored,
         runtime_targets: reset_runtime_preview(loaded, input, scope),
+        left,
     })
 }
 
@@ -96,7 +115,8 @@ fn report_reset_preview(decision: &ResetDecision) {
             decision.task_count, decision.descendant_count
         );
     }
-    report_state_moves(&decision.authored, "Would move");
+    report_state_moves(&decision.authored, "Would move", decision.tickets.as_ref());
+    decision.left.report("Would hold");
     if decision.runtime_targets.is_empty() {
         // §FS-rhei-reset.2.1: the preview includes ticket-owned export directories.
         println!("Would remove per-ticket runtime artifacts (results, exports, ledgers).");
@@ -118,7 +138,8 @@ fn report_reset_summary(decision: &ResetDecision, removed_runtime: bool) {
             decision.task_count, decision.descendant_count
         );
     }
-    report_state_moves(&decision.authored, "Moved");
+    report_state_moves(&decision.authored, "Moved", decision.tickets.as_ref());
+    decision.left.report("Held");
     if removed_runtime {
         println!("Removed runtime output.");
     } else {
@@ -126,13 +147,14 @@ fn report_reset_summary(decision: &ResetDecision, removed_runtime: bool) {
     }
 }
 
-/// One runtime path a narrowed reset removes for a ticket: either a fully
-/// resolved path, or a literal prefix within a directory when the artifact
-/// template still carries run-time placeholders (`{state}`, `{visit_count}`,
-/// `{model}`, …) that a reset cannot resolve.
+/// One runtime path a narrowed reset removes for a ticket: a fully resolved path,
+/// a name rhei writes itself matched by its prefix, or a declared path that still
+/// carries run-time placeholders (`{state}`, `{visit_count}`, `{model}`, …), matched
+/// in full, component by component. §FS-rhei-reset.2.1
 enum ScopedTarget {
     Exact(PathBuf),
-    Prefixed { dir: PathBuf, prefix: String },
+    Prefixed(NamedPrefix),
+    Pattern(ComponentPattern),
 }
 
 /// Everything keyed by an in-scope ticket id that a narrowed reset removes, and
@@ -142,6 +164,14 @@ struct ScopedRemovals {
     /// Ledger lines are pruned per execution root, once, after the per-ticket
     /// sweep: sibling rheis share one `state-transitions.log`.
     ledgers: BTreeMap<PathBuf, BTreeSet<String>>,
+    /// Which tickets the reset keeps, so the removal leaves a path one could own.
+    owners: RuntimeOwners,
+    /// Roots holding a record keyed by an in-scope ticket's bare local id that a
+    /// ticket scope did not sweep. §FS-rhei-reset.2.5.5
+    bare_kept: BTreeSet<PathBuf>,
+    /// Under a ticket scope, the tickets it removes anything for, a ledger row
+    /// included, read before it does. §FS-rhei-reset.2.5.3
+    losing: BTreeSet<String>,
 }
 
 /// The one enumeration of [`ScopedRemovals`], for the removal and for the check that it
@@ -149,7 +179,7 @@ struct ScopedRemovals {
 fn scoped_removals(
     loaded: &LoadedPlan,
     input: &Path,
-    scope: &RheiScope,
+    scope: ResetScope<'_>,
     machines: &rhei_validator::MachineSet,
 ) -> ScopedRemovals {
     let mut targets = Vec::new();
@@ -166,25 +196,24 @@ fn scoped_removals(
 
     let mut ledgers: BTreeMap<PathBuf, BTreeSet<String>> = BTreeMap::new();
 
-    // Pre-qualification runtime records are keyed by the rhei-local id; a
-    // local-id sweep at a root is only unambiguous when every rhei rooted
-    // there is in scope — shared roots collide on local ids. §FS-rhei-panta.6.4
-    let mut root_owners: BTreeMap<&PathBuf, BTreeSet<&str>> = BTreeMap::new();
+    // Pre-qualification records are keyed by the rhei-local id; a local-id sweep at a root is
+    // only unambiguous when every ticket rooted there is in scope — shared roots collide on
+    // local ids. §FS-rhei-panta.6.4 §FS-rhei-reset.2.5.5
+    let mut sweep_ok: BTreeMap<&PathBuf, bool> = BTreeMap::new();
     for (task_id, root) in &loaded.task_roots {
-        let owner = task_id.split_once('.').map(|(head, _)| head).unwrap_or(task_id);
-        root_owners.entry(root).or_default().insert(owner);
+        *sweep_ok.entry(root).or_insert(true) &= scope.contains(task_id);
     }
-    let legacy_sweep_ok = |root: &PathBuf| {
-        root_owners
-            .get(root)
-            .is_some_and(|owners| owners.iter().all(|owner| task_in_rhei_scope(scope, owner)))
-    };
+    let legacy_sweep_ok = |root: &PathBuf| sweep_ok.get(root).copied().unwrap_or(false);
+    let owners = RuntimeOwners::index(loaded, scope);
+    let mut bare_kept = BTreeSet::new();
+    let mut losing = BTreeSet::new();
+    let mut ledger_rows: BTreeMap<PathBuf, BTreeMap<String, String>> = BTreeMap::new();
 
     // Run-orchestrated logs and captures land under the project execution
     // root even for tickets whose own rhei root is a subdirectory, so a
     // narrowed reset must sweep both roots. §FS-rhei-reset.2.1
     let project_root = execution_workspace_root(input);
-    for task_id in task_ids.iter().filter(|id| task_in_rhei_scope(scope, id)) {
+    for task_id in task_ids.iter().filter(|id| scope.contains(id)) {
         let root = loaded.task_root(task_id, input);
         let ledger_ids = ledgers.entry(root.clone()).or_default();
         ledger_ids.insert(task_id.clone());
@@ -196,6 +225,7 @@ fn scoped_removals(
         if root != project_root {
             base_roots.push(project_root.clone());
         }
+        let mut own = Vec::new();
         for base in base_roots {
             let runtime = base.join("runtime");
             if !runtime.exists() {
@@ -204,13 +234,50 @@ fn scoped_removals(
             // Artifact-name patterns come from the owning ticket's machine.
             // §DA-per-rhei-state-machines
             let machine = machines.for_task_str(task_id);
-            targets.extend(scoped_runtime_targets(&runtime, task_id, machine));
+            own.extend(scoped_runtime_targets(&runtime, task_id, machine));
             if local_id != task_id && legacy_sweep_ok(&base) {
-                targets.extend(scoped_runtime_targets(&runtime, local_id, machine));
+                own.extend(scoped_runtime_targets(&runtime, local_id, machine));
+            } else if local_id != task_id && scope.tickets().is_some() {
+                // Kept, and said so where there is one to keep. §FS-rhei-reset.2.5.5
+                let bare = scoped_runtime_targets(&runtime, local_id, machine);
+                if bare.iter().any(|target| owners.takes_any(target)) {
+                    bare_kept.insert(base);
+                }
+            }
+        }
+        // What the ticket loses decides whether its supervisor is held for it, and a
+        // file it takes where a longer in-scope id could stand is lost by that ticket
+        // too. §FS-rhei-reset.2.5.3
+        if scope.tickets().is_some() {
+            let rows = ledger_rows.entry(root.clone()).or_insert_with(|| ledger_first_departures(&root));
+            let mut loses = rows.contains_key(task_id.as_str());
+            for target in &own {
+                let paths = owners.entries(target).unwrap_or_default();
+                loses |= !paths.is_empty();
+                for path in &paths {
+                    losing.extend(owners.standing(target, path).cloned());
+                }
+            }
+            if loses {
+                losing.insert(task_id.clone());
+            }
+        }
+        targets.extend(own);
+    }
+    if scope.tickets().is_some() {
+        // A ledger row keyed by a bare local id is such a record too.
+        for (root, ids) in ledgers.iter().filter(|(root, _)| !legacy_sweep_ok(root)) {
+            let rows = ledger_first_departures(root);
+            let bare = |id: &String| {
+                let local = rhei_local_id_str(id);
+                local != id.as_str() && rows.contains_key(local)
+            };
+            if ids.iter().any(bare) {
+                bare_kept.insert(root.clone());
             }
         }
     }
-    ScopedRemovals { targets, ledgers }
+    ScopedRemovals { targets, ledgers, owners, bare_kept, losing }
 }
 
 /// Remove what [`scoped_removals`] names, recording in `progress` what has landed.
@@ -218,7 +285,7 @@ fn scoped_removals(
 fn remove_scoped_runtime_artifacts(
     loaded: &LoadedPlan,
     input: &Path,
-    scope: &RheiScope,
+    scope: ResetScope<'_>,
     machines: &rhei_validator::MachineSet,
     reset_locks: &mut ResetWriterLocks,
     progress: &mut ResetProgress,
@@ -226,7 +293,7 @@ fn remove_scoped_runtime_artifacts(
     let removals = scoped_removals(loaded, input, scope, machines);
     let mut removed = false;
     for target in &removals.targets {
-        removed |= remove_scoped_target(target, &mut progress.removed_paths)?;
+        removed |= remove_scoped_target(target, &removals.owners, &mut progress.removed_paths)?;
     }
     for (root, ids) in &removals.ledgers {
         let pruned = prune_transition_ledger(root, ids, reset_locks)?;
@@ -250,23 +317,17 @@ fn scoped_runtime_targets(
         // §FS-rhei-reset.2.1: exact export homes are independent of machine artifact contracts.
         ScopedTarget::Exact(runtime.join("exports").join(task_id)),
         // §FS-rhei-agents.9 / §FS-rhei-programs.5: `task-<id>-<state>[-…].log`.
-        ScopedTarget::Prefixed { dir: runtime.join("logs"), prefix: format!("task-{task_id}-") },
+        ScopedTarget::Prefixed(NamedPrefix::new(runtime.join("logs"), "task-", task_id)),
         // The record of every spawn those logs came from. §FS-rhei-agents.8.4
-        ScopedTarget::Prefixed { dir: runtime.join("spawns"), prefix: format!("task-{task_id}-") },
+        ScopedTarget::Prefixed(NamedPrefix::new(runtime.join("spawns"), "task-", task_id)),
         // The session reports rendered from those logs, `.orphaned-…` ones
         // included. §FS-rhei-reset.2.1
-        ScopedTarget::Prefixed { dir: runtime.join("reports"), prefix: format!("task-{task_id}-") },
+        ScopedTarget::Prefixed(NamedPrefix::new(runtime.join("reports"), "task-", task_id)),
         // §FS-rhei-snapshots.4: `<id>-<state>-<slug>-<nonce>/` session dirs.
-        ScopedTarget::Prefixed {
-            dir: runtime.join("snapshot-sessions"),
-            prefix: format!("{task_id}-"),
-        },
+        ScopedTarget::Prefixed(NamedPrefix::new(runtime.join("snapshot-sessions"), "", task_id)),
         ScopedTarget::Exact(runtime.join("worktree-refs").join(format!("{task_id}.yaml"))),
         // §FS-rhei-cost-accounting.2: per-ticket captures and task index.
-        ScopedTarget::Prefixed {
-            dir: runtime.join("accounting").join("captures"),
-            prefix: format!("{accounting_id}-"),
-        },
+        ScopedTarget::Prefixed(NamedPrefix::capture(runtime.join("accounting").join("captures"), task_id)),
         ScopedTarget::Exact(
             runtime.join("accounting").join("tasks").join(format!("{accounting_id}.json")),
         ),
@@ -282,43 +343,33 @@ fn scoped_runtime_targets(
             if !artifact.path.contains("{task_id}") || !seen.insert(artifact.path.clone()) {
                 continue;
             }
-            let resolved = artifact.path.replace("{task_id}", task_id);
-            match resolved.split_once('{') {
-                // A template with placeholders a reset cannot resolve becomes a
-                // literal prefix; the text between `{task_id}` and the next
-                // placeholder keeps `auth.1` from matching `auth.10`.
-                Some((literal, _)) => {
-                    let literal = root.join(literal);
-                    let Some(dir) = literal.parent().map(Path::to_path_buf) else { continue };
-                    let Some(prefix) =
-                        literal.file_name().and_then(|name| name.to_str()).map(str::to_string)
-                    else {
-                        continue;
-                    };
-                    if !prefix.is_empty() {
-                        targets.push(ScopedTarget::Prefixed { dir, prefix });
-                    }
-                }
-                None => targets.push(ScopedTarget::Exact(root.join(resolved))),
-            }
+            // A placeholder a reset cannot resolve, before the id or after it, leaves a
+            // path matched in full, one component at a time. §FS-rhei-reset.2.1
+            targets.push(if ComponentPattern::applies_to(&artifact.path) {
+                ScopedTarget::Pattern(ComponentPattern::new(root, &artifact.path, task_id))
+            } else {
+                ScopedTarget::Exact(root.join(artifact.path.replace("{task_id}", task_id)))
+            });
         }
     }
     targets
 }
 
-fn remove_scoped_target(target: &ScopedTarget, removed_paths: &mut Vec<PathBuf>) -> MietteResult<bool> {
-    match target {
-        ScopedTarget::Exact(path) => remove_runtime_path(path, removed_paths),
-        ScopedTarget::Prefixed { dir, prefix } => {
-            let paths = matching_entries(dir, prefix)
-                .map_err(|err| file_io_report(dir, "failed to read runtime directory", err))?;
-            let mut removed = false;
-            for path in paths {
-                removed |= remove_runtime_path(&path, removed_paths)?;
-            }
-            Ok(removed)
-        }
+/// Remove what `target` names and its ticket owns, where no ticket the reset keeps
+/// could own it. §FS-rhei-reset.2.1
+fn remove_scoped_target(
+    target: &ScopedTarget,
+    owners: &RuntimeOwners,
+    removed_paths: &mut Vec<PathBuf>,
+) -> MietteResult<bool> {
+    let paths = owners
+        .entries(target)
+        .map_err(|(dir, err)| file_io_report(&dir, "failed to read runtime directory", err))?;
+    let mut removed = false;
+    for path in paths {
+        removed |= remove_runtime_path(&path, removed_paths)?;
     }
+    Ok(removed)
 }
 
 /// The entries of `dir` whose name starts with `prefix`; none where `dir` is not a

@@ -284,6 +284,7 @@ mod registry_location_tests;
 #[cfg(unix)]
 mod release_write_then_report_tests;
 mod released_supervisor_attention_tests;
+mod remove_pattern_tests;
 mod remove_resolution_tests;
 mod remove_retirement_tests;
 mod remove_tests;
@@ -303,6 +304,12 @@ mod reset_remedy_finished_tests;
 mod reset_remedy_messages_tests;
 mod reset_remedy_support;
 mod reset_remedy_tests;
+mod reset_task_scope_full_match_tests;
+mod reset_task_scope_panta_tests;
+mod reset_task_scope_pattern_tests;
+mod reset_task_scope_supervision_tests;
+mod reset_task_scope_support;
+mod reset_task_scope_tests;
 #[cfg(target_os = "linux")]
 mod reset_unwritable_limit_tests;
 #[cfg(unix)]

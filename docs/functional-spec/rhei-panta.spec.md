@@ -427,7 +427,9 @@ roadmap.
 - `rhei reset` is project-wide by default; because it destroys runtime state
   across every in-scope rhei, it always takes an explicit target ([§FS-rhei-panta.6](rhei-panta.spec.md#6-project-scope-and-command-behavior)) and
   surfaces the scope and the affected rheis before
-  acting. `--rhei` narrows it. A narrowed reset removes only the runtime
+  acting. `--rhei` narrows it to rheis, and `--task` to the tickets a named
+  ticket's closure reaches, across rheis ([§FS-rhei-reset.2.5](rhei-reset.spec.md#25-ticket-scope---task)); with `--task`,
+  `--rhei` bounds only where a local id resolves. A narrowed reset removes only the runtime
   artifacts owned by in-scope tickets rather than whole `runtime/` trees:
   sibling single-file rheis share one execution root, so removing the tree
   would destroy an out-of-scope rhei's state. "Owned" means keyed by an
@@ -443,7 +445,8 @@ roadmap.
   mid-flight instead of restarting. Runtime records written before project
   qualification are keyed by the rhei-local id; the reset sweeps those legacy
   keys too, but only at an execution root whose every rhei is in scope —
-  sibling rheis sharing a root make bare local ids ambiguous. Run-scoped output — the run report, the dashboard, accounting rollups —
+  sibling rheis sharing a root make bare local ids ambiguous; under `--task`,
+  only where every ticket of those rheis is, and otherwise it says it kept them. Run-scoped output — the run report, the dashboard, accounting rollups —
   is not ticket-owned; a narrowed reset keeps it and **says so**, rather than
   letting the operator discover the difference ([§FS-rhei-reset.2.1](rhei-reset.spec.md#21-narrowed-reset---rhei)).
 - `rhei validate` always checks the whole project graph: cross-rhei dependency

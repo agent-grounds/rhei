@@ -52,6 +52,9 @@ struct SupervisionCheckpoint {
     from: String,
     to: String,
     visit: u64,
+    /// Written by `rhei reset --task`, which reopened the descendant: it is no
+    /// move its worker made, so the prompt says so. §FS-rhei-reset.2.5.3
+    reset: bool,
 }
 
 /// Every non-terminal descendant of `task`, at any depth.
@@ -156,6 +159,7 @@ fn supervision_checkpoints(
                     .get(yaml_key("visit"))
                     .and_then(yaml_value_to_u64)
                     .unwrap_or(1),
+                reset: map.get(yaml_key("reset")).and_then(YamlValue::as_bool).unwrap_or(false),
             })
         })
         .collect()
@@ -171,6 +175,9 @@ fn checkpoint_yaml(checkpoint: &SupervisionCheckpoint) -> YamlValue {
     map.insert(yaml_key("from"), yaml_key(&checkpoint.from));
     map.insert(yaml_key("to"), yaml_key(&checkpoint.to));
     map.insert(yaml_key("visit"), yaml_u64(checkpoint.visit));
+    if checkpoint.reset {
+        map.insert(yaml_key("reset"), YamlValue::Bool(true));
+    }
     YamlValue::Mapping(map)
 }
 

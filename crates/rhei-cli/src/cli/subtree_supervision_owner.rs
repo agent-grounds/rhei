@@ -56,13 +56,15 @@ fn terminal_ancestors<'a>(
 /// The nearest supervising ancestor whose scope includes the moving task.
 ///
 /// Scope alone selects the owner. In particular, a nonmatching event filter
-/// does not make the search climb to a farther ancestor.
+/// does not make the search climb to a farther ancestor. `ancestors` is nearest
+/// first, borrowed or owned, so a reset can ask it of many tickets without
+/// copying their subtrees. §FS-rhei-reset.2.5.3
 // §FS-rhei-supervision.2.2
 fn nearest_in_scope_supervising_owner<'a>(
     machine: &rhei_validator::StateMachine,
-    ancestors: &'a [rhei_core::ast::Task],
+    ancestors: impl IntoIterator<Item = &'a rhei_core::ast::Task>,
 ) -> Option<&'a rhei_core::ast::Task> {
-    ancestors.iter().enumerate().find_map(|(distance, ancestor)| {
+    ancestors.into_iter().enumerate().find_map(|(distance, ancestor)| {
         let execute_on = execute_on_of(
             machine,
             &normalized_state_name(ancestor.state.as_str(), machine),

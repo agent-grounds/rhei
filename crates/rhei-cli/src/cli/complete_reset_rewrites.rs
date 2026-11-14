@@ -4,7 +4,7 @@
 fn reset_target_files(
     loaded: &LoadedPlan,
     input: &Path,
-    scope: &RheiScope,
+    scope: ResetScope<'_>,
 ) -> Vec<(PathBuf, String)> {
     if loaded.task_sources.is_empty() {
         // Only a bare plan file is itself the rewrite target; an empty
@@ -17,11 +17,11 @@ fn reset_target_files(
         };
     }
 
-    // §FS-rhei-panta.6.4: `--rhei` narrows which rheis are reset.
+    // §FS-rhei-panta.6.4: `--rhei` narrows which rheis are reset, `--task` which tickets.
     let mut files = loaded
         .task_sources
         .iter()
-        .filter(|(task_id, _)| task_in_rhei_scope(scope, task_id))
+        .filter(|(task_id, _)| scope.contains(task_id))
         .map(|(task_id, path)| (path.clone(), task_id.clone()))
         .collect::<Vec<_>>();
     files.sort();
@@ -38,10 +38,11 @@ fn reset_plan_file_states(
     path: &Path,
     role: PlanFileKind,
     authored: &BTreeMap<String, String>,
+    scope: ResetScope<'_>,
     locked: &LockedPlanFile,
 ) -> MietteResult<bool> {
     let raw = locked.read_to_string("failed to read plan file")?;
-    let new_raw = reset_file_text(&raw, authored, role)?;
+    let new_raw = reset_file_text(&raw, authored, role, reset_strips_under(scope, authored))?;
     if new_raw == raw {
         return Ok(false);
     }
@@ -50,52 +51,83 @@ fn reset_plan_file_states(
 }
 
 /// The text a reset writes over one plan file's `raw`: each task's `**State:**` line
-/// set to where `authored` sends it, every claim and result link gone. Metadata
-/// is reset separately in its owning document. The plan a reset
-/// is checked against is built from it too. §FS-rhei-reset.2.2 §FS-rhei-reset.2.3
+/// set to where `authored` sends it, and the claims and result links gone from under
+/// the headings `under` accepts. Metadata is reset separately in its owning document.
+/// The plan a reset is checked against is built from it too. §FS-rhei-reset.2.2
+/// §FS-rhei-reset.2.3
 fn reset_file_text(
     raw: &str,
     authored: &BTreeMap<String, String>,
     kind: PlanFileKind,
+    under: impl Fn(Option<&str>) -> bool,
 ) -> MietteResult<String> {
     let new_raw = rewrite_states_to_authored(raw, authored, kind)?;
-    let new_raw = strip_result_links(&new_raw, kind);
-    Ok(strip_assignee_lines(&new_raw, kind))
+    let new_raw = strip_result_links_under(&new_raw, kind, &under);
+    Ok(strip_assignee_lines_under(&new_raw, kind, &under))
+}
+
+/// The headings a reset strips claims and result links under: every one where it
+/// resets whole rheis, and only its own tickets' under `--task`, so a ticket it keeps
+/// keeps its link even in the same file. `authored` holds the file's in-scope tickets
+/// by local id, every one of them. §FS-rhei-reset.2 §FS-rhei-reset.2.5
+fn reset_strips_under<'a>(
+    scope: ResetScope<'_>,
+    authored: &'a BTreeMap<String, String>,
+) -> impl Fn(Option<&str>) -> bool + 'a {
+    let whole_rheis = scope.tickets().is_none();
+    move |heading| whole_rheis || heading.is_some_and(|id| authored.contains_key(id))
+}
+
+/// What a reset changes in one writable metadata document: the selected tickets'
+/// register-cleared keys, and a hold carrying reset checkpoints on each supervisor
+/// a ticket scope leaves out. §FS-rhei-reset.2 §FS-rhei-reset.2.5.3
+#[derive(Default)]
+struct MetadataReset {
+    cleared: BTreeSet<String>,
+    holds: Vec<(TaskId, Vec<SupervisionCheckpoint>)>,
 }
 
 /// Group selected live tickets, descendants included, by their writable metadata
-/// document and its own task keys. Shared manifests are written once, without
-/// touching out-of-scope entries or authored task-file blocks. §FS-rhei-reset.2
+/// document and its own task keys, beside the supervisors held there. Shared
+/// manifests are written once, without touching out-of-scope entries or authored
+/// task-file blocks. §FS-rhei-reset.2 §FS-rhei-reset.2.5.3
 fn reset_metadata_targets(
     loaded: &LoadedPlan,
     input: &Path,
-    scope: &RheiScope,
-) -> BTreeMap<PathBuf, BTreeSet<String>> {
-    let mut tasks = Vec::new();
-    collect_plan_tasks(&loaded.rhei.tasks, &mut tasks);
-    let mut targets: BTreeMap<PathBuf, BTreeSet<String>> = BTreeMap::new();
-    for task in tasks {
-        let id = task.id.to_string();
-        if task_in_rhei_scope(scope, &id) {
-            let route = loaded.task_route(&id, input);
-            targets.entry(route.metadata_file).or_default().insert(route.metadata_id);
-        }
+    scope: ResetScope<'_>,
+    authored: &AuthoredStates,
+) -> BTreeMap<PathBuf, MetadataReset> {
+    let mut targets: BTreeMap<PathBuf, MetadataReset> = BTreeMap::new();
+    for task in scope.tasks(loaded) {
+        let route = loaded.task_route(&task.id.to_string(), input);
+        targets.entry(route.metadata_file).or_default().cleared.insert(route.metadata_id);
+    }
+    for held in held_supervisors(loaded, input, scope, authored) {
+        let edit = targets.entry(held.metadata_file).or_default();
+        edit.holds.push((held.metadata_id, held.checkpoints));
     }
     targets
 }
 
 /// The metadata reset writes, also used by the validation projection. Read each
 /// document through the existing form dispatch and delete only selected tickets'
-/// register-cleared keys, pruning containers emptied by them. §FS-rhei-reset.2
-fn reset_metadata_text(path: &Path, raw: &str, task_ids: &BTreeSet<String>) -> MietteResult<String> {
+/// register-cleared keys, pruning containers emptied by them, then hold each
+/// supervisor `edit` names with its checkpoints. §FS-rhei-reset.2 §FS-rhei-reset.2.5.3
+fn reset_metadata_text(path: &Path, raw: &str, edit: &MetadataReset) -> MietteResult<String> {
     let metadata = rhei_core::metadata::parse_metadata_file(path, raw).map_err(|err| {
         miette!(
             help = plan_authoring_help(),
             "failed to parse metadata document for reset: {}", err.error.message
         )
     })?;
-    match clear_runtime_task_metadata_for(metadata.as_ref(), |id| task_ids.contains(id)) {
-        Some(cleared) if Some(&cleared) != metadata.as_ref() => rewrite_frontmatter(raw, &cleared),
+    let mut reset = clear_runtime_task_metadata_for(metadata.as_ref(), |id| edit.cleared.contains(id));
+    for (supervisor, checkpoints) in &edit.holds {
+        for checkpoint in checkpoints {
+            reset = Some(record_supervision_hold(reset.as_ref(), supervisor, Some(checkpoint)));
+        }
+    }
+    match reset {
+        Some(reset) if Some(&reset) != metadata.as_ref() => rewrite_frontmatter(raw, &reset),
         _ => Ok(raw.to_string()),
     }
 }
@@ -105,11 +137,11 @@ fn reset_metadata_text(path: &Path, raw: &str, task_ids: &BTreeSet<String>) -> M
 /// written. Returns whether it was. §FS-rhei-reset.2
 fn clear_runtime_metadata_in_file(
     path: &Path,
-    task_ids: &BTreeSet<String>,
+    edit: &MetadataReset,
     locked: &LockedPlanFile,
 ) -> MietteResult<bool> {
     let raw = locked.read_to_string("failed to read plan file")?;
-    let new_raw = reset_metadata_text(path, &raw, task_ids)?;
+    let new_raw = reset_metadata_text(path, &raw, edit)?;
     if new_raw == raw {
         return Ok(false);
     }
@@ -118,8 +150,8 @@ fn clear_runtime_metadata_in_file(
 }
 
 /// Remove `> **Result:** …` lines (and a single leading blank line when
-/// present) inserted by `rhei complete`. Used during `rhei reset` so the
-/// plan returns to a clean authored state.
+/// present) inserted by `rhei complete`, under every heading.
+#[cfg(test)]
 fn strip_result_links(raw: &str, kind: PlanFileKind) -> String {
     strip_result_links_under(raw, kind, |_| true)
 }
@@ -160,15 +192,31 @@ fn strip_result_links_under(
     output
 }
 
-/// Remove all runtime-owned `**Assignee:** …` lines during reset. A quoted one is
-/// authored text. §FS-rhei-reset.2.4
+/// Remove every runtime-owned `**Assignee:** …` line. §FS-rhei-reset.2.4
+#[cfg(test)]
 fn strip_assignee_lines(raw: &str, kind: PlanFileKind) -> String {
+    strip_assignee_lines_under(raw, kind, |_| true)
+}
+
+/// Remove the runtime-owned `**Assignee:** …` lines under a task heading whose
+/// file-local id `under` accepts, as [`strip_result_links_under`] reads headings. A
+/// quoted one is authored text. §FS-rhei-reset.2 §FS-rhei-reset.2.4
+fn strip_assignee_lines_under(
+    raw: &str,
+    kind: PlanFileKind,
+    under: impl Fn(Option<&str>) -> bool,
+) -> String {
     let lines = plan_file_lines(raw, kind);
     let mut result: Vec<String> = Vec::with_capacity(lines.len());
+    let mut heading = None;
 
     for (line, structure) in lines {
-        if structure && line.starts_with("**Assignee:**") {
-            continue;
+        if structure {
+            if let Some(task_id) = task_heading_id(line) {
+                heading = Some(task_id);
+            } else if line.starts_with("**Assignee:**") && under(heading) {
+                continue;
+            }
         }
         result.push(line.to_string());
     }

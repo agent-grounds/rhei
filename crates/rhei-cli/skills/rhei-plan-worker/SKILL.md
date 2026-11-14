@@ -100,6 +100,8 @@ rhei transition <plan> --task <id> --from <current-state> --to cancelled \
 
 Either way the message is required. No task enters a `final: true` state without a non-empty `runtime/results/<task-id>.md` — the ticket's own record of why it ended there — so a bare `rhei transition` into a terminal state is refused, naming the file and the flag. `rhei transition` is not a way around a refusal either: it skips `**Prior:**` readiness as a deliberate escape hatch, but the descendants-first rule and the result rule are enforced on the same shared path for every verb, so it refuses a parent with an open descendant exactly as `rhei complete` does.
 
+To redo finished work whose input changed, and only when the ticket or its brief asks for that rerun, run `rhei reset <plan> --task <id> --yes`: it returns that ticket, its descendants and its `**Prior:**` dependents to their authored states with their results and visit counts cleared, and keeps every other ticket; it is not `rhei transition --force`, which stays an operator's ([§FS-rhei-reset.3](../../../../docs/functional-spec/rhei-reset.spec.md#3-safety)).
+
 ### Typical transitions for the default `rhei` machine
 
 - `pending` → `completed` — the task is done.

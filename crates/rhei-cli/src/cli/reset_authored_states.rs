@@ -43,6 +43,10 @@ struct AuthoredStates {
     /// task's machine no longer declares — renamed since the run. Writing it
     /// back would leave a plan that no longer validates.
     undeclared: Vec<(String, String, String)>,
+    /// Under `--task`, each ticket that stays in the state it stands in but whose
+    /// records the reset removes, with that state: its supervisor is held for it.
+    /// §FS-rhei-reset.2.5.3
+    emptied_in_place: BTreeMap<String, String>,
 }
 
 /// Parse one execution root's ledger into `task-id → the first state it left`.
@@ -100,21 +104,11 @@ fn shows_run_trace(task: &rhei_core::ast::Task, normalized_state: &str) -> bool 
 fn collect_authored_states(
     loaded: &LoadedPlan,
     input: &Path,
-    scope: &RheiScope,
+    scope: ResetScope<'_>,
     machines: &rhei_validator::MachineSet,
 ) -> AuthoredStates {
-    let mut in_scope: Vec<&rhei_core::ast::Task> = Vec::new();
-    fn collect<'a>(task: &'a rhei_core::ast::Task, out: &mut Vec<&'a rhei_core::ast::Task>) {
-        out.push(task);
-        for child in &task.children {
-            collect(child, out);
-        }
-    }
-    for task in &loaded.rhei.tasks {
-        if task_in_rhei_scope(scope, &task.id.to_string()) {
-            collect(task, &mut in_scope);
-        }
-    }
+    // §FS-rhei-reset.2.5: a ticket scope reaches tickets, not whole trees.
+    let in_scope = scope.tasks(loaded);
 
     // One read per execution root: sibling rheis share one ledger, and a task
     // graph can hold thousands of nodes. Ledger presence is judged per root,
@@ -129,6 +123,12 @@ fn collect_authored_states(
         moves: Vec::new(),
         stranded: Vec::new(),
         undeclared: Vec::new(),
+        emptied_in_place: BTreeMap::new(),
+    };
+    // Read before the removal, which the caller makes after. §FS-rhei-reset.2.5.3
+    let losing = match scope.tickets() {
+        Some(_) => scoped_removals(loaded, input, scope, machines).losing,
+        None => BTreeSet::new(),
     };
 
     for task in in_scope {
@@ -154,6 +154,9 @@ fn collect_authored_states(
         }
 
         let target = reset_destination(recorded, &current, machine);
+        if target == current && losing.contains(&task_id) {
+            result.emptied_in_place.insert(task_id.clone(), current.clone());
+        }
         if target != current {
             result.moves.push(StateMove {
                 task_id: task_id.clone(),
@@ -182,15 +185,19 @@ fn collect_authored_states(
 
 /// Print the moves a reset makes, under `verb` ("Would move" for the preview,
 /// "Moved" for the summary). A count alone was true of the run that corrupted
-/// a supervised chain and of the run that did nothing.
-// §FS-rhei-reset.4
-fn report_state_moves(authored: &AuthoredStates, verb: &str) {
+/// a supervised chain and of the run that did nothing. Under `--task` each move
+/// carries the edge that brought its ticket in. §FS-rhei-reset.4
+fn report_state_moves(authored: &AuthoredStates, verb: &str, tickets: Option<&TicketScope>) {
     if authored.moves.is_empty() {
         println!("No task had moved from its authored state.");
     } else {
         println!("{} {} task(s) back:", verb, authored.moves.len());
         for mv in &authored.moves {
-            println!("  Task {}: {} → {}", mv.task_id, mv.from, mv.to);
+            let edge = tickets.and_then(|tickets| tickets.edge(&mv.task_id)?.label());
+            match edge {
+                Some(edge) => println!("  Task {}: {} → {}   {edge}", mv.task_id, mv.from, mv.to),
+                None => println!("  Task {}: {} → {}", mv.task_id, mv.from, mv.to),
+            }
         }
     }
 

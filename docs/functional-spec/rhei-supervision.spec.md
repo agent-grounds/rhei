@@ -365,12 +365,24 @@ metadata:
 
 - `supervision.phase` is written on the shared transition path: `held` on
   entry into a supervising state, on every delivered checkpoint, and on an exit
-  into a `gating: true` state ([§FS-rhei-supervision.3.1](rhei-supervision.spec.md#31-the-rule) rule 4); `released` on the self-loop exit.
+  into a `gating: true` state ([§FS-rhei-supervision.3.1](rhei-supervision.spec.md#31-the-rule) rule 4), and by a
+  `rhei reset --task` that leaves this supervisor out and records a reset
+  checkpoint on it ([§FS-rhei-reset.2.5.3](rhei-reset.spec.md#253-the-held-supervisor)); `released` on the self-loop exit.
   A task in a supervising state with no
   `supervision` block is `held` — the authored-initial-state case.
 - `supervision.checkpoints` accumulates delivered events in delivery order.
   `task` is the rhei-local id of the transitioning descendant, `from` and `to`
-  its bare state names, `visit` the `to` state's visit number. The list is
+  its bare state names, `visit` the `to` state's visit number. A checkpoint a
+  reset writes carries `reset: true`, `from` the state the ticket stood in,
+  `to` its authored state, and `visit: 0`: the reset has just cleared the
+  ticket's counts, and it entered `to` without a counted visit. The prompt
+  renders it as `<from> → <to> (reset)` under a line saying `rhei reset --task`
+  returned it to its authored state and removed its results, so it does not read
+  as a regression its worker made. A ticket the reset left in its authored state
+  but whose records it removed has `from` and `to` the same state
+  (`review → review (reset)`), and its line says the reset left it there and
+  removed its runtime files, its brief among them, so the supervisor briefs it
+  again. The list is
   cleared on the self-loop exit, after the visit that consumed it, or after
   an operator explicitly requested release with `--release-subtree`. A plain
   manual self-loop must not silently discard pending checkpoints ([§FS-rhei-supervision.3.1](rhei-supervision.spec.md#31-the-rule)).
@@ -831,8 +843,10 @@ engine; a supervisor that wants a fresh one overwrites it.
   cancel carries `--result "<why>"`. The waiver keys on the effective cancellation role
   ([§FS-rhei-states.1.4](rhei-states.spec.md#14-reserved-state-names)): an abandonment terminal with another name declares `role: cancellation`;
   legacy `cancelled`/`canceled` spellings keep the same waiver.
-- **Reset.** `rhei reset` on a supervisor clears its `supervision` block;
-  resetting a descendant does not touch the supervisor's phase.
+- **Reset.** `rhei reset` on a supervisor clears its `supervision` block. A
+  `rhei reset --task` that reaches a descendant and leaves the supervisor out
+  holds it, with a reset checkpoint per ticket it reopens or removes the records
+  of, and leaves its state line alone ([§FS-rhei-supervision.3.3](rhei-supervision.spec.md#33-supervision-metadata), [§FS-rhei-reset.2.5.3](rhei-reset.spec.md#253-the-held-supervisor)).
 - **Resumed runs.** A checkpoint reports a transition, not that work was done.
   A run resumed after an interruption can advance a ticket on artifacts its
   killed worker had already written — the completion condition is satisfied, so

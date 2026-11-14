@@ -32,23 +32,25 @@ fn runtime_evidence(
     for target in scoped_runtime_targets(&runtime, id, machine) {
         match target {
             ScopedTarget::Exact(path) => classify_owned_path(root, &path, id, assessment),
-            ScopedTarget::Prefixed { dir, prefix } => {
-                let entries = match fs::read_dir(&dir) {
+            ScopedTarget::Prefixed(named) => {
+                let entries = match fs::read_dir(&named.dir) {
                     Ok(entries) => entries,
                     Err(err) if err.kind() == std::io::ErrorKind::NotFound => continue,
                     Err(err) => {
                         assessment
                             .history
-                            .push(("unreadable".into(), format!("{}: {err}", display_path(&dir))));
+                            .push(("unreadable".into(), format!("{}: {err}", display_path(&named.dir))));
                         continue;
                     }
                 };
+                let prefix = named.prefix();
                 for entry in entries.flatten() {
-                    let name = entry.file_name().to_string_lossy().into_owned();
-                    if !name.starts_with(&prefix) {
+                    if !entry.file_name().to_string_lossy().starts_with(&prefix) {
                         continue;
                     }
-                    if prefix_is_ambiguous(&name, &prefix, id, others) {
+                    // Ambiguous where another ticket's longer id could stand at the id.
+                    // §FS-rhei-reset.2.1
+                    if !named.owns(&entry.path(), others.iter().map(String::as_str)) {
                         assessment.unsafe_path(format!(
                             "{} may belong to another ticket",
                             relative_to(root, &entry.path())
@@ -58,18 +60,33 @@ fn runtime_evidence(
                     classify_owned_path(root, &entry.path(), id, assessment);
                 }
             }
+            // A declared path with another placeholder, matched in full: the path is the
+            // ticket's only where no other ticket's longer id could stand at the id.
+            // §FS-rhei-reset.2.1
+            ScopedTarget::Pattern(pattern) => {
+                let paths = match pattern.entries() {
+                    Ok(paths) => paths,
+                    Err((dir, err)) => {
+                        assessment
+                            .history
+                            .push(("unreadable".into(), format!("{}: {err}", display_path(&dir))));
+                        continue;
+                    }
+                };
+                for path in paths {
+                    if !pattern.owns(&path, others.iter().map(String::as_str)) {
+                        assessment.unsafe_path(format!(
+                            "{} may belong to another ticket",
+                            relative_to(root, &path)
+                        ));
+                        continue;
+                    }
+                    classify_owned_path(root, &path, id, assessment);
+                }
+            }
         }
     }
     Ok(())
-}
-
-/// Whether a loose prefix match could equally be another ticket's: `auth.fix-`
-/// is a prefix of `auth.fix-cache-`'s files. §FS-rhei-remove.4.2
-fn prefix_is_ambiguous(name: &str, prefix: &str, id: &str, others: &[String]) -> bool {
-    others.iter().filter(|other| other.starts_with(id)).any(|other| {
-        let theirs = prefix.replacen(id, other, 1);
-        theirs != prefix && name.starts_with(&theirs)
-    })
 }
 
 /// Sort one owned path into history or residue; refuse a symlink or a path that

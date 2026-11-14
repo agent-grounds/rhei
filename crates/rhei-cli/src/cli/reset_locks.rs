@@ -14,7 +14,12 @@ struct ResetWriterLocks {
 }
 
 impl ResetWriterLocks {
-    fn acquire(loaded: &LoadedPlan, input: &Path, scope: &RheiScope) -> MietteResult<Self> {
+    fn acquire<'s>(
+        loaded: &LoadedPlan,
+        input: &Path,
+        scope: impl Into<ResetScope<'s>>,
+    ) -> MietteResult<Self> {
+        let scope = scope.into();
         let (metadata_paths, task_paths) = reset_plan_lock_paths(loaded, input, scope)?;
         let ledger_roots = reset_ledger_roots(loaded, input, scope)?;
 
@@ -33,11 +38,13 @@ impl ResetWriterLocks {
 
     /// Refuse a concurrently changed project layout rather than touching a
     /// plan or ledger pathname outside the lock set derived before acquisition.
+    /// A ticket scope's closure, taken again from the re-read, may need less than
+    /// it holds but never more. §FS-rhei-reset.2.5.5
     fn verify_coverage(
         &self,
         loaded: &LoadedPlan,
         input: &Path,
-        scope: &RheiScope,
+        scope: ResetScope<'_>,
     ) -> MietteResult<()> {
         let (metadata_paths, task_paths) = reset_plan_lock_paths(loaded, input, scope)?;
         let plan_paths = metadata_paths.into_iter().chain(task_paths).collect::<BTreeSet<_>>();
@@ -46,6 +53,16 @@ impl ResetWriterLocks {
         let ledger_roots = reset_ledger_roots(loaded, input, scope)?;
         let held_ledger_roots =
             self.ledger_locks.iter().map(|(root, _)| root.clone()).collect::<BTreeSet<_>>();
+        if scope.tickets().is_some() {
+            if plan_paths.is_subset(&held_plan_paths) && ledger_roots.is_subset(&held_ledger_roots) {
+                return Ok(());
+            }
+            return Err(miette!(
+                help = "run the reset again: it takes the closure as the plan now stands.",
+                "Refusing to reset: the tickets --task reaches changed while the reset took its \
+                 locks, so nothing was changed."
+            ));
+        }
         if plan_paths != held_plan_paths || ledger_roots != held_ledger_roots {
             return Err(miette!(
                 help = "retry the reset after the concurrent plan-layout change has finished.",
@@ -120,7 +137,7 @@ fn canonical_reset_root(path: &Path) -> MietteResult<PathBuf> {
 fn reset_plan_lock_paths(
     loaded: &LoadedPlan,
     input: &Path,
-    scope: &RheiScope,
+    scope: ResetScope<'_>,
 ) -> MietteResult<(BTreeSet<PathBuf>, BTreeSet<PathBuf>)> {
     let mut metadata_paths = BTreeSet::new();
     let mut task_paths = reset_target_files(loaded, input, scope)
@@ -128,21 +145,13 @@ fn reset_plan_lock_paths(
         .map(|(path, _)| canonical_reset_plan_path(&path))
         .collect::<MietteResult<BTreeSet<_>>>()?;
 
-    fn collect<'a>(task: &'a rhei_core::ast::Task, out: &mut Vec<&'a rhei_core::ast::Task>) {
-        out.push(task);
-        for child in &task.children {
-            collect(child, out);
-        }
-    }
-    let mut tasks = Vec::new();
-    for task in &loaded.rhei.tasks {
-        if task_in_rhei_scope(scope, &task.id.to_string()) {
-            collect(task, &mut tasks);
-        }
-    }
-    for task in tasks {
+    for task in scope.tasks(loaded) {
         let route = loaded.task_route(&task.id.to_string(), input);
         metadata_paths.insert(canonical_reset_plan_path(&route.metadata_file)?);
+    }
+    // And the documents of the supervisors it may hold. §FS-rhei-reset.2.5.5
+    for path in held_supervisor_metadata_files(loaded, input, scope) {
+        metadata_paths.insert(canonical_reset_plan_path(&path)?);
     }
 
     // Preserve the metadata files reset already clears even for empty scopes.
@@ -150,10 +159,10 @@ fn reset_plan_lock_paths(
         metadata_paths.insert(canonical_reset_plan_path(&input.join("index.rhei.md"))?);
     }
     let mut roots = loaded.task_roots.values().collect::<BTreeSet<_>>();
-    if scope.is_some() {
+    if scope.is_narrowed() {
         roots.retain(|root| {
             loaded.task_roots.iter().any(|(task_id, candidate)| {
-                candidate == *root && task_in_rhei_scope(scope, task_id)
+                candidate == *root && scope.contains(task_id)
             })
         });
     }
@@ -171,26 +180,15 @@ fn reset_plan_lock_paths(
 fn reset_ledger_roots(
     loaded: &LoadedPlan,
     input: &Path,
-    scope: &RheiScope,
+    scope: ResetScope<'_>,
 ) -> MietteResult<BTreeSet<PathBuf>> {
     let mut roots = BTreeSet::new();
-    fn collect(task: &rhei_core::ast::Task, out: &mut Vec<String>) {
-        out.push(task.id.to_string());
-        for child in &task.children {
-            collect(child, out);
-        }
-    }
-    let mut task_ids = Vec::new();
-    for task in &loaded.rhei.tasks {
-        if task_in_rhei_scope(scope, &task.id.to_string()) {
-            collect(task, &mut task_ids);
-        }
-    }
-    for task_id in task_ids {
-        roots.insert(canonical_reset_root(&loaded.task_route(&task_id, input).execution_root)?);
+    for task in scope.tasks(loaded) {
+        let route = loaded.task_route(&task.id.to_string(), input);
+        roots.insert(canonical_reset_root(&route.execution_root)?);
     }
 
-    if scope.is_none() {
+    if !scope.is_narrowed() {
         if loaded.is_panta_project() || workspace::is_workspace(input) {
             roots.insert(canonical_reset_root(input)?);
         } else {

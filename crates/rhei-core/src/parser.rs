@@ -194,6 +194,8 @@ mod fence_tests;
 #[cfg(test)]
 mod manifest_task_metadata_tests;
 #[cfg(test)]
+mod plan_pre_tasks_metadata_tests;
+#[cfg(test)]
 mod plan_snapshot_prior_tests;
 #[cfg(test)]
 mod plan_task_metadata_tests;

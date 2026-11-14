@@ -153,6 +153,35 @@ revision. See [ADR 0002](../adr/0002-hierarchical-task-nodes.md) for the rationa
 behind the nested task-node model and for migration rules from pre-revision
 plans.
 
+#### 1.1.1. Task Metadata Above the Tasks Section
+
+A single-file plan holds task metadata only under `## Tasks`. Above it, in a
+content section or before the first one, the plan obeys the rule the Directory
+Workspace index obeys for task metadata ([§FS-rhei-plan-language.1.2](rhei-plan-language.spec.md#12-directory-workspace-agent-teams-high-concurrency)). Outside
+YAML frontmatter and fenced code blocks ([§FS-rhei-plan-language.2.1](rhei-plan-language.spec.md#21-fenced-code-blocks)), a line
+above `## Tasks` that opens with a recognized task metadata marker is a parse
+error, *"Metadata field appears outside a task"*, reported at that line, whether
+or not a task-shaped heading stands above it. The markers are every task field
+of [§FS-rhei-plan-language.2](rhei-plan-language.spec.md#2-grammar-ebnf): the core fields (`**State:**`, `**Prior:**`,
+`**Inherits:**`, `**Provides:**`, `**Consumes:**`, `**Excludes:**`,
+`**Assignee:**`), the execution overrides (`**Model:**`, `**Target:**`,
+[§FS-rhei-plan-language.3.11](rhei-plan-language.spec.md#311-task-execution-overrides)), and the tooling fields (`**MCP servers:**`,
+`**Skills:**`, [§FS-rhei-task-tooling.1](rhei-task-tooling.spec.md#1-the-fields)). What follows the marker makes no
+difference: `**Model:** sample` is refused exactly as a bare `**Model:**` is.
+
+Such a line must never be absorbed into the section's content. Absorbing it is
+how a task written under the wrong chapter would vanish: the plan would load,
+and the task, with the model, target or tools its author chose for it, would be
+missing with no word said. Which field the author happened to write first under
+a misplaced heading must not decide whether the mistake is reported, so every
+command loading the plan refuses all of them alike, whether it reaches the plan
+directly or through its project, and `rhei validate` reports each such line as
+a problem of its own ([§FS-rhei-validate.4.2](rhei-validate.spec.md#42-diagnostic-parity-across-scopes)). Where no `## Tasks` chapter
+follows them, the structural diagnostic that explains the mistake comes after.
+A prose subheading alone, a task-shaped heading with no metadata line under it,
+and a bold label outside the task metadata vocabulary (`**Note:**`,
+`**Target audience:**`) remain content.
+
 ### 1.2. Directory Workspace (Agent Teams, High Concurrency)
 
 To prevent Git merge conflicts when multiple agents or humans work in parallel across disparate branches, a Rhei plan can be structured as a directory. This functions similarly to distributed issue trackers.
@@ -696,7 +725,9 @@ task_body_line  = ? any line that does not match a header production above
                    and does not begin with "> **Result:** " ? ;
 
 non_structural_line = ? any line that does not match a header
-                        production above ? ;
+                        production above and does not open with a
+                        task metadata marker (sections 1.1.1, 1.2,
+                        1.5) ? ;
 
 blank_line      = NEWLINE ;
 

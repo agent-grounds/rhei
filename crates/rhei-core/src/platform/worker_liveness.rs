@@ -22,7 +22,7 @@ pub enum WorkerLiveness {
     /// Nothing of it is left.
     Gone,
     /// Something is, or rhei cannot tell that nothing is; the processes it
-    /// could list. §FS-rhei-agents.8.1.1
+    /// could list. §FS-rhei-evidence.11.3
     Running(Vec<LiveProcess>),
 }
 

@@ -106,7 +106,7 @@ impl SpawnPlan {
     ///
     /// A spawn site asks [`NamedSpawn::plan`] instead, which first asks whether
     /// a killed run accounts for the file; this is that refusal's otherwise case.
-    // §FS-rhei-agents.8.1 §FS-rhei-agents.8.1.1
+    // §FS-rhei-agents.8.1 §FS-rhei-evidence.11.3
     #[cfg(test)]
     fn unaccounted_log_refusal(&self, task_id: &str) -> Option<String> {
         self.log.exists().then(|| unaccounted_log_message(&self.log, task_id, self.reset.as_ref()))
@@ -139,7 +139,7 @@ fn unaccounted_log_message(log: &Path, task_id: &str, reset: Option<&ResetOffer>
 ///
 /// `reset` stays on the plan, so the race-free half of the refusal, when the log
 /// is opened, offers the same command as this half. §FS-rhei-reset.5.1
-// §FS-rhei-agents.8.1 §FS-rhei-programs.5.1 §FS-rhei-agents.8.1.1
+// §FS-rhei-agents.8.1 §FS-rhei-programs.5.1 §FS-rhei-agents.8.1.1 §FS-rhei-evidence.11.3
 #[allow(clippy::too_many_arguments)]
 fn plan_named_spawn(
     machine: &rhei_validator::StateMachine,

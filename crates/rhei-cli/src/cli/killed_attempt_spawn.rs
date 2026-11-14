@@ -36,7 +36,7 @@ enum PlanRefusal {
 }
 
 impl PlanRefusal {
-    /// The refusal as a run prints it. §FS-rhei-agents.8.1 §FS-rhei-agents.8.1.1
+    /// The refusal as a run prints it. §FS-rhei-agents.8.1 §FS-rhei-evidence.11.3
     fn message(&self, task_id: &str, reset: Option<&ResetOffer>, transitions: &[String]) -> String {
         match self {
             PlanRefusal::Ledger(message) => message.clone(),
@@ -58,7 +58,7 @@ impl NamedSpawn<'_> {
     /// a spawn site, which names its `worker`, writes that attempt's record
     /// first; a reading, which passes `None`, predicts the record and writes
     /// nothing. Any other taken log is refused with its case.
-    // §FS-rhei-agents.8.1.1 §FS-rhei-evidence.11.1
+    // §FS-rhei-agents.8.1.1 §FS-rhei-evidence.11.1 §FS-rhei-evidence.11.3
     fn plan(&self, worker: Option<&str>) -> Result<(SpawnPlan, LogNumber), PlanRefusal> {
         let (task_id, state_name) = (self.task_id, self.state_name);
         let number = resolve_log_number(
@@ -213,7 +213,7 @@ fn kill_halt_line(task_id: &str, state_name: &str, kills: u64, configured: u64) 
 /// What a run's spawn site knows beyond the name of the spawn it plans: the
 /// ticket and its plan, for the `rhei transition` lines a program's refusal
 /// lists, and the settings, for the attempts a poll's kill halt offers.
-// §FS-rhei-agents.8.1.1
+// §FS-rhei-evidence.11.3 §FS-rhei-agents.3.2.3
 struct SpawnSite<'a> {
     machine: &'a rhei_validator::StateMachine,
     task: &'a rhei_core::ast::Task,
@@ -229,7 +229,7 @@ impl SpawnSite<'_> {
     /// case, and halt a poll visit its kills have spent. `worker` is the agent
     /// a killed attempt's record names; a program site passes `""`, since no
     /// program's log is one.
-    // §FS-rhei-agents.8.1 §FS-rhei-agents.8.1.1 §FS-rhei-agents.3.2.3
+    // §FS-rhei-agents.8.1 §FS-rhei-agents.8.1.1 §FS-rhei-evidence.11.3 §FS-rhei-agents.3.2.3
     fn plan(
         &self,
         task_root: &Path,

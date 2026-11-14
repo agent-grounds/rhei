@@ -89,7 +89,6 @@ fn stopped_section(stdout: &str) -> &str {
 /// gate; the gated task is listed beside it, not in its place.
 /// §FS-rhei-templates.6.1.3
 #[test]
-#[ignore = "red until #717: a gated task replaces the ready-task stop point; implement removes this"]
 fn ready_task_is_the_stop_point_when_a_task_is_gated() {
     let dir = unique_temp_dir("instantiate-stop-point-gated");
     lay_country_template(&dir, &[("01-draft.md", DRAFT_TASK), ("02-sign-off.md", SIGN_OFF_TASK)]);
@@ -121,7 +120,6 @@ fn ready_task_is_the_stop_point_when_a_task_is_gated() {
 /// After a real write the invocation is a record of what ran, labelled in the
 /// past tense; a dry run's is the write still to come. §FS-rhei-templates.6.1.2
 #[test]
-#[ignore = "red until #717: a real write labels its invocation as a command to run; implement removes this"]
 fn real_write_labels_its_invocation_in_the_past_tense() {
     let dir = unique_temp_dir("instantiate-invocation-label");
     lay_country_template(&dir, &[("01-draft.md", DRAFT_TASK), ("02-sign-off.md", SIGN_OFF_TASK)]);

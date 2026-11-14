@@ -13,7 +13,8 @@ use rhei_core::platform::worker_liveness::{LiveProcess, WorkerLiveness};
 const KILLED_ENDING: &str = "killed";
 
 /// What the evidence of runs killed outright says about a planned log name
-/// that is taken and that no spawn record accounts for. §FS-rhei-agents.8.1.1
+/// that is taken and that no spawn record accounts for: a killed attempt to
+/// resume (§FS-rhei-agents.8.1.1), or a refusal's case (§FS-rhei-evidence.11.3).
 #[derive(Debug)]
 enum TakenLog {
     /// A killed attempt of this visit: every condition of §FS-rhei-evidence.11.1
@@ -31,7 +32,7 @@ enum TakenLog {
 
 impl TakenLog {
     /// Which verdict wins when two start records name the same log; a live
-    /// group is decided before any of these. §FS-rhei-agents.8.1.1
+    /// group is decided before any of these. §FS-rhei-evidence.11.3
     fn rank(&self) -> u8 {
         match self {
             TakenLog::StillRunning(_) => 4,
@@ -44,7 +45,7 @@ impl TakenLog {
 
     /// The refusal of a spawn whose log `log` is taken, in the case this
     /// verdict names. `transitions` are the program case's `rhei transition`
-    /// lines; a reading, which prints none, passes none. §FS-rhei-agents.8.1.1
+    /// lines; a reading, which prints none, passes none. §FS-rhei-evidence.11.3
     fn refusal(
         &self,
         log: &Path,
@@ -122,7 +123,7 @@ struct KilledStart {
 /// resume the spawn site would refuse, or the other way round.
 ///
 /// `program` says whether the state runs a program, for the `kind` condition.
-// §FS-rhei-evidence.11.1 §FS-rhei-agents.8.1.1
+// §FS-rhei-evidence.11.1 §FS-rhei-agents.8.1.1 §FS-rhei-evidence.11.3
 fn classify_taken_log(
     plan: &SpawnPlan,
     task_root: &Path,
@@ -132,7 +133,7 @@ fn classify_taken_log(
 ) -> TakenLog {
     let starts = killed_starts(&evidence_root_for(task_root), &plan.log);
     // A live group wins over every other case, a program and a changed log
-    // among them. §FS-rhei-agents.8.1.1
+    // among them. §FS-rhei-evidence.11.3
     let running: Vec<&Vec<LiveProcess>> = starts
         .iter()
         .filter_map(|start| match &start.group {

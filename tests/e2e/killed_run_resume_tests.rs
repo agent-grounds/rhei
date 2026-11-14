@@ -102,7 +102,7 @@ fn a_visit_killed_again_is_charged_and_halts_within_its_budget() {
 /// A program killed with its run may already have done its work, so it is not
 /// run again on rhei's own: the rerun refuses with the program message and
 /// lists the `rhei transition` that moves the ticket on.
-// §FS-rhei-agents.8.1.1
+// §FS-rhei-evidence.11.3
 #[test]
 fn a_run_killed_during_a_program_visit_refuses_and_leaves_it_to_a_person() {
     let fx = Fixture::new("killed-run-program");
@@ -133,7 +133,7 @@ fn a_run_killed_during_a_program_visit_refuses_and_leaves_it_to_a_person() {
 /// What the killed agent left in its group keeps the visit refused, and the
 /// refusal lists the processes rather than printing a `kill` line; once the
 /// group is gone, the next run resumes.
-// §FS-rhei-agents.8.1.1 §DA-supervised-process-groups
+// §FS-rhei-evidence.11.3 §FS-rhei-agents.8.1.1 §DA-supervised-process-groups
 #[test]
 fn a_killed_agent_whose_group_still_runs_is_refused_until_it_is_stopped() {
     let fx = Fixture::new("killed-run-straggler");
@@ -179,7 +179,7 @@ fn a_killed_agent_whose_group_still_runs_is_refused_until_it_is_stopped() {
 /// longer the attempt's, so it is refused exactly as today. The edit has to
 /// land after finalization, which hashes the log as found: a rerun that halts
 /// on the still-running group is the run that finalizes.
-// §FS-rhei-agents.8.1.1 §FS-rhei-evidence.9.3
+// §FS-rhei-evidence.11.3 §FS-rhei-evidence.9.3
 #[test]
 fn an_edited_killed_log_keeps_todays_refusal() {
     let fx = Fixture::new("killed-run-edited");
@@ -216,7 +216,7 @@ fn an_edited_killed_log_keeps_todays_refusal() {
 
 /// A killed run with no group record cannot say whether its agent has
 /// stopped, so it keeps today's refusal with one sentence more.
-// §FS-rhei-agents.8.1.1 §FS-rhei-evidence.3.4
+// §FS-rhei-evidence.11.3 §FS-rhei-evidence.3.4
 #[test]
 fn a_killed_agent_with_no_group_record_keeps_the_refusal_and_says_why() {
     let fx = Fixture::new("killed-run-no-group");

@@ -2004,20 +2004,18 @@ kept with the visit, so it holds across runs and a new visit starts it at 0; a
 `rhei retry` grant adds attempts and never free endings. Poll counters are
 neither advanced nor refunded by it, and each free spawn is still an invocation.
 
-An agent **killed together with its run** ([§FS-rhei-agents.8.1.1](rhei-agents.spec.md#811-an-agent-killed-with-its-run)) spends
-nothing the first time, since its run's death ended it, but nobody asked for a
-kill, so it is bounded: the spawn record's `killed` counts the visit's kills,
-and from the second on each is charged, because a visit killed again and again
-is more likely killing its run — memory, disk — than unlucky. Under the
-built-in `attempts: 2` a worker killed every time runs three times, then the
-next run halts the visit, naming `rhei retry`. The one is built in and kept
-with the visit; a grant adds attempts, never free kills. In a **poll
-state**, which `attempts:` does not bound and whose self-loop a kill never
-takes, kills are the bound: a run that finds `killed` above one plus the
-attempts the visit's grants added halts it — `halting Task {id} in state
-'{state}': killed together with its run {k} times on this visit. The ticket
-stays in '{state}'.` — naming `rhei retry`, whose grant there allows that many
-more kills ([§FS-rhei-retry.2](rhei-retry.spec.md#2-grant-and-refusals)).
+An agent **killed together with its run** ([§FS-rhei-agents.8.1.1](rhei-agents.spec.md#811-an-agent-killed-with-its-run)) spends nothing
+the first time, since its run's death ended it, but the spawn record's `killed`
+counts the visit's kills and each from the second on is charged: a visit killed
+again and again is likelier killing its run — memory, disk — than unlucky. Under
+the built-in `attempts: 2` a worker killed every time runs three times, then the
+next run halts the visit, naming `rhei retry`. The free kill is built in and kept
+with the visit; a grant adds attempts, never free kills. A **poll state**, which
+`attempts:` does not bound and whose self-loop a kill never takes, is bounded by
+kills: a run that finds `killed` above one plus the visit's granted attempts
+halts it, naming `rhei retry`, whose grant there allows that many more kills
+([§FS-rhei-retry.2](rhei-retry.spec.md#2-grant-and-refusals)): `halting Task {id} in state '{state}': killed together with
+its run {k} times on this visit. The ticket stays in '{state}'.`
 
 ### 3.3. Consumed Export Preflight
 
@@ -2696,28 +2694,7 @@ composes the prompt, and allocation goes on as after an interruption: the next
 spawn is `-attempt{a+1}`, whose re-spawn note and prompt say the previous
 attempt `was killed together with its run`, and the kept log is never touched.
 Its cost to the visit is [§FS-rhei-agents.3.2.3](rhei-agents.spec.md#323-attempt-budget)'s. Where those records name the
-taken log but do not account for it, the refusal says which case, in order:
-
-- **Still running**: the group is not gone ([§FS-rhei-evidence.11.2](rhei-evidence.spec.md#112-gone)). This wins
-  over every other case, because any remedy but stopping it starts a second
-  worker beside the first ([§DA-supervised-process-groups](../decisions/architectural/supervised-process-groups.md#da-supervised-process-groups-subprocesses-are-supervised-process-groups-with-one-termination-path)): `refusing to spawn:
-  <path> belongs to a worker whose run was killed, and its process group still
-  has processes`, one line per process left in the group with its pid and
-  command line, and the help to stop them if they are the killed worker's and
-  run again. No `kill` command — the id may name another group by the time it
-  is read — and neither moving the file nor a reset is offered.
-- **A program**: only the `kind` condition fails. `refusing to spawn: <path>
-  belongs to a program whose run was killed while it ran; it may have finished`,
-  and the help: if it did, one of the listed `rhei transition` commands, one per
-  edge out of the state and runnable as printed; if not, move the file away or
-  run the reset of [§FS-rhei-reset.5.1](rhei-reset.spec.md#51-offering-reset-as-a-remedy). rhei never restarts on its own a program
-  its killed run started: it may already have merged, posted or claimed.
-- **No group record**: everything else holds — a run killed before that write,
-  a failed write, a workspace killed before group records existed. The 8.1
-  refusal plus `its run was killed, but rhei cannot tell whether that agent has
-  stopped`.
-- **Otherwise** the 8.1 refusal, word for word. Moving the log away still
-  wins: with nothing at the name the state starts as attempt 1, plainly named.
+taken log but do not account for it, the refusal is [§FS-rhei-evidence.11.3](rhei-evidence.spec.md#113-when-the-evidence-does-not-account-for-the-log)'s.
 
 ### 8.2. Log Format
 
@@ -2827,7 +2804,7 @@ place by each further attempt of the same invocation. It holds:
 | `ending` | `exited`, `timed out`, `interrupted`, `killed`, `provider_limited`, `provider_unavailable`, or `withheld` — why it stopped or remained in its state |
 | `attempt_charged` | whether this invocation consumed the state visit's `attempts:` budget |
 | `unavailable` | how many `provider_unavailable` endings this visit has had, charged or not; absent reads as `0` |
-| `killed` | how many attempts of this visit were killed together with their run, charged or not; absent reads as `0` |
+| `killed` | how many attempts of this visit were killed together with their run, charged or not: a killed attempt's record raises it by one, every further record carries it forward with `grants`, `unavailable` and `charged`, and a new visit starts it at `0`; absent reads as `0` |
 | `grants` | attended grants for this visit: `[{at, os_user, attempts}]`, recording timestamp, operating-system user and the configured budget granted |
 
 **A failed completion-record write is observable.** If creating the record
@@ -2841,18 +2818,15 @@ worker whose successful edge reaches a final state still completes even if only
 its record write fails. No partial record or inferred attempt, entry, charge,
 or grant substitutes for the failed transaction. If the next allocation meets
 the unaccounted log, the refusal of [§FS-rhei-agents.8.1](rhei-agents.spec.md#81-log-file-naming) still applies, even after
-the storage fault clears; automatic recovery is not required. That worker has
-an end record and its run a manifest, so [§FS-rhei-agents.8.1.1](rhei-agents.spec.md#811-an-agent-killed-with-its-run) never reaches it.
+the storage fault clears; automatic recovery is not required.
 
 **A killed attempt's record** ([§FS-rhei-agents.8.1.1](rhei-agents.spec.md#811-an-agent-killed-with-its-run)) has the start record's
-`attempt`, `ending: killed`, no `code`, `started` from the start record's
-`started_at`, and `ended` when it is written — when rhei learned of the kill,
-which keeps records ordered by `ended`. `duration` is `unknown`, and a reader
-that sums time takes none from it ([§FS-rhei-summary.2.2](rhei-summary.spec.md#22-the-steps)). `log` names the kept
-file. `killed` is the visit's count plus one, carried forward with `grants`,
-`unavailable` and `charged`; a new visit starts it at `0`. `attempt_charged` is
-`false` for the visit's first kill and `true`, with `charged` raised, after it.
-An older rhei reads `killed` as an ending without an exit code: no proof of
+`attempt` and, as `started`, its `started_at`; `ending: killed` and no `code`;
+`ended` when it is written — when rhei learned of the kill, which keeps records
+ordered by `ended`; and `duration: unknown`, of which a reader that sums time
+takes none ([§FS-rhei-summary.2.2](rhei-summary.spec.md#22-the-steps)). `log` names the kept file. `attempt_charged`
+is `false` for the visit's first kill and `true`, with `charged` raised, after
+it. An older rhei reads `killed` as an ending without an exit code: no proof of
 success, so it numbers and charges the next attempt as usual.
 
 Older spawn records without `grants` read as no grants. Further attempts of

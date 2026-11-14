@@ -189,7 +189,7 @@ record, which is published before the spawn and never rewritten
 
 A group record that cannot be written is a warning, never a refusal: the worker
 is already running, and the only cost is that a later kill of that attempt is
-refused as an unaccounted log ([§FS-rhei-agents.8.1.1](rhei-agents.spec.md#811-an-agent-killed-with-its-run)). Its one reader is that
+refused as an unaccounted log ([§FS-rhei-evidence.11.3](rhei-evidence.spec.md#113-when-the-evidence-does-not-account-for-the-log)). Its one reader is that
 recovery, which is how a run tells whether a worker its killed predecessor
 started is gone.
 
@@ -416,9 +416,9 @@ record listed with `completed: false`, and each log recorded as found at that
 moment, located by the start record's `log_path`. No end record is invented for a process that has none. That
 finalization is the recovery event. For an agent it is what lets the next spawn
 account for the killed attempt's log and resume its visit, once its group is
-gone; for a program it is what lets the refusal say the program may have
-finished ([§FS-rhei-agents.8.1.1](rhei-agents.spec.md#811-an-agent-killed-with-its-run)). Neither reads a log's bytes for meaning: the
-hash recorded here is what ties the log to the attempt.
+gone ([§FS-rhei-agents.8.1.1](rhei-agents.spec.md#811-an-agent-killed-with-its-run)); for a program it is what lets the refusal say the
+program may have finished ([§FS-rhei-evidence.11.3](rhei-evidence.spec.md#113-when-the-evidence-does-not-account-for-the-log)). Neither reads a log's
+bytes for meaning: the hash recorded here is what ties the log to the attempt.
 
 ### 9.4. The Manifest and the Checkpoint
 
@@ -488,7 +488,8 @@ conditions. Only a run holding the ticket's run lock finalizes a killed run, and
 `rhei run` finalizes before it plans its first spawn, so the run that left the
 records cannot still be alive; until some run has finalized it, those readings
 predict the refusal. An interruption never reaches these conditions: it writes
-its own spawn record ([§FS-rhei-run.3.2](rhei-run.spec.md#32-interruption-and-process-ownership)).
+its own spawn record ([§FS-rhei-run.3.2](rhei-run.spec.md#32-interruption-and-process-ownership)). Nor does a worker whose spawn record failed to
+write ([§FS-rhei-agents.8.4](rhei-agents.spec.md#84-spawn-records)): it has an end record and its run a manifest.
 
 ### 11.2. Gone
 
@@ -501,3 +502,29 @@ from `created_at`, because a pid is reused only after its process has exited;
 reused group id or pid can therefore cost a refusal, never cause a resume. On
 Windows only the agent itself is checked, not what it started: that is the reach
 termination has there today ([§REQ-cross-platform](../requirements/cross-platform.md#req-cross-platform-one-tool-on-linux-macos-and-windows)).
+
+### 11.3. When the Evidence Does Not Account for the Log
+
+Where those records name the taken log but do not account for it, the refusal
+says which case, in order:
+
+- **Still running**: the group is not gone ([§FS-rhei-evidence.11.2](rhei-evidence.spec.md#112-gone)). This wins
+  over every other case, because any remedy but stopping it starts a second
+  worker beside the first ([§DA-supervised-process-groups](../decisions/architectural/supervised-process-groups.md#da-supervised-process-groups-subprocesses-are-supervised-process-groups-with-one-termination-path)): `refusing to spawn:
+  <path> belongs to a worker whose run was killed, and its process group still
+  has processes`, one line per process left in the group with its pid and
+  command line, and the help to stop them if they are the killed worker's and
+  run again. No `kill` command — the id may name another group by the time it
+  is read — and neither moving the file nor a reset is offered.
+- **A program**: only the `kind` condition fails. `refusing to spawn: <path>
+  belongs to a program whose run was killed while it ran; it may have finished`,
+  and the help: if it did, one of the listed `rhei transition` commands, one per
+  edge out of the state and runnable as printed; if not, move the file away or
+  run the reset of [§FS-rhei-reset.5.1](rhei-reset.spec.md#51-offering-reset-as-a-remedy). rhei never restarts on its own a program
+  its killed run started: it may already have merged, posted or claimed.
+- **No group record**: everything else holds — a run killed before that write,
+  a failed write, a workspace killed before group records existed. The
+  [§FS-rhei-agents.8.1](rhei-agents.spec.md#81-log-file-naming) refusal plus `its run was killed, but rhei cannot tell whether that agent has
+  stopped`.
+- **Otherwise** the [§FS-rhei-agents.8.1](rhei-agents.spec.md#81-log-file-naming) refusal, word for word. Moving the log away still
+  wins: with nothing at the name the state starts as attempt 1, plainly named.

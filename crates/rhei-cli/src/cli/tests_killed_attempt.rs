@@ -188,7 +188,7 @@ mod killed_attempt {
 
     /// 3: a program fails only the `kind`, and is refused as one; an agent's
     /// record at a program state is no account at all.
-    // §FS-rhei-evidence.11.1 §FS-rhei-agents.8.1.1
+    // §FS-rhei-evidence.11.1 §FS-rhei-evidence.11.3
     #[test]
     fn condition_3_a_program_is_its_own_case() {
         let program = KilledRun { kind: "program", ..KilledRun::default() };
@@ -241,7 +241,7 @@ mod killed_attempt {
     }
 
     /// A live group wins over every other case: over a program, and over a log
-    /// that no longer matches its hash. §FS-rhei-agents.8.1.1
+    /// that no longer matches its hash. §FS-rhei-evidence.11.3
     #[test]
     fn a_live_group_beats_a_program_and_a_hash_mismatch() {
         let live = LiveGroup::start();
@@ -257,7 +257,7 @@ mod killed_attempt {
     /// Each case's refusal: a live group lists its processes and offers no
     /// `kill`, move or reset; a program lists its transitions; a missing group
     /// record says why; otherwise the refusal is today's, word for word.
-    // §FS-rhei-agents.8.1.1 §FS-rhei-agents.8.1
+    // §FS-rhei-evidence.11.3 §FS-rhei-agents.8.1
     #[test]
     fn each_case_is_refused_in_its_own_words() {
         let log = Path::new("/w/runtime/logs/task-plan.1-cover.log");

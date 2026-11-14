@@ -258,6 +258,7 @@ mod operator_force_support;
 mod operator_force_tests;
 mod operator_recovery_tests;
 mod operator_unwritable_state_home_tests;
+mod panta_bare_index_tests;
 mod parallel_target_override_tests;
 mod parent_prior_children_tests;
 mod poll_budget_result_tests;

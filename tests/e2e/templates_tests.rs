@@ -323,8 +323,8 @@ Say hello to {{target}}.
     );
     assert_success(&result);
     assert!(
-        result.stdout.contains("Instantiate this template with:"),
-        "expected instantiate hint in output; got:\n{}",
+        result.stdout.contains("Instantiated with:"),
+        "expected the invocation record in output; got:\n{}",
         result.stdout
     );
     // The repro command renders the output path relative to the working

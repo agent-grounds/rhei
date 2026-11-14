@@ -1,7 +1,7 @@
 use crate::ast::{ContentSection, Metadata, Structure, Task};
 use crate::fence::FenceTracker;
 use crate::header::{header_regex, PANTA_HEADER, RHEI_HEADER};
-use crate::tokens::TASK_METADATA_FIELDS;
+use crate::tokens::task_metadata_marker;
 use regex::Regex;
 
 use super::task_file_metadata::{
@@ -137,7 +137,7 @@ fn parse_manifest(input: &str, header_name: &str, frontmatter_kind: &str) -> Res
 
         // Both manifests refuse task metadata outside YAML and fences, even before the header.
         // §FS-rhei-plan-language.1.2 §FS-rhei-plan-language.1.5
-        if let Some(field) = TASK_METADATA_FIELDS.iter().find(|field| line.starts_with(**field)) {
+        if let Some(field) = task_metadata_marker(line) {
             let task_files = if header_name == PANTA_HEADER {
                 "a rhei's task files or basin/ task files"
             } else {

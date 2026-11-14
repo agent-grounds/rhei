@@ -95,8 +95,6 @@ fn assert_no_misses(misses: Vec<String>) {
 /// 1 · The ticket. Every command that loads the plan refuses it at the field
 /// line, directly and through its project. §FS-rhei-plan-language.1.1.1
 #[test]
-#[ignore = "red until #719: rhei list, render and validate accept a misplaced task whose first \
-            field is Model, Target, MCP servers or Skills; implement removes this"]
 fn every_command_refuses_a_misplaced_task_whichever_field_opens_it() {
     let mut missed = Vec::new();
     for field in VALUED_FIELDS {
@@ -122,8 +120,6 @@ fn every_command_refuses_a_misplaced_task_whichever_field_opens_it() {
 /// structural diagnostic that explains them, the same in both scopes.
 /// §FS-rhei-validate.4.2
 #[test]
-#[ignore = "red until #719: validate reports only the structural error for misplaced tasks opened \
-            by Model, Target, MCP servers or Skills; implement removes this"]
 fn validate_explains_misplaced_tasks_in_both_scopes_whichever_field_opens_them() {
     let said = [
         "(3 problems)".to_owned(),
@@ -150,8 +146,6 @@ fn validate_explains_misplaced_tasks_in_both_scopes_whichever_field_opens_them()
 /// 3 · No heading needed. A field line in a content section is refused at its
 /// line even with no task heading above it. §FS-rhei-plan-language.1.1.1
 #[test]
-#[ignore = "red until #719: a valued Model, Target, MCP servers or Skills line in a content \
-            section is kept as section text; implement removes this"]
 fn a_task_field_in_a_content_section_is_refused_without_a_heading() {
     let mut missed = Vec::new();
     for field in VALUED_FIELDS {

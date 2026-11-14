@@ -29,7 +29,8 @@ fn pass_stalled_with_more_claimable(
             || deferred_tasks.iter().any(claimable))
 }
 
-/// Agent-driven execution mode: spawn coding agents for tasks.
+/// Agent-driven execution mode: spawn coding agents for tasks, or preview the
+/// same pending spawn plans without executing them. §FS-rhei-run.4
 fn run_agent_mode(
     input: &Path,
     live: &mut LiveRunContext,
@@ -683,59 +684,35 @@ fn run_agent_mode(
 
         if !program_tasks.is_empty() && !run_programs_in_worker_pool {
             if opts.dry_run() {
-                for (task_id_str, current_state_raw, current_state, resolved) in &program_tasks {
-                    let loaded = load_run_plan(input)?;
-                    let target_id = parse_task_id(task_id_str);
-                    let machine = machines.for_task_str(task_id_str);
-                    if let Some(task) = find_task_by_id(&loaded.rhei.tasks, &target_id) {
-                        // A dry run prints the edge; how it matched decides
-                        // nothing it prints. §FS-rhei-run.4
-                        if let Some(route) = find_program_exit_transition(
-                            machine,
-                            loaded.rhei.metadata.as_ref(),
-                            task,
-                            current_state,
-                            0,
-                        )? {
-                            run_info!(
-                                "{}",
-                                format_dry_run_transition(
-                                    task_id_str,
-                                    current_state_raw,
-                                    &route.to,
-                                    machine,
-                                )
-                            );
-                        }
-                    }
-                    let _ = resolved;
-                }
-                sink.emit(RunEvent::PassEnded { pass, progressed: false });
-                break;
+                // Keep reporting selected agents after the program preview. §FS-rhei-run.4
+                preview_pending_work(
+                    input, machines, settings, opts, &workspace_root, &runtime_dir,
+                    &program_tasks, &[], &sink, &mut spawn_refusals,
+                )?;
+            } else {
+                let mut progress = AgentPassProgress {
+                    advanced_any: &mut advanced_any,
+                    agents_spawned: &mut agents_spawned,
+                    programs_spawned: &mut programs_spawned,
+                    stalled_tasks: &mut stalled_tasks,
+                    spawn_refusals: &mut spawn_refusals,
+                    empty_visit_holds: &mut empty_visit_holds,
+                    unpromptable_tasks: &mut unpromptable_tasks,
+                };
+                run_sequential_program_work_items(
+                    &program_tasks,
+                    &plan_title,
+                    input,
+                    machines,
+                    settings,
+                    opts,
+                    &workspace_root,
+                    &sink,
+                    &mut progress,
+                )
+                // Keep the actual refusal for the fallback report. §FS-rhei-budgets.9
+                .map_err(|error| summary_sink.record_program_refusal(error))?;
             }
-
-            let mut progress = AgentPassProgress {
-                advanced_any: &mut advanced_any,
-                agents_spawned: &mut agents_spawned,
-                programs_spawned: &mut programs_spawned,
-                stalled_tasks: &mut stalled_tasks,
-                spawn_refusals: &mut spawn_refusals,
-                empty_visit_holds: &mut empty_visit_holds,
-                unpromptable_tasks: &mut unpromptable_tasks,
-            };
-            run_sequential_program_work_items(
-                &program_tasks,
-                &plan_title,
-                input,
-                machines,
-                settings,
-                opts,
-                &workspace_root,
-                &sink,
-                &mut progress,
-            )
-            // Keep the actual refusal for the fallback report. §FS-rhei-budgets.9
-            .map_err(|error| summary_sink.record_program_refusal(error))?;
         }
 
         if agent_tasks.is_empty() && (program_tasks.is_empty() || !run_programs_in_worker_pool) {
@@ -867,81 +844,11 @@ fn run_agent_mode(
             snapshot_override.select(input, machines, opts, &agent_tasks)?;
 
         if opts.dry_run() {
-            if run_programs_in_worker_pool {
-                for (task_id_str, current_state_raw, current_state, resolved) in &program_tasks {
-                    let loaded = load_run_plan(input)?;
-                    let target_id = parse_task_id(task_id_str);
-                    let machine = machines.for_task_str(task_id_str);
-                    if let Some(task) = find_task_by_id(&loaded.rhei.tasks, &target_id) {
-                        // A dry run prints the edge; how it matched decides
-                        // nothing it prints. §FS-rhei-run.4
-                        if let Some(route) = find_program_exit_transition(
-                            machine,
-                            loaded.rhei.metadata.as_ref(),
-                            task,
-                            current_state,
-                            0,
-                        )? {
-                            run_info!(
-                                "{}",
-                                format_dry_run_transition(
-                                    task_id_str,
-                                    current_state_raw,
-                                    &route.to,
-                                    machine,
-                                )
-                            );
-                        }
-                    }
-                    let _ = resolved;
-                }
-            }
-            for (task_id_str, current_state_raw, _, resolved) in &batch {
-                let loaded = load_run_plan(input)?;
-                let target_id = parse_task_id(task_id_str);
-                let machine = machines.for_task_str(task_id_str);
-                if let Some(task) = find_task_by_id(&loaded.rhei.tasks, &target_id) {
-                    let task_root = loaded.task_root(task_id_str, &workspace_root);
-                    let checkout = resolve_agent_checkout_root(&task_root, task_id_str)?;
-                    let callbacks = machines.callbacks_for_str(task_id_str);
-                    let exclusions = loaded_task_exclusions(
-                        &loaded,
-                        task,
-                        &task_root,
-                        &checkout.path,
-                        &callbacks.plan_path,
-                        machine,
-                        callbacks.state_machine_path.as_deref(),
-                        settings,
-                        opts,
-                    )
-                    .map_err(exclusion_report)?;
-                    run_info!(
-                        "{}",
-                        format_dry_run_agent_spawn(
-                            task_id_str,
-                            current_state_raw,
-                            resolved,
-                            &exclusions,
-                        )
-                    );
-                    // Pending work stays visible even when the graph can also
-                    // project its post-work edge. §FS-rhei-run.4
-                    if let Some(to_state) = find_next_transition(task, &loaded.rhei, machine)? {
-                        run_info!(
-                            "{}",
-                            format_dry_run_agent_transition(
-                                task_id_str,
-                                current_state_raw,
-                                &to_state,
-                                resolved,
-                                machine,
-                                &exclusions,
-                            )
-                        );
-                    }
-                }
-            }
+            preview_pending_work(
+                input, machines, settings, opts, &workspace_root, &runtime_dir,
+                if run_programs_in_worker_pool { &program_tasks } else { &[] },
+                &batch, &sink, &mut spawn_refusals,
+            )?;
             sink.emit(RunEvent::PassEnded { pass, progressed: false });
             break;
         }
@@ -1119,6 +1026,14 @@ fn run_agent_mode(
         }
         if !manual_only_dry_run.is_empty() {
             return Err(manual_only_dry_run_error(&manual_only_dry_run));
+        }
+        // A refused pending invocation cannot predict success, even when other
+        // selected work could proceed. Its cause was streamed above. §FS-rhei-run.4
+        if !spawn_refusals.entries.is_empty() {
+            return Err(miette!(
+                help = "Follow the path and recovery guidance in each refusal above, then re-run this dry run.",
+                "`rhei run` would refuse to spawn."
+            ));
         }
         // The real run halts here; so must the prediction of it.
         // §FS-rhei-run.4

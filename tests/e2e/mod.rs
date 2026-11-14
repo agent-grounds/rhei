@@ -321,6 +321,7 @@ mod roster_behavior_tests;
 mod roster_json_tests;
 mod roster_scope_tests;
 mod roster_support;
+mod run_dry_spawn_refusal_tests;
 mod run_id_conflict_tests;
 mod run_lock_wait_tests;
 mod run_report_driver_labels_tests;

@@ -46,7 +46,6 @@ fn output(result: &CliRun) -> String {
 /// `./index.panta.md` and `.` do, instead of validating an empty project.
 // §FS-rhei-panta.6 §FS-rhei-panta.6.4
 #[test]
-#[ignore = "red until #718: bare index.panta.md validates no member and exits 0; implement removes this"]
 fn validate_bare_index_panta_refuses_the_broken_member_like_dot_slash() {
     let dir = project("panta-bare-validate", BROKEN_MEMBER);
     for spelling in ["./index.panta.md", ".", "index.panta.md"] {
@@ -71,7 +70,6 @@ fn validate_bare_index_panta_refuses_the_broken_member_like_dot_slash() {
 /// does, instead of saying the project has no tickets.
 // §FS-rhei-panta.6 §FS-rhei-panta.6.4
 #[test]
-#[ignore = "red until #718: bare index.panta.md lists an empty project; implement removes this"]
 fn list_bare_index_panta_lists_the_member_ticket_like_dot_slash() {
     let dir = project("panta-bare-list", HEALTHY_MEMBER);
     for spelling in ["./index.panta.md", ".", "index.panta.md"] {

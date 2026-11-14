@@ -81,7 +81,9 @@ pub fn panta_project_dir(path: &Path) -> Option<PathBuf> {
         return Some(path.to_path_buf());
     }
     if path.is_file() && path.file_name().and_then(|n| n.to_str()) == Some(PANTA_INDEX_FILE) {
-        return path.parent().map(Path::to_path_buf);
+        // A bare `index.panta.md` has an empty parent: it is `.`, never a directory with no rheis.
+        // §FS-rhei-panta.6
+        return Some(crate::workspace::plan_parent_dir(path).to_path_buf());
     }
     None
 }

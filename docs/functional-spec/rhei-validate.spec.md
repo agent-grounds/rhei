@@ -249,7 +249,8 @@ inside a path are not line-break opportunities.
 
 Parity matters most for the errors that cascade. A task heading authored under a
 content section rather than `## Tasks` fails first as *"Metadata field appears
-outside a task"* on a line the author did not get wrong; only the structural
+outside a task"* on a line the author did not get wrong, whichever task field
+opens its metadata block ([§FS-rhei-plan-language.1.1.1](rhei-plan-language.spec.md#111-task-metadata-above-the-tasks-section)); only the structural
 *"Tasks section must be the final `##` chapter"* diagnostic — which recovery
 reaches last — explains the mistake. Reporting one error per file would hide it
 behind the symptom, in the invocation form `rhei init` steers new authors toward

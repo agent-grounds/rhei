@@ -509,10 +509,10 @@ path = "docs/functional-spec/rhei-plan-language.spec.md"
 match = "exact"
 rules = ["citable-spec"]
 kind = "deferred"
-max_accepted = { value = 1500, unit = "lines" }
+max_accepted = { value = 1600, unit = "lines" }
 until = "A follow-up defines child declarations for the tutorial and data-model boundaries, maps every moved section to a stable ID, and migrates all inbound citations."
 reason = """
-The plan-language declaration has no approved split map for separating its tutorial, grammar, and data-model sections while preserving their live section IDs and inbound citations; this issue must extend the owning FS-rhei-plan-language.1.3 point in place. agent-grounds/rhei#475 adds the `**MCP servers:**` and `**Skills:**` productions to the grammar in section 2, where the closed metadata block is declared, and keeps what the fields mean in FS-rhei-task-tooling rather than moving grammar out of the grammar section.
+The plan-language declaration has no approved split map for separating its tutorial, grammar, and data-model sections while preserving their live section IDs and inbound citations; this issue must extend the owning FS-rhei-plan-language.1.3 point in place. agent-grounds/rhei#475 adds the `**MCP servers:**` and `**Skills:**` productions to the grammar in section 2, where the closed metadata block is declared, and keeps what the fields mean in FS-rhei-task-tooling rather than moving grammar out of the grammar section. agent-grounds/rhei#719 adds FS-rhei-plan-language.1.1.1 under the single-file format it governs, beside the section 1.2 rule for the workspace index that it mirrors and the `non_structural_line` production it narrows, so the single-file and workspace forms of one rule stay in one document.
 """
 
 [[exceptions]]

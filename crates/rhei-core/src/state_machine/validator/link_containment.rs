@@ -80,14 +80,22 @@ fn normalize_lexically(path: &Path) -> PathBuf {
     out.iter().collect()
 }
 
+/// A link base made absolute, so a base given as `.`, or as the empty parent of
+/// a bare plan file name, still names a directory: in a refusal, and as the root
+/// a link is held inside. `..` is kept, because a refusal names the path that was
+/// actually tried. §FS-rhei-plan-language.3.6
+fn absolute_link_base(dir: &Path) -> PathBuf {
+    let dir = if dir.as_os_str().is_empty() { Path::new(".") } else { dir };
+    std::path::absolute(dir).unwrap_or_else(|_| dir.to_path_buf())
+}
+
 /// The workspace root, absolute and normalized, when `target` joined to it and
 /// normalized lands outside it. `None` when the link stays inside, including
 /// one that leaves and comes back. §FS-rhei-plan-language.3.6
 fn link_leaves_workspace_root(root: &Path, target: &Path) -> Option<PathBuf> {
     // Absolute first: a relative root such as `.` normalizes to nothing, and
     // every path starts with nothing.
-    let absolute = std::path::absolute(root).unwrap_or_else(|_| root.to_path_buf());
-    let root = normalize_lexically(&absolute);
+    let root = normalize_lexically(&absolute_link_base(root));
     let landed = normalize_lexically(&root.join(target));
     (!landed.starts_with(&root)).then_some(root)
 }

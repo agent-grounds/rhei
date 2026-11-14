@@ -625,7 +625,7 @@ a flag ([§FS-rhei-library.2](rhei-library.spec.md#2---into-placing-a-template-i
 7. **Validate and publish.** Validate a prospective member through its project under the intended final member id, using the staged files as that member's source. For a composition, construct and serialize the complete lock before final validation, and validate with the lock present in the staged tree. Reconcile template settings with project settings for this validation without exposing a half-applied member or settings merge. Resolve the member's own state machine, callbacks, and every `agent`, `model`, `mcp_servers`, and `skills` reference in that final project context. After validation succeeds, commit the reconciled project settings and atomically rename the hidden sibling to `--output`; that rename publishes the flat workspace, settings, and lock together. A successful command publishes exactly one visible member. Validation, lock serialization/write, or publication failure removes staged output and restores prior project settings unless `--keep-on-error` is passed. With `--keep-on-error`, retain the whole staged set, including any successfully written lock and reconciled settings, at the requested visible path when safe or at the reported hidden staging path otherwise. Because the project loader is strict, invalid retained output makes project-scoped commands fail until it is repaired or removed. Standalone validation continues to use the output's `states.yaml` when present and the built-in default otherwise.
 8. **Or union into an existing rhei.** With `--into`, steps 6 and 7 are replaced: the rendered template is unioned into the target's own `states.yaml`, index frontmatter and task files under [§FS-rhei-library.3](rhei-library.spec.md#3-the-union-rules)'s three rules, the whole result is validated in memory, and only then is anything written — under the sibling lock a create takes ([§FS-rhei-new.4](rhei-new.spec.md#4-ids)), keeping the host's bytes and inserting the template's entries at the end of each block. Nothing is staged, so a refusal leaves the target byte-identical and `--keep-on-error` has nothing to keep. The target must have a machine in its own execution root ([§FS-rhei-library.2.1](rhei-library.spec.md#21-the-machine-the-target-must-have)). `settings.json` hoists exactly as [§FS-rhei-templates.6.2](rhei-templates.spec.md#62-instantiating-inside-a-panta-project) specifies. `--dry-run` prints the insertion and writes nothing. When the target is a Panta project rather than a rhei, [§FS-rhei-library.2.2](rhei-library.spec.md#22-a-project-target) says what is laid instead.
 9. **Print summary.** After successful validation, print a human-readable instantiation summary with the output path, task/state counts, instantiated output tree, rendered task tree, the last few rendered task definitions in source order, and a stop-point explanation. `--dry-run` performs the same serialization and validation in scratch and writes nothing at the requested output. For normal instantiation without `--execute`, the stop point is the next ready task and the reason is that execution has not started. With `--into`, the summary is the insertion instead: what the union added, where, and how many tickets it placed.
-9. **Print invocation.** Only after a successful instantiation or dry run, print a shell-safe `rhei instantiate ... --output <path>` command that shows how to instantiate the same template and input values again. The printed command uses the resolved output path, so shell expressions such as `$(date ...)` appear as the concrete path value seen by the CLI.
+9. **Print invocation.** Only after a successful instantiation or dry run, print a shell-safe `rhei instantiate ... --output <path>` command that shows how to instantiate the same template and input values again. The printed command uses the resolved output path, so shell expressions such as `$(date ...)` appear as the concrete path value seen by the CLI. Its label says what the command is. After `--dry-run` it is the real write still to come, and the label is the imperative `Instantiate this template with:`. After a real write, with or without `--execute`, it is a record of what ran, and the label is the past-tense `Instantiated with:`: running it again is refused, because its `--output` now exists. With `--into`, no invocation is printed.
 10. **Execute (optional).** When `--execute` is passed, invoke `rhei run <output>` after successful validation. `rhei run` uses the instantiated output's root `states.yaml` by default when present; otherwise it falls back to the built-in default.
 
 Publication must atomically refuse any existing destination, including a path
@@ -708,6 +708,7 @@ Recent task definitions:
 
 Stopped:
   <stop reason>
+  [<gated tasks>]
 ```
 
 Paths in the report — the `Output:` line, the `Files` root, the `Stopped`
@@ -757,10 +758,19 @@ their own recent definitions when they are among the last five tasks.
 - In `--dry-run`, the reason says rendering and validation succeeded but no
   files were written to the requested output path.
 - If all tasks are terminal, the reason says the plan is already complete.
-- If one or more tasks are in a gating state, the reason lists the first few
-  human-gated tasks.
 - If at least one task is ready, the reason names the next ready task and shows
-  `rhei run <output>` and `rhei next <output>` follow-up commands.
+  `rhei run <output>` and `rhei next <output>` follow-up commands:
+  ``instantiation stopped before execution; next ready task is <task>. Run
+  `rhei run <output>` or claim it with `rhei next <output>`.`` This is the
+  stop point of step 9 of [§FS-rhei-templates.6.1.2](rhei-templates.spec.md#612-behavior), and a task in a gating state
+  never replaces it. When tasks are also in a gating state, a second line under
+  `Stopped:` lists the first three of them, with ` (+<k> more)` for the rest:
+  `<n> task waits on a person at a human gate: <tasks>.`, or `<n> tasks wait on
+  a person at a human gate: <tasks>.` when `<n>` is more than one.
+- If no task is ready and one or more tasks are in a gating state, the reason
+  lists the first few human-gated tasks:
+  `instantiation stopped at a human gate: <tasks>.` The summary says the
+  instantiation stopped at a gate only in this case.
 - If no task is ready because prerequisites are incomplete, the reason lists
   the first few blocked tasks.
 - If none of the above applies, the reason says validation succeeded but no

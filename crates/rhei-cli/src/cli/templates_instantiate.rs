@@ -137,6 +137,7 @@
             set_files,
             values_files,
             &output_dir,
+            dry_run,
         );
 
         if execute {
@@ -296,6 +297,9 @@
         Ok((standalone, agent, program, snapshot).into())
     }
 
+    /// Prints the reproducible invocation (§FS-rhei-templates.6.1.2, "Print invocation"): a
+    /// command to run after `--dry-run`, a record of what ran after a real write.
+    #[allow(clippy::too_many_arguments)]
     fn print_template_instantiation_command(
         template: &str,
         input_args: &[String],
@@ -303,8 +307,9 @@
         set_files: &[String],
         values_files: &[PathBuf],
         output_dir: &Path,
+        dry_run: bool,
     ) {
-        println!("Instantiate this template with:");
+        println!("{}", if dry_run { "Instantiate this template with:" } else { "Instantiated with:" });
         println!(
             "  {}",
             format_template_instantiation_command(

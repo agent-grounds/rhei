@@ -247,14 +247,18 @@ spelling is selected, the complete path is emitted on one physical diagnostic
 line even when it is longer than the renderer's wrap width; `/`, `\`, and `-`
 inside a path are not line-break opportunities.
 
-Parity matters most for the errors that cascade. A task heading authored under a
-content section rather than `## Tasks` fails first as *"Metadata field appears
-outside a task"* on a line the author did not get wrong, whichever task field
-opens its metadata block ([§FS-rhei-plan-language.1.1.1](rhei-plan-language.spec.md#111-task-metadata-above-the-tasks-section)); only the structural
-*"Tasks section must be the final `##` chapter"* diagnostic — which recovery
-reaches last — explains the mistake. Reporting one error per file would hide it
-behind the symptom, in the invocation form `rhei init` steers new authors toward
-([§FS-rhei-init](rhei-init.spec.md#fs-rhei-init-rhei-init)).
+Parity matters most for the errors that cascade. A task field authored in a
+content section with no task heading above it fails as *"Metadata field appears
+outside a task"*, whichever field it is ([§FS-rhei-plan-language.1.1.1](rhei-plan-language.spec.md#111-task-metadata-above-the-tasks-section)), and
+where no `## Tasks` chapter follows, only the structural *"Tasks section must
+be the final `##` chapter"* diagnostic — which recovery reaches last — explains
+the mistake. Reporting one error per file would hide it behind the symptom, in
+the invocation form `rhei init` steers new authors toward ([§FS-rhei-init](rhei-init.spec.md#fs-rhei-init-rhei-init)).
+A task heading authored above `## Tasks` does not cascade: whichever task field
+opens its metadata block, both scopes report it once, at the heading, naming
+`## Tasks` and the edit ([§FS-rhei-errors.1.7](rhei-errors.spec.md#17-a-task-heading-above--tasks)), with no separate problem for its
+fields or the missing section, and still report every independent fault in the
+file.
 
 The project loader still stops at the first failing rhei entry: a project whose
 second rhei also fails reports the first one, and the next run reports the next.

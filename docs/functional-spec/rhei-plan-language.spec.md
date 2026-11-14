@@ -160,8 +160,12 @@ content section or before the first one, the plan obeys the rule the Directory
 Workspace index obeys for task metadata ([§FS-rhei-plan-language.1.2](rhei-plan-language.spec.md#12-directory-workspace-agent-teams-high-concurrency)). Outside
 YAML frontmatter and fenced code blocks ([§FS-rhei-plan-language.2.1](rhei-plan-language.spec.md#21-fenced-code-blocks)), a line
 above `## Tasks` that opens with a recognized task metadata marker is a parse
-error, *"Metadata field appears outside a task"*, reported at that line, whether
-or not a task-shaped heading stands above it. The markers are every task field
+error. What it says depends on the nearest heading above the line. Under a
+task-shaped heading the task, not its field, is what is misplaced, so the
+refusal is the one [§FS-rhei-errors.1.7](rhei-errors.spec.md#17-a-task-heading-above--tasks) gives: at the heading's line, naming
+`## Tasks`, with the edit that puts the task under it. Under any other heading,
+or none, it is *"Metadata field appears outside a task"*, reported at the
+field's line. The markers are every task field
 of [§FS-rhei-plan-language.2](rhei-plan-language.spec.md#2-grammar-ebnf): the core fields (`**State:**`, `**Prior:**`,
 `**Inherits:**`, `**Provides:**`, `**Consumes:**`, `**Excludes:**`,
 `**Assignee:**`), the execution overrides (`**Model:**`, `**Target:**`,
@@ -175,10 +179,13 @@ and the task, with the model, target or tools its author chose for it, would be
 missing with no word said. Which field the author happened to write first under
 a misplaced heading must not decide whether the mistake is reported, so every
 command loading the plan refuses all of them alike, whether it reaches the plan
-directly or through its project, and `rhei validate` reports each such line as
-a problem of its own ([§FS-rhei-validate.4.2](rhei-validate.spec.md#42-diagnostic-parity-across-scopes)). Where no `## Tasks` chapter
-follows them, the structural diagnostic that explains the mistake comes after.
-A prose subheading alone, a task-shaped heading with no metadata line under it,
+directly or through its project. `rhei validate` reports a misplaced task
+heading once, never again for its fields or for the `## Tasks` it names; with
+no `## Tasks` in the plan, every misplaced heading shares that one cause,
+reported at the first. A field line under any other heading is a problem of its
+own, and where no `## Tasks` chapter follows it, the structural diagnostic that
+explains it comes after. Faults independent of these are still reported
+([§FS-rhei-validate.4.2](rhei-validate.spec.md#42-diagnostic-parity-across-scopes)). A prose subheading alone, a task-shaped heading with no metadata line under it,
 and a bold label outside the task metadata vocabulary (`**Note:**`,
 `**Target audience:**`) remain content.
 

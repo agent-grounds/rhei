@@ -117,6 +117,7 @@ mod effort_version_tests;
 mod entry_log_restart_tests;
 mod entry_log_support;
 mod entry_log_tests;
+mod entry_log_unrecorded_arrival_tests;
 mod error_guidance_tests;
 mod evidence_accounting_tests;
 mod evidence_callback_tests;

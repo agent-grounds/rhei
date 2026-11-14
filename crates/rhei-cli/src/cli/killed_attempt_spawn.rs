@@ -61,6 +61,7 @@ impl NamedSpawn<'_> {
     // §FS-rhei-agents.8.1.1 §FS-rhei-evidence.11.1 §FS-rhei-evidence.11.3
     fn plan(&self, worker: Option<&str>) -> Result<(SpawnPlan, LogNumber), PlanRefusal> {
         let (task_id, state_name) = (self.task_id, self.state_name);
+        // Every spawn site plans for the state the ticket is in. §FS-rhei-agents.8.1
         let number = resolve_log_number(
             self.machine,
             state_name,
@@ -68,6 +69,7 @@ impl NamedSpawn<'_> {
             self.task_root,
             self.runtime_dir,
             task_id,
+            Stay::Current,
         )
         .map_err(PlanRefusal::Ledger)?;
         let mut plan = SpawnPlan {
@@ -85,6 +87,14 @@ impl NamedSpawn<'_> {
         while plan.log.exists() {
             let verdict = classify_taken_log(&plan, self.task_root, task_id, state_name, program);
             let TakenLog::Killed { started } = &verdict else {
+                // §FS-rhei-agents.8.1: a log the record at its name puts at an earlier stay.
+                let verdict = match (verdict, plan.earlier_stay_record()) {
+                    (TakenLog::Unaccounted, Some(record)) => TakenLog::EarlierStay {
+                        record_path: plan.record.clone(),
+                        record: Box::new(record),
+                    },
+                    (verdict, _) => verdict,
+                };
                 return Err(PlanRefusal::Taken { log: plan.log, verdict });
             };
             let killed = match worker {

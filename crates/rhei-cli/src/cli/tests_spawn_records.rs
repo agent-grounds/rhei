@@ -39,7 +39,8 @@ mod spawn_records {
     /// `implement` as an uncounted state: numbered by its entries. §FS-rhei-agents.8.1
     fn plan_for(root: &std::path::Path) -> SpawnPlan {
         let runtime = root.join("runtime");
-        let entry = ticket_entry_number(root, &runtime, "plan.1", "implement").expect("ledger");
+        let entry = ticket_entry_number(root, &runtime, "plan.1", "implement", Stay::Current)
+            .expect("ledger");
         plan_spawn_attempt(&runtime, root, "plan.1", "implement", None, LogNumber::Entry(entry))
     }
 

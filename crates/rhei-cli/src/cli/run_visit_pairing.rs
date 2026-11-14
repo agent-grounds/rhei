@@ -142,6 +142,8 @@ impl InvocationCompletion<'_> {
             self.artifact_root,
             self.runtime_dir,
             &task_id,
+            // Read before the move out is written, with the **State:** it is read with. §FS-rhei-agents.8.1
+            Stay::of(self.machine, self.state_name, self.current_state_raw),
         )
         .ok()?;
         let identity = resolved_agent_log_identity(resolved);

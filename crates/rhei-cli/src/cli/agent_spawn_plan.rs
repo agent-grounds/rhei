@@ -95,22 +95,58 @@ fn current_visit_record(
 }
 
 impl SpawnPlan {
+    /// The spawn record at the planned name when it names the planned log at an
+    /// earlier `moves`: the log is an earlier stay's, whose entry number this
+    /// stay took because the ledger lacks an arrival. §FS-rhei-agents.8.1
+    fn earlier_stay_record(&self) -> Option<SpawnRecord> {
+        read_spawn_record(&self.record)
+            .filter(|record| record.log == self.log && record.moves < self.moves)
+    }
+
     /// The refusal of a spawn whose log name is already taken.
     ///
-    /// The attempt is derived from the records, so a name they account for is
-    /// always behind the one planned: a file *at* the planned name is one no
-    /// record accounts for — a planted file, a stale report-less leftover, or
-    /// the log of a spawn killed before it could record itself, or whose
-    /// completion record could not be written. It is kept, and
-    /// neither the attempt nor the entry moves forward because it exists.
+    /// The attempt is derived from the records, so a record at the current
+    /// `moves` is always behind the planned name. A file *at* it is one of two
+    /// things. When the record at this name names it at an earlier `moves`, it
+    /// is an earlier stay's log whose entry number this stay took because the
+    /// ledger lacks an arrival (agent-grounds/rhei#667). Otherwise no record
+    /// accounts for it — a planted file, a stale report-less leftover, or the
+    /// log of a spawn killed before it could record itself, or whose completion
+    /// record could not be written. Either way it is kept, and neither the
+    /// attempt nor the entry moves forward because it exists.
     ///
     /// A spawn site asks [`NamedSpawn::plan`] instead, which first asks whether
     /// a killed run accounts for the file; this is that refusal's otherwise case.
     // §FS-rhei-agents.8.1 §FS-rhei-evidence.11.3
     #[cfg(test)]
     fn unaccounted_log_refusal(&self, task_id: &str) -> Option<String> {
-        self.log.exists().then(|| unaccounted_log_message(&self.log, task_id, self.reset.as_ref()))
+        if !self.log.exists() {
+            return None;
+        }
+        Some(match self.earlier_stay_record() {
+            Some(record) => earlier_stay_log_message(&self.log, &self.record, &record),
+            None => unaccounted_log_message(&self.log, task_id, self.reset.as_ref()),
+        })
     }
+}
+
+/// The sentence a log an earlier stay's record names is refused with — what was
+/// verified, the record, and not where the ledger lost the arrival — and on
+/// the line after it the remedy, which points at the ledger rather than at a
+/// reset: the stay is one missing arrival, not a runtime to throw away.
+// §FS-rhei-agents.8.1 §FS-rhei-authoring.7
+fn earlier_stay_log_message(log: &Path, record_path: &Path, record: &SpawnRecord) -> String {
+    let state = &record.state;
+    format!(
+        "refusing to spawn: {} belongs to an earlier stay in '{state}': the spawn record at moves \
+         {} names it, so the ledger misses an arrival in '{state}' and this stay took the same \
+         entry number\n  help: a `**State:**` line edited by hand writes no arrival in \
+         the ledger, and `rhei transition` does; move {} and {} aside and run again",
+        log.display(),
+        record.moves,
+        log.display(),
+        record_path.display()
+    )
 }
 
 /// The sentence a taken, unaccounted log name is refused with, and on the line

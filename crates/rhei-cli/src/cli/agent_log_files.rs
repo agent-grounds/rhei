@@ -42,6 +42,32 @@ impl LogNumber {
     }
 }
 
+/// Whether the state an entry number is asked for is the one the ticket is in.
+///
+/// Only the current stay can be an arrival no line records and no later line
+/// reveals: a ticket edited by hand back into a state it left. Every spawn asks
+/// about the current state; a reader asking about another state, or one whose
+/// ledger already holds the move out of it, must not count a stay that is over.
+// §FS-rhei-agents.8.1
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Stay {
+    /// The ticket is in the asked state, as read with the ledger.
+    Current,
+    /// The ticket is somewhere else.
+    Elsewhere,
+}
+
+impl Stay {
+    /// The stay `state_name` is for a ticket whose `**State:**` reads `current_state_raw`.
+    fn of(machine: &rhei_validator::StateMachine, state_name: &str, current_state_raw: &str) -> Self {
+        if normalized_state_name(current_state_raw, machine) == state_name {
+            Stay::Current
+        } else {
+            Stay::Elsewhere
+        }
+    }
+}
+
 /// Which number names this invocation's log: a counted state's `{visit_count}`,
 /// and otherwise — a `poll:` state too — the entry number, read from the
 /// ledger. An `Err` is the diagnostic an unreadable ledger is, already worded as
@@ -54,8 +80,9 @@ fn resolve_log_number(
     task_root: &Path,
     runtime_dir: &Path,
     task_id: &str,
+    stay: Stay,
 ) -> Result<LogNumber, String> {
-    resolve_log_number_report(machine, state_name, visit_count, task_root, runtime_dir, task_id)
+    resolve_log_number_report(machine, state_name, visit_count, task_root, runtime_dir, task_id, stay)
         .map_err(|error| error.to_string())
 }
 
@@ -68,16 +95,25 @@ fn resolve_log_number_report(
     task_root: &Path,
     runtime_dir: &Path,
     task_id: &str,
+    stay: Stay,
 ) -> MietteResult<LogNumber> {
     if state_counts_visits(machine, state_name) {
         return Ok(LogNumber::Visit(visit_count));
     }
-    ticket_entry_number_report(task_root, runtime_dir, task_id, state_name).map(LogNumber::Entry)
+    ticket_entry_number_report(task_root, runtime_dir, task_id, state_name, stay).map(LogNumber::Entry)
 }
 
-/// How many times the ticket has arrived in `state_name`: its arrivals over the
-/// two ledgers the move count reads, summed, plus one when it was placed there
-/// initially — its first ledger line leaves the state, or it has none yet.
+/// How many times the ticket has arrived in `state_name`, recorded or not, so
+/// that no stay takes an earlier stay's name (agent-grounds/rhei#309): every
+/// ledger line that lands in the state, over the two ledgers the move count
+/// reads, summed, plus each unrecorded arrival a line leaving the state reveals
+/// when the ticket's line before it does not land there. An initial placement
+/// is the first line's case; a `**State:**` line edited by hand is the case
+/// agent-grounds/rhei#667 found. The current stay is one more unrecorded
+/// arrival when neither ledger's last line of the ticket lands in the state — a
+/// hand edit back into a state it left — or when the ticket has no line at all,
+/// which is entry 1. Only a `Stay::Current` ask counts it: asked about a state
+/// the ticket has left, that stay is over and its departure already counted.
 ///
 /// The movement parser is the ledger's own, so a forced metadata row and its
 /// movement row are one arrival and a metadata row it does not know is none. A
@@ -90,8 +126,9 @@ fn ticket_entry_number(
     runtime_dir: &Path,
     task_id: &str,
     state_name: &str,
+    stay: Stay,
 ) -> Result<u64, String> {
-    ticket_entry_number_report(task_root, runtime_dir, task_id, state_name)
+    ticket_entry_number_report(task_root, runtime_dir, task_id, state_name, stay)
         .map_err(|error| error.to_string())
 }
 
@@ -102,11 +139,14 @@ fn ticket_entry_number_report(
     runtime_dir: &Path,
     task_id: &str,
     state_name: &str,
+    stay: Stay,
 ) -> MietteResult<u64> {
     let owning = task_root.join("runtime").join("state-transitions.log");
     let running = runtime_dir.join("state-transitions.log");
-    let mut first_from: Option<String> = None;
     let mut arrivals = 0u64;
+    let mut earlier_ledger_has_line = false;
+    // Whether a ledger's last line of the ticket lands in the state. §FS-rhei-agents.8.1
+    let mut a_last_line_lands = false;
     for path in std::iter::once(&owning).chain((running != owning).then_some(&running)) {
         let raw = match read_transition_ledger(path) {
             Ok(raw) => raw,
@@ -121,13 +161,24 @@ fn ticket_entry_number_report(
                 let context = unreadable_ledger(path, &err.to_string());
                 ledger_report(path, err).wrap_err(context)
             })?;
+        // Whether the ticket's line before this one lands in the state: none for
+        // the first line, and at the seam the owning ledger's line counts as one
+        // that does, so the seam reveals nothing. §FS-rhei-agents.8.1
+        let mut before_lands = earlier_ledger_has_line.then_some(true);
+        let mut last_lands = None;
         for movement in movements.into_iter().filter(|movement| movement.task_id == task_id) {
-            first_from.get_or_insert_with(|| movement.from.clone());
-            arrivals += u64::from(movement.to == state_name);
+            let lands = movement.to == state_name;
+            let unrecorded = movement.from == state_name && before_lands != Some(true);
+            arrivals += u64::from(lands) + u64::from(unrecorded);
+            before_lands = Some(lands);
+            last_lands = Some(lands);
         }
+        a_last_line_lands |= last_lands == Some(true);
+        earlier_ledger_has_line |= last_lands.is_some();
     }
-    let placed_here = first_from.is_none_or(|from| from == state_name);
-    Ok((arrivals + u64::from(placed_here)).max(1))
+    // The current stay no line lands in is an arrival too, the initial placement included.
+    arrivals += u64::from(stay == Stay::Current && !a_last_line_lands);
+    Ok(arrivals.max(1))
 }
 
 /// The refusal an unreadable ledger is: no entry number, so no name. §FS-rhei-agents.8.1

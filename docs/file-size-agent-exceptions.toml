@@ -424,13 +424,14 @@ path = "docs/functional-spec/rhei-agents.spec.md"
 match = "exact"
 rules = ["citable-spec"]
 kind = "deferred"
-max_accepted = { value = 2450, unit = "lines" }
+max_accepted = { value = 2490, unit = "lines" }
 until = "The agent specification is split at its own top-level boundaries — the profile registry and built-in catalogue apart from prompt composition, and the run loop apart from timeouts and log capture — each half carrying its own declaration, with every `§FS-rhei-agents.<n>` citation repointed."
 issue = "agent-grounds/rhei#179"
 reason = """
 Three subjects share this declaration: what an agent profile is, what rhei composes when it spawns one, and what the run loop does around it. The split is real and is not this change's to make. What is edited here is one ticket's specification point — `agents.<id>.family`, the built-in a wrapped profile belongs to, written into the field table, the merge rule, the roster's provenance, the wholesale-replacement rule it is the counterpart to, and the log header that carries it — and splitting the document in the same commit would move every section citation alongside a behaviour change, which is precisely what a spec-first commit must not hide. agent-grounds/rhei#462 adds the first machine-only settings key, `defaults.clamp_projects`, to the defaults table with its agreed rule, and keeps where it is refused and how in §FS-rhei-budgets.2.1 so this document stays under its hard limit. agent-grounds/rhei#509 writes the writable roots a Codex launch is granted into §FS-rhei-agents.2.2, beside the modes they are passed with, which carried it 2053 -> 2100; its review then added that a root with no Unicode spelling is left out with a warning, 2100 -> 2104. agent-grounds/rhei#513 adds §FS-rhei-agents.2.5, a pi session whose provider stops answering, and the attempt-budget exception, re-spawn phrase, spawn-record field and log-footer rule it needs, which carried it 2157 -> 2247; the recognition is one rule over one family's stream and belongs beside the refusal it is a sibling of. agent-grounds/rhei#549 respells one sentence of §FS-rhei-agents.8.1, the refusal's remedy, to follow §FS-rhei-reset.5.1, which carried it 2309 -> 2310; the rule itself went to the reset specification so this document grows by no more than the sentence that points at it.
 agent-grounds/rhei#548 extends the existing log-authority and completion-record points with failure diagnostics. It retains their section addresses for the implementation and red-test contract; the declaration and citation migration named above remains the prerequisite for splitting. The measured size is now 2324 non-blank lines, so the accepted ceiling moves to the next configured step, 2400.
 agent-grounds/rhei#670 widens §FS-rhei-agents.2.2.2 from the pi family's exception into the one statement of how every family ends a stdin command line, adding codex's `-- -` and the fork that reads no prompt without it, and points the stdin_prompt field, the codex row and the flag order of §FS-rhei-agents.2.2 at it, which carried it 2404 -> 2435. The point keeps its number because fifteen sites cite it, and a split would move every section citation in the same commit as the red tests. The next configured step, 2500, is this document's hard limit, where a soft ceiling never fires, so the accepted ceiling is stated as 2450 instead.
+agent-grounds/rhei#661 adds §FS-rhei-agents.8.1.1, the resume of an agent killed with its run, the `killed` ending, count and record in §FS-rhei-agents.8.4, the sixth non-spend exception and the poll halt in §FS-rhei-agents.3.2.3, and the re-spawn phrase in §FS-rhei-agents.3.2.1, which carried it 2447 -> 2480; the conditions, what "gone" means, the refusal cases and the group record went to §FS-rhei-evidence.11 and §FS-rhei-evidence.3.4 so that this document grows by no more than that. The hard limit is still the next configured step, so the accepted ceiling is stated as 2490.
 """
 [[exceptions]]
 path = "docs/functional-spec/rhei-transitions.spec.md"
@@ -581,10 +582,11 @@ path = "docs/functional-spec/rhei-run.spec.md"
 match = "exact"
 rules = ["citable-spec"]
 kind = "deferred"
-max_accepted = { value = 1400, unit = "lines" }
+max_accepted = { value = 1500, unit = "lines" }
 until = "a dedicated spec-decomposition change introduces stable child declarations and migrates every affected FS-rhei-run citation"
 reason = """
 The execution loop is still one normative declaration with heavily cited numbered sections; a child-declaration boundary and atomic citation-migration plan must exist before it can be split safely.
+agent-grounds/rhei#661 adds the "After a supervisor's death" paragraph to §FS-rhei-run.3.2, what the next run does about a run killed outright, which carried it 1401 -> 1409, so the accepted ceiling moves to the next configured step, 1500.
 """
 [[exceptions]]
 path = "docs/functional-spec/rhei-supervision.spec.md"

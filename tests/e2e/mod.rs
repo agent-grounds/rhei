@@ -491,6 +491,9 @@ mod git_env;
 mod inherited_rhei_env;
 #[path = "../support/python_fixture.rs"]
 mod python_fixture;
+// The helper's own test, in this binary alone so it runs once.
+#[path = "../support/python_fixture_append.rs"]
+mod python_fixture_append;
 #[path = "../support/test_dir.rs"]
 mod test_dir;
 #[path = "../support/unique_dir_name.rs"]

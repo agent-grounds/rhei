@@ -39,8 +39,6 @@ append(target, 'topic2-1 ' + name + ' together\n')
 /// steps and each writer held between them until the other has sought. Both
 /// lines land only when the helper serialises the append. §REQ-cross-platform.4.2
 #[test]
-#[ignore = "red until #723: under Windows' seek-then-write append the fixture helper `append` \
-            keeps one of two concurrent lines; implement removes this"]
 fn fixture_append_keeps_both_lines_two_processes_write_at_once() {
     let dir = unique_temp_dir("fixture-append");
     let meet = dir.join("meet");

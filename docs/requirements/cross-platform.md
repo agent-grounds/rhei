@@ -68,6 +68,30 @@ predicate remains true on disk. Its failure reports the exit status and captured
 scheduler stdout and stderr. Waiting for successful completion is a separate
 operation: a terminal run cannot establish readiness for a live interaction.
 
+### 4.2 A File Two Processes Append To Is Appended Under A Lock
+
+A fixture that appends to a file another process may append to at the same
+moment — the arms of one fan-out, tasks run in parallel, callbacks that fire
+together — takes an exclusive lock on that file first and holds it across the
+write and the flush. Appending is one atomic step on POSIX, where the descriptor
+carries `O_APPEND`, and two on Windows, where the C runtime seeks to the end and
+then writes: two writers that seek together write at one offset, and the line
+that landed first is overwritten. agent-grounds/rhei#723 is that failure: on
+`windows-latest` both arms of a task appended to one `arms.log` at once, every
+arm ran, and the log held three lines of four.
+
+The lock goes with its holder however the holder ends, so a fixture killed
+mid-append never stalls the next writer, and it leaves no file behind or beside
+the one appended to. A writer that cannot take it waits no longer than a margin
+[§REQ-cross-platform.8](cross-platform.md#8-a-margin-outlasts-a-stalled-runner) and then fails, naming the file. The shared fixture helper
+`append` is where this lives; a fixture that opens such a file in append mode
+itself is another copy of the race.
+
+The measure is two processes that each append one line through the helper to
+one file, with every append given Windows' seek-then-write and each writer held
+between its seek and its write until the other has sought: the file holds both
+lines, on every platform, including those whose own append is atomic.
+
 ## 5. Paths Are Data
 
 Code never builds a path from `/`-joined strings, never compares two spellings

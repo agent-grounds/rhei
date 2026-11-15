@@ -58,7 +58,8 @@ transitions:
         }),
         None,
         &format!(
-            "with pathlib.Path({}).open('a') as marker:\n    marker.write('spawned\\n')",
+            // Both agents run at once under `--parallel 2`. §REQ-cross-platform.4.2
+            "append({}, 'spawned\\n')",
             serde_json::to_string(spawned.to_string_lossy().as_ref()).expect("marker")
         ),
     );

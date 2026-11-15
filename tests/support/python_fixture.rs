@@ -46,7 +46,9 @@ pub fn python_command() -> &'static str {
 /// the same values from the authoritative prompt; the actual process
 /// environment stays empty, which tests that exercise isolation inspect with
 /// `os.environ` directly. `write`, `append`, and `result` create parents as
-/// `mkdir -p` did.
+/// `mkdir -p` did, and `append` takes an exclusive lock on the file across the
+/// write, so processes appending to one file at once all land
+/// §REQ-cross-platform.4.2.
 
 // §FS-rhei-agents.4
 const FIXTURE_PRELUDE: &str = r#"import io
@@ -149,11 +151,82 @@ def write(path, text):
         handle.write(text)
 
 
+# How long `append` waits for another writer's lock: a margin, the e2e binary's
+# 60 s fixture margin, not a behaviour. §REQ-cross-platform.8
+_APPEND_LOCK_MARGIN = 60.0
+
+# Where a Windows writer takes its lock. `msvcrt.locking` locks a byte range from
+# the descriptor's position, and Windows locks are mandatory: a reader of a locked
+# byte is refused. So the range is one byte far past any fixture file's end, where
+# nothing reads or writes; Windows allows locking past the end of a file. It stays
+# below 2**31 - 1 so the C runtime's `_locking` accepts the offset.
+_APPEND_LOCK_OFFSET = 0x7FFFFF00
+
+
+def _append_try_lock(fd):
+    """One attempt at the append lock on `fd`; raises `OSError` while another holds it.
+
+    Both are locks the OS drops when the holder's descriptor closes or its process
+    ends, however it ends, and neither leaves a file behind. §REQ-cross-platform.4.2
+    """
+    if os.name == 'nt':
+        import msvcrt
+        os.lseek(fd, _APPEND_LOCK_OFFSET, os.SEEK_SET)
+        msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+    else:
+        import fcntl
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+
+def _append_unlock(fd):
+    if os.name == 'nt':
+        import msvcrt
+        os.lseek(fd, _APPEND_LOCK_OFFSET, os.SEEK_SET)
+        msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+    else:
+        import fcntl
+        fcntl.flock(fd, fcntl.LOCK_UN)
+
+
+def _append_lock(fd, target):
+    """Wait for the append lock on `fd`, no longer than the margin, then fail
+    naming `target`. §REQ-cross-platform.4.2
+
+    Polled rather than blocking: `flock` alone would wait forever, and
+    `msvcrt.LK_LOCK` gives up after about 10 s.
+    """
+    until = time.monotonic() + _APPEND_LOCK_MARGIN
+    while True:
+        try:
+            _append_try_lock(fd)
+            return
+        except OSError as error:
+            if time.monotonic() >= until:
+                raise TimeoutError(
+                    f'append: no lock on {target} within {_APPEND_LOCK_MARGIN:.0f} s'
+                ) from error
+        time.sleep(0.01)
+
+
 def append(path, text):
+    """Append `text` to `path` under an exclusive lock held across the write and
+    the flush, so two processes appending at once both land. §REQ-cross-platform.4.2
+
+    The open stays in append mode, so each write goes to the end whatever the
+    descriptor's position: one atomic step on POSIX (`O_APPEND`), and on Windows
+    the C runtime's seek to the end, which the lock is what keeps from racing.
+    Moving the position to take the Windows lock therefore never moves the write.
+    """
     target = pathlib.Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
     with target.open('a', encoding='utf-8', newline='') as handle:
-        handle.write(text)
+        fd = handle.fileno()
+        _append_lock(fd, target)
+        try:
+            handle.write(text)
+            handle.flush()
+        finally:
+            _append_unlock(fd)
 
 
 def result(text):

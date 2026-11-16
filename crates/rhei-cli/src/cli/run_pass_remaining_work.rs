@@ -285,13 +285,13 @@ fn agent_deadline_since(
                 };
                 // No arm waits, no completion read: this scan runs on every pass.
                 if invocations.iter().any(|resolved| waits(resolved).is_some()) {
-                    // The first arm still to be spawned to come free makes the ticket ready, and a
-                    // finished arm adds no deadline. §FS-rhei-run.5.1
+                    // A free arm leaves no deadline, else the earliest held one. §FS-rhei-run.5.1
                     spawns
                         .invocations_still_to_spawn(rhei, task, machine, &state, state_def, invocations)
                         .iter()
-                        .filter_map(waits)
-                        .min()
+                        .map(waits)
+                        .collect::<Option<Vec<_>>>()
+                        .and_then(|deadlines| deadlines.into_iter().min())
                 } else {
                     None
                 }

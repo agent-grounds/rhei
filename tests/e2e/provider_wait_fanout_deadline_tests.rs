@@ -6,9 +6,11 @@
 //! FAR: `--until-idle` named it as the next attempt, and the continuous run,
 //! sequential or in the worker pool, announced a sleep to it, while the first
 //! arm could already spawn at NEAR. The single-target control beside it shows
-//! the fold across tickets was already the earliest. The last case guards the
-//! other half of the rule: an arm already finished is not still to be spawned,
-//! so its identity's earlier record does not make the ticket due.
+//! the fold across tickets was already the earliest. A guard covers the other
+//! half of the rule: an arm already finished is not still to be spawned, so its
+//! identity's earlier record does not make the ticket due. The last case is a
+//! free arm behind a poll: an arm still to be spawned on an identity with no
+//! wait leaves the ticket no provider deadline, so the poll alone decides.
 // §FS-rhei-run.5.1 §FS-rhei-run.3.3
 
 use super::provider_limit_support::*;
@@ -19,8 +21,9 @@ use super::*;
 /// `fix` is the ticket's fan-out, one arm per identity: `codex/openai` and
 /// `mock/mock`. `finishing` is the same fan-out owing one output per arm, so an
 /// arm whose output is written is satisfied while its sibling is still to be
-/// spawned. `solo` holds the `codex/openai` identity on one target alone, and
-/// `other` the `mock/mock` one. §FS-rhei-run.3.3
+/// spawned, and `polling` is the same fan-out retried hourly. `solo` holds the
+/// `codex/openai` identity on one target alone, and `other` the `mock/mock`
+/// one. §FS-rhei-run.3.3
 const MACHINE: &str = r#"name: fan-out-deadlines
 version: 1
 states:
@@ -38,6 +41,14 @@ states:
     outputs:
       - name: arm
         path: runtime/fanout/{model.name}.txt
+  polling:
+    all_targets:
+      - codex:openai:alpha
+      - mock:mock:beta
+    attempts: 1
+    poll:
+      interval: 1h
+      max_attempts: 5
   solo:
     target: codex:openai:alpha
     attempts: 1
@@ -54,6 +65,11 @@ transitions:
   - from: finishing
     to: review
   - from: review
+    to: completed
+  - from: polling
+    to: polling
+    condition: pollAttempts < pollMaxAttempts
+  - from: polling
     to: completed
   - from: solo
     to: completed
@@ -256,6 +272,57 @@ fn a_finished_arm_on_an_earlier_held_identity_does_not_make_its_fan_out_due() {
         "Task 1's only arm still to be spawned waits until FAR, about 7200s; its finished arm's \
          identity, held until NEAR, must not make it due; it slept {seconds}s and \
          printed:\n{printed}"
+    );
+    assert_nothing_started(&fixture);
+}
+
+/// A free arm behind a poll: Task 1's `polling` fan-out is next due at NEAR, its
+/// `codex/openai` arm is held until FAR, and its `mock/mock` arm's identity has
+/// no wait recorded. At NEAR that arm is free and the pass spawns it alone, so
+/// the ticket has no provider deadline and its poll alone makes it due: NEAR,
+/// not the later of the poll and the held arm. §FS-rhei-run.5.1
+#[test]
+fn a_fan_out_with_a_free_arm_is_due_at_its_poll_not_its_held_arm() {
+    let at = Deadlines::from_now();
+    let fixture = ProviderFixture::new(
+        "free-arm-behind-poll",
+        &[("01.md", "### Task 1: Poll it\n**State:** polling\n")],
+        MACHINE,
+        LOGS_EVERY_START,
+    );
+    edit_metadata(&fixture.root, |m| {
+        m["metadata"] = serde_json::json!({"tasks": {"1": {
+            "pollNextAttemptAt": {"polling": at.near},
+            "providerLimits": {"polling": held("codex", "openai", at.far)},
+        }}});
+    });
+
+    let text = run_until_idle(&fixture, &[]);
+    assert_exit(&text, EXIT_IDLE, "the ticket is waiting on its poll");
+    let combined = format!("{}{}", text.stdout, text.stderr);
+    assert!(
+        combined.contains("Run idle:")
+            && combined.contains(&format!("next attempt {}", utc_at(at.near)))
+            && !combined.contains(&format!("next attempt {}", utc_at(at.far))),
+        "the next attempt is the poll (NEAR {}), where the free arm spawns, not the held arm \
+         (FAR {}); got:\n{combined}",
+        utc_at(at.near),
+        utc_at(at.far)
+    );
+
+    let json = run_until_idle(&fixture, &["--json"]);
+    assert_exit(&json, EXIT_IDLE, "the ticket is waiting on its poll");
+    assert_eq!(
+        stop_payload(&json)["next_attempt_at"],
+        serde_json::json!(utc_at(at.near)),
+        "the stream's next attempt is the poll (NEAR), not the held arm (FAR)"
+    );
+
+    let (seconds, printed) = announced_sleep(&fixture, "free-arm", &[]);
+    assert!(
+        seconds <= 3600 && seconds + SLACK_SECS > 3600,
+        "the run sleeps until the poll, about 3600s, not the held arm, about 7200s; it slept \
+         {seconds}s and printed:\n{printed}"
     );
     assert_nothing_started(&fixture);
 }

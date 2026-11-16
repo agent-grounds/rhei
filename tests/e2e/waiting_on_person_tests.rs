@@ -236,3 +236,43 @@ fn the_scoped_no_work_line_reads_the_claim_before_the_person() {
         "a claimed ticket contributes no reason of its own, and the prior still names one"
     );
 }
+
+/// The same rule for a blocker no clock releases: a person-waiting poll missing
+/// its required input is reported for the input in the halt block, so the
+/// `--rhei` no-work line names no person for it either. Naming the author there
+/// gave the one ticket two reasons, and the author's answer cannot write the file.
+// §FS-rhei-run.5.1.1 §FS-rhei-run-report.3.1 §FS-rhei-panta.6.1
+#[test]
+fn the_scoped_no_work_line_names_no_person_for_a_poll_missing_its_input() {
+    let machine = APPROVAL_MACHINE.replacen(
+        "    initial: true\n",
+        "    initial: true\n    inputs:\n      - name: brief\n        path: runtime/brief.md\n",
+        1,
+    );
+    let plan = "# Rhei: Brief\n\n## Tasks\n\n### Task 1: Get the plan approved\n**State:** plan-approval\n";
+    let dir = unique_temp_dir("waiting-on-scoped-missing-input");
+    let plan_path = write_fixture_file(&dir, "plan.rhei.md", plan);
+    let machine_path = write_fixture_file(&dir, "states.yaml", &machine);
+
+    let result = run_cli(
+        "run",
+        &plan_path,
+        &machine_path,
+        &["--rhei", "plan", "--no-callbacks", "--no-tui"],
+    );
+
+    assert!(
+        result.stdout.contains("Task plan.1 (plan-approval): required input(s) not found: brief"),
+        "the halt block names the input in:\n{}",
+        result.stdout
+    );
+    let no_work = result
+        .stdout
+        .lines()
+        .find(|line| line.starts_with("No tasks could be advanced"))
+        .unwrap_or_else(|| panic!("no no-advancement line in:\n{}", result.stdout));
+    assert_eq!(
+        no_work, "No tasks could be advanced in the --rhei scope (plan).",
+        "the input, not the author, holds the ticket"
+    );
+}

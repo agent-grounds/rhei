@@ -1526,9 +1526,12 @@ provider-limit deadline is the **earliest** among its invocations still to be
 spawned — the invocations the held-ticket rule below judges — because the first
 of them to come free makes the ticket ready, and its pass spawns that arm alone.
 A fan-out ticket whose arms wait on different identities is therefore due when
-its first held arm frees, not its last. An invocation the pre-spawn completion
-check already finds satisfied is not still to be spawned, so it adds no
-deadline, even while its identity stays held. The run
+its first held arm frees, not its last. An invocation still to be spawned on an
+identity with no wait recorded is free already, so a task with one has no
+provider-limit deadline at all, and only its poll deadline, if any, holds it
+back. An invocation the pre-spawn completion check already finds satisfied is
+not still to be spawned, so it adds no deadline, even while its identity stays
+held. The run
 sleeps until the earliest such effective eligibility deadline among all
 waiting tasks, bounded below by 1 s, and **in the continuous mode** does not
 emit `run_finished` merely because all remaining work is provider-limited —

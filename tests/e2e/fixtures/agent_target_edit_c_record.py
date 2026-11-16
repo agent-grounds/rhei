@@ -2,7 +2,8 @@
 
 Shared by d's agent and the startup scheduler, after shared_access_refused.py,
 so that all three reads wait out a refusal by one rule within the fixture's
-5-second monotonic bound. §FS-rhei-agent-visit-pairing.5.1
+named monotonic fixture margin, embedded by Rust as `_FIXTURE_MARGIN`.
+§FS-rhei-agent-visit-pairing.5.1
 """
 import json
 import pathlib
@@ -40,12 +41,11 @@ def _read_c_record(root, deadline, waiting):
 
 
 def _await_c_success(root, waiting):
-    """Return once c has completed plan.1's work visit 2, within 5 seconds.
+    """Return once c has completed plan.1's work visit 2, within the fixture margin.
 
-    The bound leaves room within the fixture's 10s agent timeout.
     §FS-rhei-agent-visit-pairing.5 §FS-rhei-agent-visit-pairing.5.1
     """
-    deadline = time.monotonic() + 5
+    deadline = time.monotonic() + _FIXTURE_MARGIN
     while True:
         record, absent = _read_c_record(root, deadline, waiting)
         if absent is None and (

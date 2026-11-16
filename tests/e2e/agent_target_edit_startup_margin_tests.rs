@@ -5,7 +5,6 @@ use super::*;
 
 // §FS-rhei-agent-visit-pairing.5.1: port #739's real six-second interpreter stall.
 #[test]
-#[ignore = "red until #739: healthy delayed d must reach deliberate exit 1; implement removes this"]
 fn failed_own_record_survives_a_six_second_healthy_startup_stall_in_both_orders() {
     for order in ["c-first", "d-first"] {
         failure_support::check_failed_own_record_with(
@@ -29,7 +28,6 @@ fn failed_own_record_survives_a_six_second_healthy_startup_stall_in_both_orders(
 
 // §FS-rhei-agent-visit-pairing.5.1: profiles override the fallback; check every generated bound.
 #[test]
-#[ignore = "red until #739: all effective target-edit timeouts must use the fixture margin; implement removes this"]
 fn target_edit_execution_bounds_all_use_the_named_fixture_margin() {
     let margin = super::super::helpers::FIXTURE_MARGIN;
     let machine: serde_yaml::Value =

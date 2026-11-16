@@ -123,7 +123,11 @@ fn permanent_problems(site: &str, order: &str) -> Vec<String> {
     };
     expect(ran.status.code() == Some(97), &format!("exit 97, got {:?}", ran.status.code()));
     expect(named(&events, "escaped").is_empty(), "the refusal escaped the fixture");
-    expect((5.0..=6.0).contains(&elapsed), &format!("retried to the 5s bound, elapsed={elapsed}"));
+    let margin = FIXTURE_MARGIN_DURATION.as_secs_f64();
+    expect(
+        (margin..=margin + 1.0).contains(&elapsed),
+        &format!("retried to the {FIXTURE_MARGIN} bound, elapsed={elapsed}"),
+    );
     expect(reads > 1, &format!("read again after a refusal, reads={reads}"));
     expect(error.contains("timed out"), "says it timed out");
     expect(error.contains(&path), "names c's record path");

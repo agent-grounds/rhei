@@ -394,16 +394,12 @@ impl<'a> DeliberateWaitJudgment<'a> {
     }
 
     fn compute(&mut self, task: &'a rhei_core::ast::Task) -> bool {
-        // A held ticket answers with the blocker at the other end of the hold,
-        // and a supervisor parked at a gate has no next visit to release it on.
-        // §FS-rhei-run-report.3.1 §FS-rhei-supervision.3.1
+        // A held ticket inherits its holder's full reading, including any outer hold.
+        // §FS-rhei-run-report.3.1 §FS-rhei-supervision.3.2
         let supervision = supervision_verdict_for(
             task, &self.index, self.machines, self.rhei.metadata.as_ref(), &HashSet::new(),
         );
-        if let SupervisionVerdict::Held { supervisor, state } = &supervision {
-            if self.machines.for_task(supervisor).states.get(state).is_some_and(|def| def.gating) {
-                return true;
-            }
+        if let SupervisionVerdict::Held { supervisor, .. } = &supervision {
             return self.index.get(supervisor).copied()
                 .is_some_and(|holder| self.judge(holder) == Some(true));
         }
@@ -413,16 +409,17 @@ impl<'a> DeliberateWaitJudgment<'a> {
         // the same reading `has_pending_human_gate` uses.
         let own_gate_pending =
             machine.states.get(&state).map(|def| def.gating && !def.terminal).unwrap_or(false);
-        // A supervisor is ready *while* its subtree is open, so its own gate
-        // and claim are read ahead of the subtree, as `classify_halt` reads
-        // them. §FS-rhei-supervision.3.1 §FS-rhei-run-report.3.1
-        if task_is_supervising(task, machine) {
-            if own_gate_pending {
-                return true;
-            }
-            if task.assignee.is_some() {
-                return false;
-            }
+        // A supervisor reads its gate and claim before its open subtree; a retained
+        // hold also makes its own gate the blocker. §FS-rhei-supervision.3.1 §FS-rhei-run-report.3.1
+        if own_gate_pending
+            && (task_is_supervising(task, machine)
+                || recorded_supervision_phase(self.rhei.metadata.as_ref(), &task.id)
+                    == Some(SupervisionPhase::Held))
+        {
+            return true;
+        }
+        if task_is_supervising(task, machine) && task.assignee.is_some() {
+            return false;
         }
         // An owed supervisor answers for its own visit despite open children. §FS-rhei-run.5.1
         // Other parents inherit their open descendants' blockers, each judged

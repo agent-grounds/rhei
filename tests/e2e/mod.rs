@@ -415,6 +415,7 @@ mod supervision_retry_support;
 mod supervision_spent_visit_retry_tests;
 mod supervision_surfaces_tests;
 mod supervision_tests;
+mod supervisor_provider_wait_blocker_tests;
 mod supervisor_provider_wait_support;
 mod supervisor_provider_wait_tests;
 mod supervisor_validation_scope_tests;

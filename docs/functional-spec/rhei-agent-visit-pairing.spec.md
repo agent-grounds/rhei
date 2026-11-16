@@ -86,9 +86,18 @@ exit. Rhei replaces that record by rename, and a reader that overlaps the
 replacement may be refused
 ([§AR-agent-orchestrator-workflow.3.3.1.1](../architecture/agent-orchestrator-workflow.spec.md#3311-a-replacement-refused-by-an-open-handle)).
 
+Startup prerequisites, d's poll for c's success, and the snapshot read use
+bounded monotonic waits derived from the e2e binary's one named fixture margin
+([§REQ-cross-platform.8](../requirements/cross-platform.md#8-a-margin-outlasts-a-stalled-runner)).
+The target-edit machine's agent timeout, the generated settings' default agent
+timeout, and every generated agent profile's timeout use that margin too, so
+an effective outer timeout does not preempt a healthy delayed startup. The
+startup predicates and deliberate one-second ordering delay remain meaningful;
+expiry still fails with prerequisite-timeout exit 97 and names the prerequisite.
+
 Each of the three reads retries an access, sharing or lock refusal
-(`PermissionError`, or Windows error 5, 32 or 33) within the fixture's existing
-5-second monotonic bound, so a transient refusal neither escapes d's process
+(`PermissionError`, or Windows error 5, 32 or 33) within its monotonic bound,
+so a transient refusal neither escapes d's process
 nor is mistaken for d's deliberate exit: the snapshot is always written after
 that exit and holds c's successful record. A refusal that lasts to the bound
 ends with the fixture's prerequisite-timeout exit, 97, naming c's record path
@@ -99,6 +108,20 @@ test harness, not the engine's reads.
 A deterministic regression injects one recognizable refusal into each of the
 three reads of the actual fixtures and still requires the whole scenario above,
 and injects a permanent refusal and an unrelated error into each read directly.
+Direct expiry coverage uses controlled time rather than waiting a real fixture
+margin for each negative case.
+
+Controlled delayed-start coverage stalls d's healthy interpreter for six real
+seconds before the scheduler, in both startup orders, without changing clocks
+or agent exit policies. Both c and d must actually start and reach their
+application side effects; c succeeds before d deliberately exits 1, the exit
+snapshot holds c's successful current-visit record, and orphan x stays
+successful. On the next invocation only d retries, with a fresh attempt and
+log; c's and x's records remain unchanged and no orphan reuse note covers d's
+failed own record. A prerequisite timeout or interruption cannot substitute
+for d's deliberate failure. Focused coverage checks the generated machine,
+default and every profile timeout against the named margin, so fixing the
+former five-second wait cannot move the failure to a ten-second outer bound.
 
 ## 6. The Legacy First-Visit Branch
 

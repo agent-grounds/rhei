@@ -1622,6 +1622,36 @@ is ([§FS-rhei-panta.6.1](rhei-panta.spec.md#61-readiness-and-rhei-next)).
 including auto-emit, is suppressed for self-loop attempts and runs only on a
 terminal non-self-loop exit when the state is otherwise snapshot-capable.
 
+#### 5.1.1. A Blocker No Clock Releases
+
+The rule above that a task contributes a deadline only when that deadline
+alone would make it eligible holds for the sleep of the continuous mode as
+much as for the reported next attempt, and it covers every reason the ready
+scan ([§FS-rhei-run.3](rhei-run.spec.md#3-execution-loop) step 2) holds a ticket back, not only a claim, an open
+subtree, a held supervisor or an unsatisfied `**Prior:**`. A ticket whose
+state's required `inputs:` are not on disk is held back for a reason no clock
+releases: only the operator writing the file, or marking the input
+`optional: true`, does. Such a ticket contributes no deadline, whatever poll
+deadline or provider-limit record ([§FS-rhei-run.3.3](rhei-run.spec.md#33-provider-limit-parking)) it carries, live or
+expired.
+
+So a plan whose only remaining work is such a ticket halts at once, in the
+continuous mode and under `--until-idle` alike, with the `Nothing to schedule`
+report that names the missing file and its remedy
+([§FS-rhei-run-report.3.1](rhei-run-report.spec.md#31-layout)) — the same report, exit status and wording it
+gives when the ticket carries no record at all. It prints no
+`No ready tasks; sleeping` line, opens no pass, and spawns nothing. Under
+`--until-idle` the run is not idle, because a missing input is the operator's
+to repair, and the stop's `next_attempt_at` is present and null
+([§FS-rhei-run-json.2.1](rhei-run-json.spec.md#21-records)).
+
+This changes nothing about a ticket the ready scan would otherwise take. An
+expired provider record on such a ticket still means "eligible now", so a
+deadline that moved between a worker-pool refill and the outer check causes
+one rescan rather than a false halt ([§FS-rhei-run.3.3](rhei-run.spec.md#33-provider-limit-parking)), and a poll deadline
+already past at the instant the pass read its ready set still keeps the pass
+loop alive ([§FS-rhei-run.3.6](rhei-run.spec.md#36-stall-release) item 3).
+
 ### 5.2. Concurrent vs. Serial States
 
 The [`concurrent`](rhei-states.spec.md#12-per-state-fields) flag on a `StateDef` determines whether multiple ready tasks in the same state may be scheduled together in one pass:

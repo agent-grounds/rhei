@@ -1521,7 +1521,14 @@ States that declare a [`poll:`](rhei-states.spec.md#2-polling-states) block are 
 If, at the end of a pass, every remaining non-terminal task is either in a gating state, blocked behind a gating dependency, or blocked by a pending `pollNextAttemptAt`, `rhei run` sleeps until the earliest `pollNextAttemptAt` across all blocked poll tasks (bounded below by 1 s to avoid busy-looping) and then begins a new pass. If no poll deadline is pending and only gating remains, the run exits as it does today. A poll whose reverted attempts have spent `poll.max_attempts` is not blocked by its `pollNextAttemptAt`, because no attempt follows it ([§FS-rhei-run.3.7.4](rhei-run.spec.md#374-the-charge)).
 
 Provider-limit waits join this same deadline scan. For one task, eligibility is
-the later of its applicable poll deadline and provider-limit deadline. The run
+the later of its applicable poll deadline and provider-limit deadline. A task's
+provider-limit deadline is the **earliest** among its invocations still to be
+spawned — the invocations the held-ticket rule below judges — because the first
+of them to come free makes the ticket ready, and its pass spawns that arm alone.
+A fan-out ticket whose arms wait on different identities is therefore due when
+its first held arm frees, not its last. An invocation the pre-spawn completion
+check already finds satisfied is not still to be spawned, so it adds no
+deadline, even while its identity stays held. The run
 sleeps until the earliest such effective eligibility deadline among all
 waiting tasks, bounded below by 1 s, and **in the continuous mode** does not
 emit `run_finished` merely because all remaining work is provider-limited —
@@ -1550,8 +1557,9 @@ alone.
 would sleep here returns idle instead, and the deadline scan becomes the
 reported **earliest effective next attempt** rather than a sleep duration.
 Composition is unchanged and must not diverge from it — the *later* of a task's
-applicable poll and provider-limit deadlines, then the *earliest* such instant
-across waiting tasks, published as an RFC 3339 UTC instant. One filter is added
+applicable poll and provider-limit deadlines, the latter the earliest among its
+invocations still to be spawned, then the *earliest* such instant across
+waiting tasks, published as an RFC 3339 UTC instant. One filter is added
 for the reported value, and it is the whole difference between a schedule hint
 and a published contract: a task contributes only when its deadline **alone**
 makes it eligible for *this* invocation, under the `--rhei` scope it was given

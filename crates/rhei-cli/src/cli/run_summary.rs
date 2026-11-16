@@ -564,6 +564,7 @@ fn marker_for_task(
         Some(
             HaltCause::HeldBySupervisor { .. }
                 | HaltCause::WaitingOnPerson { .. }
+                | HaltCause::WaitingOnPoll { .. }
                 | HaltCause::ProviderLimited { .. }
         )
     ) && !state_is_failure(state)
@@ -629,6 +630,8 @@ struct AttentionRow {
     /// its count line names each rather than calling both "held".
     // §FS-rhei-states.2.5 §FS-rhei-run-report.3.1
     waits_on_person: bool,
+    /// True for a plain poll held by its own next attempt. §FS-rhei-run-report.3.1
+    waits_on_poll: bool,
     /// True for a durable provider wait, counted separately from supervision
     /// holds and human polling. §FS-rhei-run-report.3.1
     provider_limited: bool,
@@ -1420,6 +1423,7 @@ fn collect_rows(
                     halt_causes.get(&id),
                     Some(HaltCause::WaitingOnPerson { .. })
                 ),
+                waits_on_poll: matches!(halt_causes.get(&id), Some(HaltCause::WaitingOnPoll { .. })),
                 provider_limited: matches!(
                     halt_causes.get(&id),
                     Some(HaltCause::ProviderLimited { kind: ProviderWaitKind::Limit, .. })
@@ -1437,6 +1441,7 @@ fn collect_rows(
                 Some(
                     HaltCause::HeldBySupervisor { .. }
                         | HaltCause::WaitingOnPerson { .. }
+                        | HaltCause::WaitingOnPoll { .. }
                         | HaltCause::ProviderLimited { .. }
                 )
             ) {
@@ -1557,20 +1562,24 @@ fn result_phrase(
 }
 
 /// What the Waiting group holds, named by kind: `2 held`, `1 waiting on a
-/// person`, or both joined. A group of held tickets alone reads exactly as it
+/// person`, `1 waiting on a poll`, or several joined. A group of held tickets alone reads exactly as it
 /// did before the second kind joined it.
 // §FS-rhei-run-report.3.1 §FS-rhei-states.2.5
 fn waiting_tally(waiting: &[AttentionRow]) -> String {
     let people = waiting.iter().filter(|row| row.waits_on_person).count();
+    let polls = waiting.iter().filter(|row| row.waits_on_poll).count();
     let provider = waiting.iter().filter(|row| row.provider_limited).count();
     let unavailable = waiting.iter().filter(|row| row.provider_unavailable).count();
-    let held = waiting.len() - people - provider - unavailable;
+    let held = waiting.len() - people - polls - provider - unavailable;
     let mut parts = Vec::new();
     if held > 0 {
         parts.push(format!("{held} held"));
     }
     if people > 0 {
         parts.push(format!("{people} waiting on a person"));
+    }
+    if polls > 0 {
+        parts.push(format!("{polls} waiting on a poll"));
     }
     if provider > 0 {
         parts.push(format!("{provider} provider-limited"));

@@ -150,6 +150,15 @@ fn classify_halt(
     if let Some(label) = waiting_on.filter(|_| clock_can_wait) {
         return HaltCause::WaitingOnPerson { label: label.to_string() };
     }
+    // The scan's own poll skip, so only a deadline that alone holds the ticket — still ahead, bound
+    // unspent, no blocker a clock cannot release — earns the row.
+    // §FS-rhei-run-report.3.1 §FS-rhei-run.5.1 §FS-rhei-run.5.1.1
+    if let Some(deadline) = spawns
+        .pending_poll_deadline(rhei, machine, task, &state, spawns.pending_since())
+        .filter(|_| clock_can_wait)
+    {
+        return HaltCause::WaitingOnPoll { next_attempt_at: epoch_rfc3339(deadline) };
+    }
     // Ahead of every work-shaped cause below: an interrupted worker explains
     // both an unwritten artifact and a bare stall. §FS-rhei-run-report.3.1
     if interrupted {

@@ -212,6 +212,7 @@ transitions:
             next: "n".to_string(),
             is_gate: true,
             waits_on_person,
+            waits_on_poll: false,
             provider_limited,
             provider_unavailable: false,
         };
@@ -575,6 +576,7 @@ transitions:
             next: "inspect the logs".to_string(),
             is_gate: false,
             waits_on_person: false,
+            waits_on_poll: false,
             provider_limited: false,
             provider_unavailable: false,
         }

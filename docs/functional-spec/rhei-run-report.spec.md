@@ -265,6 +265,11 @@ the summary prints five stacked groups:
    an unsatisfied prior and an active provider limit each still classify the
    ticket, and a poll whose deadline for its current state has passed or was
    never recorded is not waiting on anything and keeps its ordinary row.
+   A blocker no clock releases — a missing required input, a spent attempt
+   budget, a strict run's refusal ([§FS-rhei-run.5.1.1](rhei-run.spec.md#511-a-blocker-no-clock-releases)) — means the next attempt
+   would not start it either, so such a ticket is classified by that blocker
+   exactly as it is without the deadline, and never reads `rhei resumes it
+   itself`.
    Only the per-ticket row moves; the run's `idle_blocker` and `run.json`
    ([§FS-rhei-run-json.2.1](rhei-run-json.spec.md#21-records)) read as before.
 

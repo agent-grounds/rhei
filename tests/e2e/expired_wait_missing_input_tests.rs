@@ -96,8 +96,6 @@ fn a_ticket_missing_its_input_halts_with_nothing_to_schedule() {
 /// run halts with the same report as the control, instead of sleeping 1 s and
 /// rescanning until something kills it. §FS-rhei-run.5.1.1
 #[test]
-#[ignore = "red until #728: an expired provider record on a ticket missing its input keeps the \
-            continuous run sleeping 1s forever; implement removes this"]
 fn an_expired_provider_record_does_not_keep_a_ticket_missing_its_input_waiting() {
     let plan = missing_input_plan("missing-input-expired-record", true);
     let result = run_within(&plan, &["--no-tui"]);

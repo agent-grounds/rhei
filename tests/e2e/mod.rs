@@ -135,6 +135,7 @@ mod exclusions_tests;
 mod exclusions_validation_tests;
 mod exit_code_overlap_tests;
 mod expired_wait_missing_input_tests;
+mod expired_wait_strict_refusal_tests;
 mod export_prior_migration_implementation_tests;
 mod export_prior_migration_tests;
 mod fence_reader_completion_tests;

@@ -239,8 +239,6 @@ transitions:
     /// and the run halts instead of sleeping for it (agent-grounds/rhei#728).
     /// §FS-rhei-run.5.1.1
     #[test]
-    #[ignore = "red until #728: the deadline scan takes an expired provider record on a ticket \
-                missing its input for a deadline of now; implement removes this"]
     fn a_ticket_missing_its_input_contributes_no_deadline_for_its_provider_record() {
         let mut rhei = rhei_core::parse(
             "# Rhei: Limits\n\n## Tasks\n\n### Task 1: Needs a brief\n**State:** working\n",

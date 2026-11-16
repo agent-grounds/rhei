@@ -295,3 +295,118 @@
         );
         assert!(!transition_ends_supervisor_visit(&machine, "review", "completed"));
     }
+
+    // -----------------------------------------------------------------------
+    // Deadlines
+    // -----------------------------------------------------------------------
+
+    // The deadline scan takes its candidates from the ready set with the poll
+    // clock set aside, so the barrier also decides whose provider wait the run
+    // sleeps for. §FS-rhei-run.5.1.1 §FS-rhei-supervision.3.2
+    mod supervisor_deadlines {
+        use super::provider_limits::deadline;
+        use super::*;
+
+        /// A supervisor on an agent target a provider limit can park, and a gate
+        /// for its subtree to sit in.
+        fn supervisor_machine() -> rhei_validator::StateMachine {
+            rhei_validator::StateMachine::from_yaml_str(
+                r#"name: supervised-wait
+version: 1
+states:
+  supervising:
+    initial: true
+    execute_on: child-terminal
+    target: codex:openai:gpt-5.6-sol
+    visits: 12
+  review:
+    gating: true
+  completed:
+    final: true
+transitions:
+  - from: supervising
+    to: supervising
+  - from: supervising
+    to: completed
+    condition: openDescendants < 1
+  - from: review
+    to: completed
+"#,
+            )
+            .expect("supervisor state machine")
+        }
+
+        /// Task 1 supervising one child in `child_state`, parked on a provider
+        /// limit whose wait ends at `next_attempt_at`, its subtree released or not.
+        fn supervisor_plan(
+            child_state: &str,
+            next_attempt_at: u64,
+            released: bool,
+        ) -> rhei_core::ast::Rhei {
+            let mut rhei = rhei_core::parse(&format!(
+                "# Rhei: Supervised\n---\nstructure:\n  maxLevels: 3\n---\n\n## Tasks\n\n\
+                 ### Task 1: Supervisor\n**State:** supervising\n\n\
+                 #### Task 1.1: Child\n**State:** {child_state}\n"
+            ))
+            .expect("parse supervised plan");
+            let limit = ProviderLimit {
+                identity: ProviderIdentity { agent: "codex".into(), provider: "openai".into() },
+                kind: ProviderWaitKind::Limit,
+                signal: "signal".into(),
+                observed_at: deadline(next_attempt_at.min(current_unix_secs()) - 3600),
+                next_attempt_at: deadline(next_attempt_at),
+            };
+            let supervisor = parse_task_id("1");
+            let existing = rhei.metadata.as_ref();
+            let (metadata, _) =
+                set_provider_limit_metadata(existing, &supervisor, "supervising", &limit);
+            rhei.metadata = Some(if released {
+                record_supervision_release(Some(&metadata), &supervisor)
+            } else {
+                metadata
+            });
+            rhei
+        }
+
+        /// The deadline the continuous run sleeps for and `--until-idle` reports.
+        fn scanned_deadline(rhei: &rhei_core::ast::Rhei) -> Option<u64> {
+            let machines = rhei_validator::MachineSet::single(supervisor_machine());
+            let settings = RheiSettings { agents: built_in_agents(), ..RheiSettings::default() };
+            let dir = tempfile::tempdir().expect("tmpdir");
+            let runtime = dir.path().join("runtime");
+            let spawns = SpawnSiteRoots {
+                settings: Some(&settings),
+                ..SpawnSiteRoots::plan_only(dir.path(), &runtime)
+            };
+            earliest_pending_agent_deadline(rhei, &machines, &settings, &None, &spawns)
+        }
+
+        /// A supervisor that released its subtree waits for that subtree to report,
+        /// not for a clock: the ready scan holds it back however its provider wait
+        /// stands, so the record it carries, expired here, contributes no deadline
+        /// even with every descendant terminal. §FS-rhei-run.5.1.1
+        #[test]
+        fn a_released_supervisor_contributes_no_deadline_for_its_provider_record() {
+            let rhei = supervisor_plan("completed", current_unix_secs() - 3600, true);
+            assert_eq!(
+                scanned_deadline(&rhei),
+                None,
+                "the ready scan holds a released supervisor, so no clock releases it"
+            );
+        }
+
+        /// A held supervisor is work while its subtree is open: once its provider
+        /// wait ends the ready scan takes it, so that wait is its only blocker and
+        /// the run sleeps for it rather than halting as if nothing were pending.
+        /// §FS-rhei-run.5.1 §FS-rhei-supervision.3.1
+        #[test]
+        fn a_held_supervisor_over_an_open_subtree_contributes_its_provider_deadline() {
+            let parked_until = current_unix_secs() + 600;
+            let rhei = supervisor_plan("review", parked_until, false);
+            assert_eq!(
+                scanned_deadline(&rhei),
+                Some(parked_until),
+                "the provider wait is all that stands between the supervisor and its visit"
+            );
+        }
+    }

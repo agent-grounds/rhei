@@ -78,3 +78,32 @@ fn first_blocking_prior_reading(
     }
     first
 }
+
+/// The unsatisfied `**Prior:**` tickets a reader of a ticket's wait follows, or
+/// `None` when one of them can never satisfy it — cancelled, or not in the plan —
+/// so that prior holds the ticket whatever its clocks or its other priors say.
+///
+/// Read before either clock by the deliberate-wait judgment and the idle blocker
+/// scan, as `classify_halt` reads it: a ticket an unsatisfied prior holds is
+/// waiting only when that prior is. §FS-rhei-run.5.1.1 §FS-rhei-run-report.3.1
+fn live_unsatisfied_priors<'a>(
+    task: &rhei_core::ast::Task,
+    tasks: &[&'a rhei_core::ast::Task],
+    state_map: &std::collections::HashMap<&'a TaskId, String>,
+    machines: &rhei_validator::MachineSet,
+) -> Option<Vec<&'a rhei_core::ast::Task>> {
+    let mut live = Vec::new();
+    for dep_id in &task.prior {
+        let state = state_map.get(dep_id)?;
+        let machine = machines.for_task(dep_id);
+        if dependency_is_satisfied(state, machine) {
+            continue;
+        }
+        // Under the prior's own machine, as the halt row names it. §FS-rhei-states.1.4
+        if machine.is_cancellation(&normalized_state_name(state, machine)) {
+            return None;
+        }
+        live.push(tasks.iter().copied().find(|candidate| &candidate.id == dep_id)?);
+    }
+    Some(live)
+}

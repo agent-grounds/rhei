@@ -308,13 +308,14 @@ fn should_wait_for_human_gate(
 /// parked by a recognized provider limit, or waiting on a `**Prior:**` that is
 /// itself deliberately waiting.
 ///
-/// Two rungs of §FS-rhei-run-report.3.1's order answer the other way and so
+/// Three rungs of §FS-rhei-run-report.3.1's order answer the other way and so
 /// must be walked before the clocks they outrank: a live `**Assignee:**`,
-/// which is not deliberate at all, and a supervisor's hold, which answers with
-/// the blocker at the other end. Everything after them is a disjunction, so
-/// their order among themselves does not change this answer — unlike
-/// `IdleBlockerScan`, which asks *which* wait and is order-dependent
-/// throughout.
+/// which is not deliberate at all, and a supervisor's hold and an unsatisfied
+/// `**Prior:**`, which answer with the blocker at the other end — a ticket a
+/// cancelled prior holds is not waiting, whatever its own clock says. Only the
+/// two clocks after them form a disjunction, so only their order leaves this
+/// answer alone — unlike `IdleBlockerScan`, which asks *which* wait and is
+/// order-dependent throughout. §FS-rhei-run.5.1.1
 ///
 /// One rung is read out of the published order's turn, and §FS-rhei-run-report.3.1
 /// says so: a supervising ticket is classified by its own gate and its own
@@ -428,6 +429,14 @@ impl<'a> DeliberateWaitJudgment<'a> {
         if task.assignee.is_some() {
             return false;
         }
+        // Ahead of both clocks, as `classify_halt` reads it: a ticket an unsatisfied
+        // prior holds waits only when that prior does, never on a cancelled one.
+        // §FS-rhei-run.5.1.1
+        let priors = live_unsatisfied_priors(task, &self.tasks, &self.state_map, self.machines);
+        let Some(priors) = priors else { return false };
+        if !priors.is_empty() {
+            return priors.into_iter().any(|prior| self.judge(prior) == Some(true));
+        }
         // §FS-rhei-run.5.1: a poll whose bound is spent waits for nothing, and every clock
         // here is judged at the instant the plan was read, as the ready scan judged it.
         let (now, since) = (self.spawns.read_at, self.spawns.pending_since());
@@ -448,22 +457,6 @@ impl<'a> DeliberateWaitJudgment<'a> {
             && clock_can_wait()
         {
             return true;
-        }
-        for dep_id in &task.prior {
-            let Some(dep_state) = self.state_map.get(dep_id).cloned() else {
-                continue;
-            };
-            // The prior's own machine says whether it satisfies.
-            // §FS-rhei-panta.6.1
-            if dependency_is_satisfied(&dep_state, self.machines.for_task(dep_id)) {
-                continue;
-            }
-            let Some(dep_task) = self.tasks.iter().copied().find(|c| &c.id == dep_id) else {
-                continue;
-            };
-            if self.judge(dep_task) == Some(true) {
-                return true;
-            }
         }
         false
     }

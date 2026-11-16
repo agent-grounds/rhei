@@ -228,12 +228,15 @@ fn idle_return(
         // says "more than one plain answer" rather than inventing a fifth.
         .unwrap_or(rhei_tui::IdleBlocker::Mixed);
     let next_attempt_at =
-        earliest_pending_agent_deadline(rhei, machines, settings, scope, spawns).map(
-            |deadline| {
-                rhei_tui::format_rfc3339(std::time::UNIX_EPOCH + Duration::from_secs(deadline))
-            },
-        );
+        earliest_pending_agent_deadline(rhei, machines, settings, scope, spawns).map(epoch_rfc3339);
     Some(IdleReturn { blocker, waiting: waiting.len(), next_attempt_at })
+}
+
+/// A deadline in epoch seconds, written the way the idle line's `next attempt`
+/// writes it — the one spelling a poll wait's row shares with that line.
+// §FS-rhei-run-report.3.1
+fn epoch_rfc3339(deadline: u64) -> String {
+    rhei_tui::format_rfc3339(std::time::UNIX_EPOCH + Duration::from_secs(deadline))
 }
 
 /// The console result line of an idle return.

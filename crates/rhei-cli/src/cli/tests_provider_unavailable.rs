@@ -398,6 +398,7 @@ mod provider_unavailable {
             next,
             is_gate: true,
             waits_on_person: false,
+            waits_on_poll: false,
             provider_limited: false,
             provider_unavailable: true,
         };

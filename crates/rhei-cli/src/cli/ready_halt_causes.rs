@@ -47,6 +47,11 @@ enum HaltCause {
     /// for hours looking exactly like a running agent.
     // §FS-rhei-states.2.5 §FS-rhei-run-report.3.1
     WaitingOnPerson { label: String },
+    /// A poll that declares no person, held only by its own next attempt, which
+    /// rhei takes by itself once that instant passes. Without this it read as
+    /// never scheduled, under a `!` and remedies for a ticket that was fine.
+    // §FS-rhei-run-report.3.1 §FS-rhei-run.5.1
+    WaitingOnPoll { next_attempt_at: String },
     /// A supported provider has supplied a durable safe retry deadline. This
     /// is deliberate waiting, not attention. §FS-rhei-run-report.3.1
     /// `kind` says whether a refusal or an unavailability set it. §FS-rhei-run.3.3
@@ -173,6 +178,7 @@ impl HaltCause {
             | HaltCause::WaitingOnDescendants { .. }
             | HaltCause::Gate
             | HaltCause::GateHoldingSubtree { .. }
+            | HaltCause::WaitingOnPoll { .. }
             | HaltCause::ProviderLimited { .. }
             | HaltCause::HeldBySupervisor { .. }
             | HaltCause::SupervisorHasNoTerminalEdge { .. }
@@ -262,6 +268,11 @@ impl HaltCause {
                 format!(
                     "nothing to do on Task {id}; the poll resumes itself when {label} answers"
                 ),
+            ),
+            // §FS-rhei-run-report.3.1: the instant, and nothing for anyone to do.
+            HaltCause::WaitingOnPoll { next_attempt_at } => (
+                format!("waiting on its poll until {next_attempt_at}"),
+                format!("nothing to do on Task {id}; rhei resumes it itself"),
             ),
             HaltCause::ProviderLimited { provider, next_attempt_at, kind } => (
                 match kind {

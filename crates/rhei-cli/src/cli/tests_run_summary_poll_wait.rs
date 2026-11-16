@@ -96,8 +96,6 @@ transitions:
     /// input and not a deadline the fixture never seeded.
     // §FS-rhei-run.5.1.1 §FS-rhei-run-report.3.1
     #[test]
-    #[ignore = "red until #736: a plain poll wait is classified NotScheduled, so the written-input \
-                half finds no poll row; implement removes this"]
     fn a_plain_poll_missing_its_input_is_reported_for_the_input() {
         const FUTURE: u64 = 1_893_456_000; // 2030-01-01T00:00:00Z
         let dir = tempfile::tempdir().expect("tmpdir");

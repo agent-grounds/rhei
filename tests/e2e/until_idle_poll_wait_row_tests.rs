@@ -37,8 +37,6 @@ fn poll_row() -> String {
 /// run failed to reach.
 // §FS-rhei-run-report.3.1 §FS-rhei-run.5.1
 #[test]
-#[ignore = "red until #736: a plain poll held by its deadline gets the generic not-scheduled row; \
-            implement removes this"]
 fn until_idle_explains_a_plain_poll_wait_as_waiting_on_its_poll() {
     let plan = polled_plan("poll-wait-row", "### Task 1: Retries later\n**State:** poll\n");
 
@@ -72,8 +70,6 @@ fn until_idle_explains_a_plain_poll_wait_as_waiting_on_its_poll() {
 /// `--dry-run` predicts the same row the run prints.
 // §FS-rhei-run-report.3.1 §FS-rhei-run.4
 #[test]
-#[ignore = "red until #736: --dry-run predicts the generic not-scheduled row for a plain poll wait; \
-            implement removes this"]
 fn dry_run_predicts_the_plain_poll_wait_row() {
     let plan = polled_plan("poll-wait-row-dry", "### Task 1: Retries later\n**State:** poll\n");
 

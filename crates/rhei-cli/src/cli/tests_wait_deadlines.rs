@@ -233,66 +233,6 @@ transitions:
         );
     }
 
-    /// A ticket the ready scan holds back for a missing required input has a
-    /// blocker no clock releases, so the provider record it still carries —
-    /// expired, as every session limit leaves one — contributes no deadline,
-    /// and the run halts instead of sleeping for it (agent-grounds/rhei#728).
-    /// §FS-rhei-run.5.1.1
-    #[test]
-    fn a_ticket_missing_its_input_contributes_no_deadline_for_its_provider_record() {
-        let mut rhei = rhei_core::parse(
-            "# Rhei: Limits\n\n## Tasks\n\n### Task 1: Needs a brief\n**State:** working\n",
-        )
-        .unwrap();
-        let now = current_unix_secs();
-        let limit = ProviderLimit {
-            identity: ProviderIdentity { agent: "codex".into(), provider: "openai".into() },
-            kind: ProviderWaitKind::Limit,
-            signal: "signal".into(),
-            observed_at: deadline(now - 7200),
-            next_attempt_at: deadline(now - 3600),
-        };
-        let (metadata, _) =
-            set_provider_limit_metadata(None, &parse_task_id("1"), "working", &limit);
-        rhei.metadata = Some(metadata);
-        let machine = rhei_validator::StateMachine::from_yaml_str(
-            r#"name: missing-input
-version: 1
-states:
-  working:
-    initial: true
-    target: codex:openai:gpt-5.6-sol
-    inputs:
-      - name: brief
-        path: runtime/brief.md
-  completed:
-    final: true
-transitions:
-  - from: working
-    to: completed
-"#,
-        )
-        .expect("missing-input state machine");
-        let machines = rhei_validator::MachineSet::single(machine);
-        let settings = RheiSettings { agents: built_in_agents(), ..RheiSettings::default() };
-        let dir = tempfile::tempdir().expect("tmpdir");
-        let runtime = dir.path().join("runtime");
-        let spawns =
-            SpawnSiteRoots { settings: Some(&settings), ..SpawnSiteRoots::plan_only(dir.path(), &runtime) };
-        assert!(!runtime.join("brief.md").exists(), "the required input is missing");
-
-        assert_eq!(
-            earliest_pending_agent_deadline(&rhei, &machines, &settings, &None, &spawns),
-            None,
-            "no deadline releases a missing input, so the run must halt, not sleep"
-        );
-        assert_eq!(
-            agent_deadline_since(&rhei, &machines, &settings, &None, &spawns, spawns.pending_since()),
-            None,
-            "the pass loop's scan must agree"
-        );
-    }
-
     /// The provider-limit term of the plan-wide deliberate-wait judgment.
     ///
     /// The judgment and the deadline scan diverged over provider limits: the

@@ -291,6 +291,7 @@ mod provider_unavailable_pi_tests;
 mod provider_wait_fanout_deadline_tests;
 mod provider_wait_quiet_support;
 mod provider_wait_quiet_tests;
+mod provider_wait_scan_tests;
 mod registry_location_tests;
 #[cfg(unix)]
 mod release_write_then_report_tests;

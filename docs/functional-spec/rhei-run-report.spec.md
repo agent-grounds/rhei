@@ -381,8 +381,11 @@ the summary prints five stacked groups:
    supervising ticket, which reads its own rungs first (below); a gating state
    awaiting a decision; a live `**Assignee:**`; an
    unsatisfied `**Prior:**`; a poll state that declares it waits on a person; a
-   worker interrupted mid-flight by an *operator's*
-   shutdown ([§FS-rhei-run.3.2](rhei-run.spec.md#32-interruption-and-process-ownership)) — a run that tore its own workers down while
+   poll state held only by its own pending `pollNextAttemptAt`, as the
+   poll-wait paragraph above describes — this rung and the person-waiting
+   poll's only while no blocker no clock releases holds the ticket
+   ([§FS-rhei-run.5.1.1](rhei-run.spec.md#511-a-blocker-no-clock-releases)); a worker interrupted mid-flight by an
+   *operator's* shutdown ([§FS-rhei-run.3.2](rhei-run.spec.md#32-interruption-and-process-ownership)) — a run that tore its own workers down while
    failing describes their tickets by the failure instead, never by "re-run to
    continue"; a manual-only initial state for a ticket this run neither worked
    nor interrupted; a worker that ran and

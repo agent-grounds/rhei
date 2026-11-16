@@ -265,7 +265,19 @@ const PATIENCE: Duration = Duration::from_secs(90);
 /// Output goes to files rather than pipes because the wait has to poll: a
 /// child that filled a pipe nobody was draining would block, and the guard
 /// would report a hang that was the harness's own.
-pub(super) fn bounded(mut command: Command, what: &str, scratch: &Path) -> CliRun {
+pub(super) fn bounded(command: Command, what: &str, scratch: &Path) -> CliRun {
+    bounded_within(command, what, scratch, PATIENCE)
+}
+
+/// [`bounded`] under a guard of the caller's choosing, for a case whose
+/// regression is a run that sleeps forever and must fail without holding CI
+/// for the whole of [`PATIENCE`].
+pub(super) fn bounded_within(
+    mut command: Command,
+    what: &str,
+    scratch: &Path,
+    patience: Duration,
+) -> CliRun {
     // §REQ-cross-platform.6: a name of this run's own, not of the clock's tick. It
     // names directories elsewhere; here it names two files, built from the one name
     // rather than by `with_extension`, which would need a discriminator free of dots.
@@ -280,7 +292,7 @@ pub(super) fn bounded(mut command: Command, what: &str, scratch: &Path) -> CliRu
         .stderr(err)
         .spawn()
         .unwrap_or_else(|error| panic!("spawn {what}: {error}"));
-    let deadline = Instant::now() + PATIENCE;
+    let deadline = Instant::now() + patience;
     let status = loop {
         match child.try_wait().expect("inspect run status") {
             Some(status) => break status,
@@ -288,7 +300,7 @@ pub(super) fn bounded(mut command: Command, what: &str, scratch: &Path) -> CliRu
                 let _ = child.kill();
                 let _ = child.wait();
                 panic!(
-                    "{what} had not returned after {PATIENCE:?}\nstdout:\n{}\nstderr:\n{}",
+                    "{what} had not returned after {patience:?}\nstdout:\n{}\nstderr:\n{}",
                     fs::read_to_string(&out_path).unwrap_or_default(),
                     fs::read_to_string(&err_path).unwrap_or_default()
                 );

@@ -48,7 +48,8 @@ fn transition_ledger_mark(
 struct EmptyVisitHolds {
     held_at: HashMap<String, LedgerMark>,
     /// Stalls a deadline sleep kept because the ticket's spawn site halted it on
-    /// a bound that is still spent. §FS-rhei-run.3.6.1
+    /// a bound that is still spent, or on a log name that still cannot be
+    /// allocated. §FS-rhei-run.3.6.1
     spent_in_sleep: HashSet<String>,
 }
 
@@ -93,9 +94,10 @@ impl EmptyVisitHolds {
     /// sleep advanced nothing, and the attempt it made due releases one only by
     /// advancing something. §FS-rhei-run.3.6 item 3
     ///
-    /// Nor a ticket whose bound `still_spent` reads as still spent: the sleep
-    /// cannot change that either, so it stays out and opens no pass until
-    /// [`Self::release_unspent`] finds it retried or advanced.
+    /// Nor a ticket `still_spent` reads as still halted, on a spent bound or a
+    /// log name it cannot allocate: the sleep cannot change that either, so it
+    /// stays out and opens no pass until [`Self::release_unspent`] finds it
+    /// retried, advanced or its name freed.
     /// §FS-rhei-run.3.6.1
     fn keep_held(&mut self, stalled_tasks: &mut HashSet<String>, still_spent: impl Fn(&str) -> bool) {
         let held_at = &self.held_at;
@@ -112,8 +114,8 @@ impl EmptyVisitHolds {
         });
     }
 
-    /// Let back in every ticket a deadline sleep kept for a spent bound that a
-    /// `rhei retry` or an advance has since lifted, on a fresh read each slice.
+    /// Let back in every ticket a deadline sleep kept whose halt a `rhei retry`,
+    /// an advance or a freed log name has since lifted, on a fresh read each slice.
     /// What is left is what the sleeping run's ready set leaves out.
     /// §FS-rhei-run.3.6.1
     fn release_unspent(

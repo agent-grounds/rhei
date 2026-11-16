@@ -1117,13 +1117,13 @@ advances that land between two releases buy one re-spawn between them, not one
 each. The worker pool ([§FS-rhei-run.5](rhei-run.spec.md#5-parallel-execution)) keeps the same rule as the sequential loop. Every
 other stall — a missing output, a spent attempt budget, a refused admission
 ([§FS-rhei-run.3.4](rhei-run.spec.md#34-bound-admission)) — keeps the release of the two paragraphs above unchanged, except that a
-deadline sleep does not release a spent bound ([§FS-rhei-run.3.6.1](rhei-run.spec.md#361-a-spent-bound-during-a-deadline-sleep)).
+deadline sleep does not release a spent bound or a refused log name ([§FS-rhei-run.3.6.1](rhei-run.spec.md#361-a-spent-bound-during-a-deadline-sleep)).
 
 #### 3.6.1. A Spent Bound During a Deadline Sleep
 
 A ticket whose spawn site halted it because its visit's attempts are spent
-(step 5) is stalled for a reason no sleep can change, so the deadline sleep of
-[§FS-rhei-run.5.1](rhei-run.spec.md#51-polling-states) does not let it back in. While the run sleeps, each slice keeps
+(step 5) is held by a blocker no clock releases ([§FS-rhei-run.5.1.1](rhei-run.spec.md#511-a-blocker-no-clock-releases)), so the
+deadline sleep of [§FS-rhei-run.5.1](rhei-run.spec.md#51-polling-states) does not let it back in. While the run sleeps, each slice keeps
 that stall as it keeps a held ticket out: the ticket opens no pass — no
 `Pass N:` header, no `Ready:` line naming it, no repeated halt line — and the
 halt naming its spent attempts is printed once, by the pass that halted it.
@@ -1133,7 +1133,11 @@ advance of the ticket out of the visit that spent them; and the end of the
 wait, when the deadline the run slept toward makes other work due and the
 release of the paragraphs above applies as it always has. A ticket that
 stalled with attempts still left on its visit is not halted on a spent bound:
-it keeps getting its next attempt during the sleep, as before. The worker pool
+it keeps getting its next attempt during the sleep, as before. A ticket whose
+spawn was refused because its log name cannot be allocated
+([§FS-rhei-agents.8.1](rhei-agents.spec.md#81-log-file-naming)) stays out of the sleep's passes the same way, and its
+refusal is printed once, until a fresh read finds the name free, an advance,
+or the end of the wait releases it. The worker pool
 ([§FS-rhei-run.5](rhei-run.spec.md#5-parallel-execution)) keeps the same rule as the sequential loop, and neither the
 run's exit code nor its halt report (step 9) changes: a run that ends with the
 ticket still spent names it as it does today.

@@ -241,16 +241,17 @@ fn without_provider_held_tickets<'a>(
     free
 }
 
-/// Whether the ticket `task_id` names still has the bound its spawn site halts
-/// it on spent, read afresh from the plan `spawns` stands for: the one question
-/// both deadline-sleep sites and the sleeping run's ready filter ask, so they
-/// cannot disagree about which stalls a sleep keeps. A ticket the plan no
-/// longer has answers `false`. §FS-rhei-run.3.6.1
-fn spawn_bound_still_spent(loaded: &LoadedPlan, spawns: &SpawnSiteRoots<'_>, task_id: &str) -> bool {
+/// Whether the ticket `task_id` names is still halted before its next spawn,
+/// read afresh from the plan `spawns` stands for: its bound is spent, or its
+/// log name cannot be allocated (§FS-rhei-agents.8.1). The one question both
+/// deadline-sleep sites and the sleeping run's ready filter ask, so they cannot
+/// disagree about which stalls a sleep keeps. A ticket the plan no longer has
+/// answers `false`. §FS-rhei-run.3.6.1
+fn spawn_still_halted(loaded: &LoadedPlan, spawns: &SpawnSiteRoots<'_>, task_id: &str) -> bool {
     let Some(task) = find_task_by_id_str(&loaded.rhei.tasks, task_id) else { return false };
     let machine = spawns.machines.for_task(&task.id);
     let state = normalized_state_name(task.state.as_str(), machine);
-    spawns.attempt_budget_spent(&loaded.rhei, machine, task, &state)
+    spawns.next_spawns_halt(&loaded.rhei, machine, task, &state).is_some()
 }
 
 /// Whether a provider wait holds this ticket at the instant `spawns` was read:

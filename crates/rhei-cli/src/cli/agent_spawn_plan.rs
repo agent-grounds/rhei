@@ -200,6 +200,18 @@ fn plan_named_spawn(
     named.plan(None).map_err(|refusal| refusal.message(task_id, Some(reset), &[]))
 }
 
+/// Why a ticket's every next spawn is halted before it starts. Ordered so a
+/// fan-out with one arm spent and another refused reads as refused.
+/// §FS-rhei-run.3.6.1
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+enum SpawnHalt {
+    /// Every spawn is refused for the bound its site holds it to. §FS-rhei-run.3.7.4
+    Spent,
+    /// Some spawn's planning is refused outright, such as for a log name no
+    /// spawn record accounts for. §FS-rhei-agents.8.1
+    Refused,
+}
+
 /// The roots a run's spawn sites plan a ticket's next spawn under: where its
 /// ledger is read and its spawn record kept, and what its agents resolve
 /// under. A reading of the plan holds them to ask what that spawn would be
@@ -297,12 +309,9 @@ impl<'a> SpawnSiteRoots<'a> {
 
     /// Whether this ticket's `poll:` state has spent its bound: every spawn it
     /// would make next is refused for `poll.max_attempts`, so it is stalled, not
-    /// waiting. A state that is no poll, or an agent poll whose agents or
-    /// settings do not resolve, answers `false` and leaves its deadline standing.
-    ///
-    /// Settings are read only to resolve an agent poll's agents. A poll's budget
-    /// is its own `max_attempts`, which no setting changes, so a program poll
-    /// answers from its spawn record alone.
+    /// waiting. [`Self::attempt_budget_spent`] restricted to poll states: a state
+    /// that is no poll, or an agent poll whose agents or settings do not resolve,
+    /// answers `false` and leaves its deadline standing.
     // §FS-rhei-run.3.7.4
     fn poll_bound_spent(
         &self,
@@ -311,22 +320,20 @@ impl<'a> SpawnSiteRoots<'a> {
         task: &rhei_core::ast::Task,
         state_name: &str,
     ) -> bool {
-        let Some(state_def) = machine.states.get(state_name) else { return false };
-        let Some(budget) = poll_attempt_budget(state_def) else { return false };
-        if state_def.program.is_some() {
-            return self.next_spawns_spent(rhei, machine, task, state_name, None, budget);
-        }
-        let mut read = None;
-        let Some(settings) = self.settings_or_merged(&mut read) else { return false };
-        self.budget_spent_under(rhei, machine, task, state_name, settings, budget)
+        let is_poll = machine.states.get(state_name).is_some_and(|def| def.poll.is_some());
+        is_poll && self.attempt_budget_spent(rhei, machine, task, state_name)
     }
 
     /// Whether every spawn this ticket's state would make next is one its spawn
-    /// site refuses for a spent attempt budget: the visit's own `attempts:`, or a
-    /// poll's bound as [`Self::poll_bound_spent`] reads it. Only `rhei retry`
-    /// releases such a ticket, so no clock it carries is its wait. A state whose
-    /// agents or settings do not resolve answers `false`, as the bound's does.
-    // §FS-rhei-run.5.1.1 §FS-rhei-agents.3.2.3
+    /// site refuses for a spent attempt budget: a poll's `poll.max_attempts`, or
+    /// the visit's own `attempts:` with any `rhei retry` grant. No clock releases
+    /// such a ticket - a retry or an advance does - so no clock it carries is its
+    /// wait. A plan refused for another reason, or a state whose agents or
+    /// settings do not resolve, answers `false`: that is not a spent budget. It
+    /// reads [`Self::next_spawns_halt`], the reading the deadline sleep keeps its
+    /// stalls by, so the deadline scan, the halt classification and the sleep
+    /// cannot disagree about which budget is spent.
+    // §FS-rhei-run.5.1.1 §FS-rhei-run.3.7.4 §FS-rhei-run.3.6.1 §FS-rhei-agents.3.2.3
     fn attempt_budget_spent(
         &self,
         rhei: &rhei_core::ast::Rhei,
@@ -334,38 +341,57 @@ impl<'a> SpawnSiteRoots<'a> {
         task: &rhei_core::ast::Task,
         state_name: &str,
     ) -> bool {
-        let Some(state_def) = machine.states.get(state_name) else { return false };
-        if state_def.poll.is_some() {
-            return self.poll_bound_spent(rhei, machine, task, state_name);
-        }
-        let mut read = None;
-        let Some(settings) = self.settings_or_merged(&mut read) else { return false };
-        // The budget the spawn site resolves, through the same chain. §FS-rhei-agents.3.2.1
-        let budget = resolve_attempt_budget(Some(state_def), settings);
-        self.budget_spent_under(rhei, machine, task, state_name, settings, budget)
+        self.next_spawns_halt(rhei, machine, task, state_name) == Some(SpawnHalt::Spent)
     }
 
-    /// [`Self::next_spawns_spent`] for the agents `settings` resolves for this
-    /// state, or for its program. Agents that do not resolve answer `false`.
-    fn budget_spent_under(
+    /// Why every spawn this ticket's state would make next is halted, if each
+    /// is: the bound its spawn site holds it to is spent - `poll.max_attempts`
+    /// in a poll state, the visit's `attempts:` with any `rhei retry` grant
+    /// elsewhere - or its planning is refused, such as a log name that cannot
+    /// be allocated. Read afresh from the spawn records and the logs each time,
+    /// so a retry, an advance or a freed name answers `None` the moment it
+    /// lands. A state, agents or settings that do not resolve answer `None`.
+    ///
+    /// Settings are read only where the answer needs them: to resolve an agent
+    /// state's agents, or a visit's configured `attempts:`. A program poll's
+    /// budget is its own `max_attempts`, so it answers from its spawn record
+    /// alone. §FS-rhei-run.3.7.4 §FS-rhei-run.3.6.1
+    fn next_spawns_halt(
         &self,
         rhei: &rhei_core::ast::Rhei,
         machine: &rhei_validator::StateMachine,
         task: &rhei_core::ast::Task,
         state_name: &str,
-        settings: &RheiSettings,
-        budget: AttemptBudget,
-    ) -> bool {
-        let program = machine.states.get(state_name).is_some_and(|def| def.program.is_some());
-        let agents = if program {
-            None
+    ) -> Option<SpawnHalt> {
+        let state_def = machine.states.get(state_name)?;
+        let poll = poll_attempt_budget(state_def);
+        let mut read = None;
+        let settings = if state_def.program.is_none() || poll.is_none() {
+            Some(self.settings_or_merged(&mut read)?)
         } else {
-            let resolved =
-                resolve_agent_invocations_for_task(machine, state_name, settings, self.opts, Some(task));
-            let Ok(resolved) = resolved else { return false };
-            Some(resolved)
+            None
         };
-        self.next_spawns_spent(rhei, machine, task, state_name, agents.as_deref(), budget)
+        let budget = match (poll, settings) {
+            (Some(budget), _) => budget,
+            // The budget the spawn site resolves, through the same chain. §FS-rhei-agents.3.2.1
+            (None, Some(settings)) => resolve_attempt_budget(Some(state_def), settings),
+            (None, None) => return None,
+        };
+        let agents = match (state_def.program.is_some(), settings) {
+            (true, _) => None,
+            (false, Some(settings)) => {
+                let resolved = resolve_agent_invocations_for_task(
+                    machine,
+                    state_name,
+                    settings,
+                    self.opts,
+                    Some(task),
+                );
+                Some(resolved.ok()?)
+            }
+            (false, None) => return None,
+        };
+        self.planned_spawns_halt(rhei, machine, task, state_name, agents.as_deref(), budget)
     }
 
     /// The run's settings, or for a reading no run is behind the merged settings
@@ -380,16 +406,16 @@ impl<'a> SpawnSiteRoots<'a> {
         }
     }
 
-    /// Whether every spawn this ticket's state would make next is refused for
-    /// `budget` spent, asked as its spawn site asks it: the same plan, from the
-    /// same roots and under the same name, held to the same gate. So a reader
-    /// that asks this never waits for a spawn the spawner will refuse.
+    /// Why every spawn this ticket's state would make next is halted, asked as
+    /// its spawn site asks it: the same plan, from the same roots and under the
+    /// same name, held to the same gate. So a reader that asks this never waits
+    /// for a spawn the spawner will refuse. `Spent` only when every one is
+    /// refused for `budget` spent; `Refused` when each is halted and some plan
+    /// is refused outright, such as for a taken log name or an unreadable ledger.
     ///
-    /// `agents` is `None` for a program state. A plan its site would refuse for
-    /// another reason, such as an unreadable ledger, answers `false`: that
-    /// refusal is not a spent budget.
-    // §FS-rhei-agents.3.2.3 §FS-rhei-agents.8.4 §FS-rhei-run.3.7.4
-    fn next_spawns_spent(
+    /// `agents` is `None` for a program state.
+    // §FS-rhei-agents.3.2.3 §FS-rhei-agents.8.4 §FS-rhei-run.3.7.4 §FS-rhei-run.3.6.1
+    fn planned_spawns_halt(
         &self,
         rhei: &rhei_core::ast::Rhei,
         machine: &rhei_validator::StateMachine,
@@ -397,7 +423,7 @@ impl<'a> SpawnSiteRoots<'a> {
         state_name: &str,
         agents: Option<&[ResolvedAgent]>,
         budget: AttemptBudget,
-    ) -> bool {
+    ) -> Option<SpawnHalt> {
         let task_id = task.id.to_string();
         let task_root = self.tasks.artifact_root(&task_id);
         let visit_count = render_visit_count(
@@ -407,7 +433,7 @@ impl<'a> SpawnSiteRoots<'a> {
             task.state.as_str(),
             machine,
         );
-        let spent = |runtime_dir: &Path, identity: Option<&str>| {
+        let halt = |runtime_dir: &Path, identity: Option<&str>| {
             let planned = plan_named_spawn(
                 machine,
                 task_root,
@@ -418,21 +444,26 @@ impl<'a> SpawnSiteRoots<'a> {
                 identity,
                 &self.machines.reset,
             );
-            // A poll visit its kills have spent halts as one its budget has. §FS-rhei-agents.3.2.3
-            planned.is_ok_and(|(plan, _)| {
-                plan.budget_spent(budget).is_some() || plan.kills_spent(budget).is_some()
-            })
+            match planned {
+                // A poll visit its kills have spent halts as one its budget has. §FS-rhei-agents.3.2.3
+                Ok((plan, _)) => (plan.budget_spent(budget).is_some()
+                    || plan.kills_spent(budget).is_some())
+                .then_some(SpawnHalt::Spent),
+                // A name §FS-rhei-agents.8.1 cannot allocate halts until a fresh read finds it free.
+                Err(_) => Some(SpawnHalt::Refused),
+            }
         };
         match agents {
             // A program records under its ticket's own root. §FS-rhei-programs.5.1
-            None => spent(&task_root.join("runtime"), None),
+            None => halt(&task_root.join("runtime"), None),
+            Some([]) => None,
             Some(agents) => {
                 let runtime_dir =
                     self.machines.agent_runtime_dir(&task_id, task_root, self.runtime_dir);
-                !agents.is_empty()
-                    && agents.iter().all(|agent| {
-                        spent(&runtime_dir, resolved_agent_log_identity(agent).as_deref())
-                    })
+                agents.iter().try_fold(SpawnHalt::Spent, |all, agent| {
+                    let one = halt(&runtime_dir, resolved_agent_log_identity(agent).as_deref())?;
+                    Some(all.max(one))
+                })
             }
         }
     }

@@ -1675,7 +1675,12 @@ its spawn site spawn. An expired provider record on such a ticket still means
 "eligible now", so a deadline that moved between a worker-pool refill and the
 outer check causes one rescan rather than a false halt ([§FS-rhei-run.3.3](rhei-run.spec.md#33-provider-limit-parking)), and a poll deadline
 already past at the instant the pass read its ready set still keeps the pass
-loop alive ([§FS-rhei-run.3.6](rhei-run.spec.md#36-stall-release) item 3).
+loop alive ([§FS-rhei-run.3.6](rhei-run.spec.md#36-stall-release) item 3). Expired records all observed before the ticket's
+current visit last spawned it are spent: that spawn ran past them, so they are
+no deadline and release no stall ([§FS-rhei-run.3.6](rhei-run.spec.md#36-stall-release)), unlike a record that spawn wrote,
+which is observed after it started. An invocation still to be spawned whose
+records are all spent is free, as one on an identity with no wait recorded is,
+so a fan-out ticket with one has no provider-limit deadline either.
 
 ### 5.2. Concurrent vs. Serial States
 

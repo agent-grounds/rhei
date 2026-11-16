@@ -9,6 +9,9 @@
 
 // §AR-source-file-size.3 §FS-rhei-run.5.1
 
+// The same deadline scan, read beside the visit's spawn record. §FS-rhei-run.5.1.1
+include!("tests_expired_record_spawns.rs");
+
 mod wait_deadline_reading {
     use super::wait_deadlines::{record_reverted_attempt_of, POLL_MACHINE};
     use super::*;

@@ -1116,7 +1116,27 @@ spawns the visit again at most once for each advance made after the hold — and
 advances that land between two releases buy one re-spawn between them, not one
 each. The worker pool ([§FS-rhei-run.5](rhei-run.spec.md#5-parallel-execution)) keeps the same rule as the sequential loop. Every
 other stall — a missing output, a spent attempt budget, a refused admission
-([§FS-rhei-run.3.4](rhei-run.spec.md#34-bound-admission)) — keeps the release of the two paragraphs above unchanged.
+([§FS-rhei-run.3.4](rhei-run.spec.md#34-bound-admission)) — keeps the release of the two paragraphs above unchanged, except that a
+deadline sleep does not release a spent bound ([§FS-rhei-run.3.6.1](rhei-run.spec.md#361-a-spent-bound-during-a-deadline-sleep)).
+
+#### 3.6.1. A Spent Bound During a Deadline Sleep
+
+A ticket whose spawn site halted it because its visit's attempts are spent
+(step 5) is stalled for a reason no sleep can change, so the deadline sleep of
+[§FS-rhei-run.5.1](rhei-run.spec.md#51-polling-states) does not let it back in. While the run sleeps, each slice keeps
+that stall as it keeps a held ticket out: the ticket opens no pass — no
+`Pass N:` header, no `Ready:` line naming it, no repeated halt line — and the
+halt naming its spent attempts is printed once, by the pass that halted it.
+Three things release it, and only these: a `rhei retry` that gives the visit
+new attempts, including one run from another process while the run sleeps; an
+advance of the ticket out of the visit that spent them; and the end of the
+wait, when the deadline the run slept toward makes other work due and the
+release of the paragraphs above applies as it always has. A ticket that
+stalled with attempts still left on its visit is not halted on a spent bound:
+it keeps getting its next attempt during the sleep, as before. The worker pool
+([§FS-rhei-run.5](rhei-run.spec.md#5-parallel-execution)) keeps the same rule as the sequential loop, and neither the
+run's exit code nor its halt report (step 9) changes: a run that ends with the
+ticket still spent names it as it does today.
 
 ### 3.7. A Worker's Edit That Breaks the Plan
 
@@ -1564,7 +1584,9 @@ limit and for an outage's wait alike ([§FS-rhei-run.3.3](rhei-run.spec.md#33-pr
 and in the `--parallel` worker pool, and for a run that starts onto a wait an
 earlier run persisted: that run sleeps the same way and prints no halt report,
 because a held ticket is waiting, not stuck. What the run prints therefore
-grows with the work it does, not with the length of the wait. A ticket with
+grows with the work it does, not with the length of the wait. A ticket the
+run has already halted on its spent attempts opens no pass during the sleep
+either ([§FS-rhei-run.3.6.1](rhei-run.spec.md#361-a-spent-bound-during-a-deadline-sleep)). A ticket with
 one invocation on a free identity is ready, and its pass spawns that arm
 alone. A ticket with no invocation left to spawn is not held, even while the
 identity of an arm it already satisfied still waits: it is ready, and its pass

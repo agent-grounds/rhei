@@ -56,28 +56,24 @@ fn run_output(fixture: &ProviderFixture) -> String {
 
 #[cfg(unix)]
 #[test]
-#[ignore = "red until #727: an owed supervisor waits after a provider refusal; implement removes this"]
 fn supervisor_provider_wait_fresh_sequential() {
     continuous(false, &[]);
 }
 
 #[cfg(unix)]
 #[test]
-#[ignore = "red until #727: an owed supervisor waits after a provider refusal; implement removes this"]
 fn supervisor_provider_wait_fresh_parallel() {
     continuous(false, &["--parallel", "2"]);
 }
 
 #[cfg(unix)]
 #[test]
-#[ignore = "red until #727: an owed supervisor waits at startup; implement removes this"]
 fn supervisor_provider_wait_persisted_sequential() {
     continuous(true, &[]);
 }
 
 #[cfg(unix)]
 #[test]
-#[ignore = "red until #727: an owed supervisor waits at startup; implement removes this"]
 fn supervisor_provider_wait_persisted_parallel() {
     continuous(true, &["--parallel", "2"]);
 }
@@ -103,13 +99,87 @@ fn until_idle(extra: &[&str]) {
 }
 
 #[test]
-#[ignore = "red until #727: an owed supervisor publishes its provider retry; implement removes this"]
 fn supervisor_provider_wait_until_idle_sequential() {
     until_idle(&[]);
 }
 
 #[test]
-#[ignore = "red until #727: an owed supervisor publishes its provider retry; implement removes this"]
 fn supervisor_provider_wait_until_idle_parallel() {
     until_idle(&["--parallel", "2"]);
+}
+
+// A held child's own gate cannot replace its holder's provider blocker. §FS-rhei-run-report.3.1
+fn gated_child_until_idle(extra: &[&str]) {
+    let fixture = fixture();
+    std::fs::write(&fixture.machine, MACHINE.replace("  work:\n", "  work:\n    gating: true\n"))
+        .unwrap();
+    let deadline = seed_wait(&fixture);
+    let mut args = vec!["--until-idle"];
+    args.extend_from_slice(extra);
+    let mut run = fixture.start(&args);
+    let status = run.wait_for_exit("the gated child's holder to report its provider wait");
+    assert_held(&fixture, 0);
+    let finished = fixture
+        .events()
+        .into_iter()
+        .find(|e| e["event"] == "run_finished")
+        .unwrap_or_else(|| panic!("missing finish event: {}", fixture.output()));
+    let stop = &finished["summary"]["stop"];
+    assert_eq!(status.code(), Some(3), "{}", fixture.output());
+    assert_eq!(stop["reason"], "idle");
+    assert_eq!(stop["idle_blocker"], "provider_limit", "{}", fixture.output());
+    assert_eq!(stop["next_attempt_at"], deadline, "{}", fixture.output());
+}
+
+#[test]
+fn supervisor_provider_wait_gated_child_until_idle_sequential() {
+    gated_child_until_idle(&[]);
+}
+
+#[test]
+fn supervisor_provider_wait_gated_child_until_idle_parallel() {
+    gated_child_until_idle(&["--parallel", "2"]);
+}
+
+// A provider reset cannot supply an absent required supervisor input. §FS-rhei-run.5.1
+fn missing_input(extra: &[&str]) {
+    let fixture = fixture();
+    std::fs::write(
+        &fixture.machine,
+        MACHINE.replace(
+            "    visits: 6\n",
+            "    visits: 6\n    inputs:\n      - name: brief\n        path: runtime/missing-brief.md\n",
+        ),
+    )
+    .unwrap();
+    seed_wait(&fixture);
+    let mut run = fixture.start(extra);
+    let status = run.wait_for_exit("the missing supervisor input to halt the run");
+    let output = fixture.output();
+    assert_eq!(status.code(), Some(1), "{output}");
+    assert!(output.contains("required input(s) not found: brief"), "{output}");
+    assert!(output.contains("missing-brief.md"), "{output}");
+    assert!(!output.contains("sleeping"), "{output}");
+    assert!(!fixture.events().iter().any(|e| e["event"] == "task_spawned"), "{output}");
+    assert_held(&fixture, 0);
+}
+
+#[test]
+fn supervisor_provider_wait_missing_input_sequential() {
+    missing_input(&[]);
+}
+
+#[test]
+fn supervisor_provider_wait_missing_input_parallel() {
+    missing_input(&["--parallel", "2"]);
+}
+
+#[test]
+fn supervisor_provider_wait_missing_input_until_idle_sequential() {
+    missing_input(&["--until-idle"]);
+}
+
+#[test]
+fn supervisor_provider_wait_missing_input_until_idle_parallel() {
+    missing_input(&["--until-idle", "--parallel", "2"]);
 }

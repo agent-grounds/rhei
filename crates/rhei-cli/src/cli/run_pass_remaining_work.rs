@@ -326,6 +326,8 @@ fn should_wait_for_human_gate(
 /// therefore the only thing stopping it. An ordinary parent is never dispatched
 /// while its subtree is open, so its own claim is moot and it keeps answering
 /// through the subtree.
+/// An owed visit skips that subtree rung entirely and reads its own blockers,
+/// as the ready scan does. §FS-rhei-run.5.1
 ///
 /// One judgment, reached two ways — the top-level scan applies it to every
 /// in-scope ticket, and the prior walk applies it to every ticket it reaches.
@@ -343,6 +345,7 @@ fn should_wait_for_human_gate(
 struct DeliberateWaitJudgment<'a> {
     rhei: &'a rhei_core::ast::Rhei,
     tasks: Vec<&'a rhei_core::ast::Task>,
+    index: HashMap<TaskId, &'a rhei_core::ast::Task>,
     state_map: HashMap<&'a TaskId, String>,
     machines: &'a rhei_validator::MachineSet,
     /// Where a poll's spawn record is read, to tell its wait from a spent bound.
@@ -362,6 +365,7 @@ impl<'a> DeliberateWaitJudgment<'a> {
     ) -> Self {
         let mut tasks = Vec::new();
         collect_plan_tasks(&rhei.tasks, &mut tasks);
+        let index = task_index(&tasks);
         let state_map: HashMap<&'a TaskId, String> = tasks
             .iter()
             .map(|task| {
@@ -369,7 +373,7 @@ impl<'a> DeliberateWaitJudgment<'a> {
             })
             .collect();
         let (memo, stack) = (HashMap::new(), HashSet::new());
-        Self { rhei, tasks, state_map, machines, spawns, memo, stack }
+        Self { rhei, tasks, index, state_map, machines, spawns, memo, stack }
     }
 
     /// The verdict for `task`, or `None` when `task` is already on the current
@@ -393,10 +397,15 @@ impl<'a> DeliberateWaitJudgment<'a> {
         // A held ticket answers with the blocker at the other end of the hold,
         // and a supervisor parked at a gate has no next visit to release it on.
         // §FS-rhei-run-report.3.1 §FS-rhei-supervision.3.1
-        if held_by_supervisor(task, self.rhei, self.machines)
-            .is_some_and(|hold| hold.awaiting_human)
-        {
-            return true;
+        let supervision = supervision_verdict_for(
+            task, &self.index, self.machines, self.rhei.metadata.as_ref(), &HashSet::new(),
+        );
+        if let SupervisionVerdict::Held { supervisor, state } = &supervision {
+            if self.machines.for_task(supervisor).states.get(state).is_some_and(|def| def.gating) {
+                return true;
+            }
+            return self.index.get(supervisor).copied()
+                .is_some_and(|holder| self.judge(holder) == Some(true));
         }
         let machine = self.machines.for_task(&task.id);
         let state = normalized_state_name(task.state.as_str(), machine);
@@ -415,11 +424,11 @@ impl<'a> DeliberateWaitJudgment<'a> {
                 return false;
             }
         }
-        // A parent is not workable until its subtree closes, so it is blocked
-        // by exactly whatever blocks its open descendants, each judged by this
-        // same walk. §FS-rhei-plan-language.3
+        // An owed supervisor answers for its own visit despite open children. §FS-rhei-run.5.1
+        // Other parents inherit their open descendants' blockers, each judged
+        // by this same walk. §FS-rhei-plan-language.3
         let open = open_descendant_tasks(task, self.machines);
-        if !open.is_empty() {
+        if supervision != SupervisionVerdict::SupervisorReady && !open.is_empty() {
             return open.iter().copied().all(|child| self.judge(child).unwrap_or(true));
         }
         if own_gate_pending {

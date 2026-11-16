@@ -60,10 +60,13 @@ fn merge_blockers(left: Option<rhei_tui::IdleBlocker>, right: Option<rhei_tui::I
 /// stopping it and `rhei release` the only thing that starts it again. An
 /// ordinary parent is never dispatched while its subtree is open, so its own
 /// claim is moot and it answers through the subtree as before.
+/// An owed visit skips that subtree rung entirely and reads its own blockers,
+/// as the ready scan does. §FS-rhei-run.5.1
 // §FS-rhei-run.3 §FS-rhei-run-report.3.1
 struct IdleBlockerScan<'a> {
     rhei: &'a rhei_core::ast::Rhei,
     tasks: Vec<&'a rhei_core::ast::Task>,
+    index: HashMap<TaskId, &'a rhei_core::ast::Task>,
     state_map: HashMap<&'a TaskId, String>,
     machines: &'a rhei_validator::MachineSet,
     /// Where a poll's spawn record is read, to tell its wait from a spent bound.
@@ -81,13 +84,14 @@ impl<'a> IdleBlockerScan<'a> {
     ) -> Self {
         let mut tasks = Vec::new();
         collect_plan_tasks(&rhei.tasks, &mut tasks);
+        let index = task_index(&tasks);
         let state_map: HashMap<&'a TaskId, String> = tasks
             .iter()
             .map(|task| {
                 (&task.id, normalized_state_name(task.state.as_str(), machines.for_task(&task.id)))
             })
             .collect();
-        Self { rhei, tasks, state_map, machines, spawns, stack: HashSet::new() }
+        Self { rhei, tasks, index, state_map, machines, spawns, stack: HashSet::new() }
     }
 
     fn classify(&mut self, task: &'a rhei_core::ast::Task) -> Option<rhei_tui::IdleBlocker> {
@@ -103,10 +107,14 @@ impl<'a> IdleBlockerScan<'a> {
         // The head of the order: a held ticket reports the blocker at the
         // other end of the hold, and a gate-parked supervisor's is its gate.
         // §FS-rhei-run-report.3.1 §FS-rhei-supervision.3.1
-        if held_by_supervisor(task, self.rhei, self.machines)
-            .is_some_and(|hold| hold.awaiting_human)
-        {
-            return Some(rhei_tui::IdleBlocker::Gate);
+        let supervision = supervision_verdict_for(
+            task, &self.index, self.machines, self.rhei.metadata.as_ref(), &HashSet::new(),
+        );
+        if let SupervisionVerdict::Held { supervisor, state } = &supervision {
+            if self.machines.for_task(supervisor).states.get(state).is_some_and(|def| def.gating) {
+                return Some(rhei_tui::IdleBlocker::Gate);
+            }
+            return self.index.get(supervisor).copied().and_then(|holder| self.classify(holder));
         }
         let machine = self.machines.for_task(&task.id);
         let state = normalized_state_name(task.state.as_str(), machine);
@@ -123,10 +131,11 @@ impl<'a> IdleBlockerScan<'a> {
                 return None;
             }
         }
-        // A parent is blocked by exactly whatever blocks its open descendants.
+        // An owed supervisor answers for its own visit despite open children. §FS-rhei-run.5.1
+        // Any other parent is blocked by exactly whatever blocks its open descendants.
         // §FS-rhei-plan-language.3
         let open = open_descendant_tasks(task, self.machines);
-        if !open.is_empty() {
+        if supervision != SupervisionVerdict::SupervisorReady && !open.is_empty() {
             return open
                 .iter()
                 .copied()

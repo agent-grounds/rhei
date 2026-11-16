@@ -585,11 +585,12 @@ path = "docs/functional-spec/rhei-run.spec.md"
 match = "exact"
 rules = ["citable-spec"]
 kind = "deferred"
-max_accepted = { value = 1500, unit = "lines" }
+max_accepted = { value = 1526, unit = "lines" }
 until = "a dedicated spec-decomposition change introduces stable child declarations and migrates every affected FS-rhei-run citation"
 reason = """
 The execution loop is still one normative declaration with heavily cited numbered sections; a child-declaration boundary and atomic citation-migration plan must exist before it can be split safely.
 agent-grounds/rhei#661 adds the "After a supervisor's death" paragraph to §FS-rhei-run.3.2, what the next run does about a run killed outright, which carried it 1401 -> 1409, so the accepted ceiling moves to the next configured step, 1500.
+agent-grounds/rhei#735 makes the existing free-invocation rule's classification consequence explicit in §FS-rhei-run.5.1. The stable child declarations and citation migration above remain prerequisites to decomposition; the ceiling is retuned to exactly the resulting 1526 non-blank lines, with no further growth allowance.
 """
 [[exceptions]]
 path = "docs/functional-spec/rhei-supervision.spec.md"

@@ -373,6 +373,11 @@ the summary prints five stacked groups:
    budget, a strict run's refusal ([§FS-rhei-run.5.1.1](rhei-run.spec.md#511-a-blocker-no-clock-releases)) — means the retry would
    not start it either, so such a ticket is classified by that blocker exactly
    as it is without the record, and never reads `rhei resumes it automatically`.
+   A provider record on one fan-out arm does not park the ticket when another
+   invocation still to be spawned is free ([§FS-rhei-run.5.1](rhei-run.spec.md#51-polling-states)).
+   If only its future poll holds it, the idle count and blocker say `poll`,
+   and neither the halt explanation nor the durable report row names the held
+   arm's provider as its wait, just as with that provider record removed.
 
    The blocker and next action come from a **plan-wide classification** of why
    each non-terminal task node is not moving, in this order: a supervisor's

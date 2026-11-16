@@ -1572,6 +1572,20 @@ emit `run_finished` merely because all remaining work is provider-limited —
 under `--until-idle` that is precisely when it does ([§FS-rhei-run.3](rhei-run.spec.md#3-execution-loop) step 9). Poll attempt
 counters, self-loop selection, and exhaustion are unchanged.
 
+The same pending-invocation rule decides whether a provider wait holds the
+ticket for classification, not just for its next-attempt time. With a future
+poll deadline and a free invocation still to be spawned, a fan-out ticket waits
+on its poll even if it carries a provider record for another arm. Under
+`--until-idle`, it contributes one poll wait, its stop blocker is `poll`, and
+its next attempt remains the poll deadline. Removing that irrelevant provider
+record changes none of those answers. Neither its halt explanation nor its
+durable report row attributes the wait to the held arm's provider
+([§FS-rhei-run-report.3.1](rhei-run-report.spec.md#31-layout),
+[§FS-rhei-run-json.2.1](rhei-run-json.spec.md#21-records)). This does not require
+a new explanation for a poll without `waiting_on`; its existing generic
+explanation may remain. Independently proven blockers retain their precedence
+([§FS-rhei-run.5.1.1](rhei-run.spec.md#511-a-blocker-no-clock-releases)).
+
 **A held ticket opens no pass.** A ticket is held while it has at least one
 invocation still to be spawned and every such invocation waits on an active
 provider deadline of its execution identity. The continuous run leaves a held

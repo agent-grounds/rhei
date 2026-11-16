@@ -182,6 +182,12 @@ including for the informational stderr notice a line frontend may print when
 the option suppresses a TUI that detection would have chosen, which never
 reaches this stream.
 
+`idle_blocker` uses the effective wait on the invocations still to be spawned
+([§FS-rhei-run.5.1](rhei-run.spec.md#51-polling-states)), matching the console and durable report
+classification ([§FS-rhei-run-report.3.1](rhei-run-report.spec.md#31-layout)). A lone polling fan-out with a free
+pending invocation and only a future poll holding it therefore reports `poll`
+and that poll's `next_attempt_at`, even when another arm has a provider record.
+
 `budget_snapshot` carries the bounds in force before any capacity is spent, so
 a reader that sees only the head of the stream still knows what the run is
 bounded by ([§FS-rhei-budgets.9](rhei-budgets.spec.md#9-visibility)). "Each receipt" means each `start` and `spend`

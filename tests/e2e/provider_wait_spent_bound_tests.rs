@@ -102,7 +102,6 @@ fn assert_halted_once_and_quiet(fixture: &ProviderFixture, run: &mut RunningChil
 
 /// The ticket's own case, in the sequential loop. §FS-rhei-run.3.6.1
 #[test]
-#[ignore = "red until #726: the deadline sleep re-admits a spent ticket every slice; implement removes this"]
 fn a_spent_ticket_beside_a_provider_wait_opens_no_pass_while_the_run_sleeps() {
     let fixture = fixture("spent-beside-wait", MACHINE);
     let mut run = start_text_run(&fixture, "run", &[]);
@@ -111,7 +110,6 @@ fn a_spent_ticket_beside_a_provider_wait_opens_no_pass_while_the_run_sleeps() {
 
 /// The same in the `--parallel 2` worker pool. §FS-rhei-run.3.6.1 §FS-rhei-run.5
 #[test]
-#[ignore = "red until #726: the worker pool's sleep re-admits a spent ticket every slice; implement removes this"]
 fn a_spent_ticket_beside_a_provider_wait_opens_no_pass_in_the_worker_pool() {
     let machine = MACHINE
         .replace("    initial: true", "    initial: true\n    concurrent: true")

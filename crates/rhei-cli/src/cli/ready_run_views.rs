@@ -210,6 +210,10 @@ fn find_runnable_program_polls_for_mode_selection<'a>(
 /// pass, instead of opening one on every slice of it.
 /// §FS-rhei-run.3 step 2 §FS-rhei-run.5.1
 ///
+/// It leaves out, too, every ticket a deadline sleep kept for a bound still
+/// spent (`kept_spent`), which no pass the sleep opens could do anything but
+/// halt again. §FS-rhei-run.3.6.1
+///
 /// That sleep alone decides whether a wait is worth sleeping for. When it would
 /// find nothing to wake for, the scan comes back as it was, so a held ticket
 /// never turns a wait into a halt the unfiltered pass would not have reached.
@@ -219,10 +223,12 @@ fn without_provider_held_tickets<'a>(
     settings: &RheiSettings,
     scope: &RheiScope,
     spawns: &SpawnSiteRoots<'_>,
+    kept_spent: &HashSet<String>,
 ) -> Vec<&'a rhei_core::ast::Task> {
     let free: Vec<_> = ready
         .iter()
         .copied()
+        .filter(|task| !kept_spent.contains(&task.id.to_string()))
         .filter(|task| !provider_holds_ticket(task, loaded, settings, spawns))
         .collect();
     if free.is_empty()
@@ -233,6 +239,18 @@ fn without_provider_held_tickets<'a>(
         return ready;
     }
     free
+}
+
+/// Whether the ticket `task_id` names still has the bound its spawn site halts
+/// it on spent, read afresh from the plan `spawns` stands for: the one question
+/// both deadline-sleep sites and the sleeping run's ready filter ask, so they
+/// cannot disagree about which stalls a sleep keeps. A ticket the plan no
+/// longer has answers `false`. §FS-rhei-run.3.6.1
+fn spawn_bound_still_spent(loaded: &LoadedPlan, spawns: &SpawnSiteRoots<'_>, task_id: &str) -> bool {
+    let Some(task) = find_task_by_id_str(&loaded.rhei.tasks, task_id) else { return false };
+    let machine = spawns.machines.for_task(&task.id);
+    let state = normalized_state_name(task.state.as_str(), machine);
+    spawns.attempt_budget_spent(&loaded.rhei, machine, task, &state)
 }
 
 /// Whether a provider wait holds this ticket at the instant `spawns` was read:

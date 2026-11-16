@@ -1654,7 +1654,8 @@ refused ([§FS-rhei-seal.8.4](rhei-seal.spec.md#84-the-refusal)). None of them c
 record or from another ticket's: a provider record is a deadline for every
 ticket on its execution identity ([§FS-rhei-run.3.3](rhei-run.spec.md#33-provider-limit-parking)), and it is one only for a
 ticket the run would spawn once it passes. A run whose remaining work is such a
-ticket halts on the refusal it printed instead of rescanning it every second.
+ticket halts rather than rescanning it every second. Its spawn site prints the
+refusal only when it reaches the ticket, which a live provider record prevents.
 
 **One question, every reader of a clock.** A poll deadline or a provider record
 is a ticket's wait only when nothing this point names holds the ticket, and

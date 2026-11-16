@@ -91,8 +91,13 @@
     /// that waits on CI, so a person wait and a machine backoff can block each
     /// other in one plan. §FS-rhei-states.2.5
     fn approval_report(tasks: &str) -> RunSummaryReport {
-        let rhei = rhei_core::parse(&format!("# Rhei: Approvals\n\n## Tasks\n\n{tasks}"))
-            .expect("plan parses");
+        let plan = format!("# Rhei: Approvals\n\n## Tasks\n\n{tasks}");
+        approval_plan_report(&plan, &SummarySink::new())
+    }
+
+    /// A whole `plan` on the same machine, read with `sink`'s events.
+    fn approval_plan_report(plan: &str, sink: &SummarySink) -> RunSummaryReport {
+        let rhei = rhei_core::parse(plan).expect("plan parses");
         let machine = rhei_validator::StateMachine::from_yaml_str(
             r#"name: approvals
 version: 1
@@ -118,7 +123,7 @@ transitions:
         RunSummaryReport::build(
             &rhei,
             &rhei_validator::MachineSet::single(machine),
-            &SummarySink::new(),
+            sink,
             test_stats(),
             "plan.rhei.md",
             &no_task_roots(),

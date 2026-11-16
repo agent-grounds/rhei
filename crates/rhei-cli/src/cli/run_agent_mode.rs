@@ -241,7 +241,12 @@ fn run_agent_mode(
         let ready = if opts.dry_run() || opts.until_idle() {
             ready
         } else {
-            without_provider_held_tickets(ready, &loaded, settings, &rhei_scope, &spawns)
+            // Nor one a deadline sleep kept for a bound a retry or an advance has not
+            // lifted since. §FS-rhei-run.3.6.1
+            let kept_spent = empty_visit_holds.release_unspent(&mut stalled_tasks, |id| {
+                spawn_bound_still_spent(&loaded, &spawns, id)
+            });
+            without_provider_held_tickets(ready, &loaded, settings, &rhei_scope, &spawns, kept_spent)
         };
         if ready.is_empty() {
             if !opts.dry_run() {
@@ -763,7 +768,10 @@ fn run_agent_mode(
                             );
                             awaiting_deadline_announced = Some(deadline);
                         }
-                        empty_visit_holds.keep_held(&mut stalled_tasks);
+                        // A spent bound stays out of the passes the sleep opens. §FS-rhei-run.3.6.1
+                        empty_visit_holds.keep_held(&mut stalled_tasks, |id| {
+                            spawn_bound_still_spent(&loaded, &spawns, id)
+                        });
                         progress_since_stall_reset = false;
                         interruptible_sleep(
                             Duration::from_secs(sleep_secs).min(Duration::from_millis(500)),
@@ -949,14 +957,11 @@ fn run_agent_mode(
         // §FS-rhei-run.5.1: the sleep is the continuous mode's.
         if !opts.until_idle() {
             let (machines, settings) = (&live.machines, &live.settings);
-            if let Some(deadline) = agent_deadline_since(
-                &loaded.rhei,
-                &machines.set,
-                settings,
-                &rhei_scope,
-                &SpawnSiteRoots::new(&workspace_root, &runtime_dir, &loaded, machines, Some(settings), opts),
-                pass_ready_at,
-            ) {
+            let spawns =
+                SpawnSiteRoots::new(&workspace_root, &runtime_dir, &loaded, machines, Some(settings), opts);
+            if let Some(deadline) =
+                agent_deadline_since(&loaded.rhei, &machines.set, settings, &rhei_scope, &spawns, pass_ready_at)
+            {
                 let sleep_secs = deadline.saturating_sub(current_unix_secs()).max(1);
                 if awaiting_deadline_announced != Some(deadline) {
                     run_info!(
@@ -965,7 +970,10 @@ fn run_agent_mode(
                     );
                     awaiting_deadline_announced = Some(deadline);
                 }
-                empty_visit_holds.keep_held(&mut stalled_tasks);
+                // The same rule as the sequential loop's sleep. §FS-rhei-run.3.6.1
+                empty_visit_holds.keep_held(&mut stalled_tasks, |id| {
+                    spawn_bound_still_spent(&loaded, &spawns, id)
+                });
                 progress_since_stall_reset = false;
                 interruptible_sleep(
                     Duration::from_secs(sleep_secs).min(Duration::from_millis(500)),

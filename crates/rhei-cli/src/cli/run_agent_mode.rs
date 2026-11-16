@@ -463,8 +463,8 @@ fn run_agent_mode(
                     runtime_dir.clone()
                 };
                 let pending = agent_invocations_to_spawn(
-                    &loaded,
-                    &workspace_root,
+                    &loaded.rhei,
+                    &task_root,
                     &agent_runtime_dir,
                     task,
                     machine,

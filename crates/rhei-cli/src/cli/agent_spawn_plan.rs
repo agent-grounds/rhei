@@ -389,6 +389,37 @@ impl<'a> SpawnSiteRoots<'a> {
         }
     }
 
+    /// Which of `invocations` this ticket's next pass in `state_name` would
+    /// still spawn: those the pre-spawn completion check does not find
+    /// satisfied, asked from the roots its spawn site plans under, and saying
+    /// no pairing note. The ready filter's held-ticket rule and the deadline
+    /// scan both judge this one set, so they cannot disagree about which arms a
+    /// provider wait holds. §FS-rhei-run.3 step 2 §FS-rhei-run.3.3 §FS-rhei-run.5.1
+    fn invocations_still_to_spawn(
+        &self,
+        rhei: &rhei_core::ast::Rhei,
+        task: &rhei_core::ast::Task,
+        machine: &rhei_validator::StateMachine,
+        state_name: &str,
+        state_def: &rhei_validator::StateDef,
+        invocations: Vec<ResolvedAgent>,
+    ) -> Vec<ResolvedAgent> {
+        let task_id = task.id.to_string();
+        let task_root = self.tasks.artifact_root(&task_id);
+        let runtime_dir = self.machines.agent_runtime_dir(&task_id, task_root, self.runtime_dir);
+        agent_invocations_to_spawn(
+            rhei,
+            task_root,
+            &runtime_dir,
+            task,
+            machine,
+            state_name,
+            state_def,
+            invocations,
+            None,
+        )
+    }
+
     /// A single-file plan's roots, where every ticket's root is the plan's own
     /// and no rhei was admitted after startup: the shape the unit tests build,
     /// under the default settings rather than whatever the machine has.

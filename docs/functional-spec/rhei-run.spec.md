@@ -1570,6 +1570,20 @@ alone. A ticket with no invocation left to spawn is not held, even while the
 identity of an arm it already satisfied still waits: it is ready, and its pass
 advances it without a spawn.
 
+**An owed supervisor visit has the same wait.** A supervisor whose phase is
+`held`, with no descendant in flight, is otherwise ready even while its
+descendants remain open ([§FS-rhei-supervision.3.2](rhei-supervision.spec.md#32-readiness)).
+Its applicable provider deadline therefore contributes to this sleep and to
+the effective next attempt reported under `--until-idle`, whether the current
+run observed the refusal or loaded the persisted wait at startup. An open
+subtree alone must not discard that deadline and turn the wait into a halt.
+While held by the provider, the supervisor keeps its state and subtree hold;
+no child executes, and the quiet-wait rules above apply in both scheduling
+loops. This does not admit an ordinary parent with open descendants, a
+released supervisor, or a supervisor with a descendant in flight. Claims,
+held ancestors, unsatisfied priors, gates, scope and spent bounds retain their
+existing exclusions: expiry must itself make the visit schedulable.
+
 **The sleep is the continuous mode's.** With `--until-idle`, each site that
 would sleep here returns idle instead, and the deadline scan becomes the
 reported **earliest effective next attempt** rather than a sleep duration.

@@ -7,6 +7,8 @@
 
 // §AR-source-file-size.3 §FS-rhei-run.5.1 §FS-rhei-run-report.3.1
 
+include!("tests_supervisor_provider_wait.rs");
+
 mod wait_deadlines {
     use super::provider_limits::{codex_openai, deadline};
     use super::*;

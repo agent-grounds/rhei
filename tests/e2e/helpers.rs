@@ -10,22 +10,23 @@ use super::{
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
-#[cfg(unix)]
 use std::time::Duration;
 
-/// The one value behind both spellings of the margin. §REQ-cross-platform.8
+/// The one value behind all spellings of the margin. §REQ-cross-platform.8
 macro_rules! fixture_margin_secs {
     () => {
         60
     };
 }
 
+// §FS-rhei-agent-visit-pairing.5.1: embed this same margin in the ordering fixture's Python.
+pub(super) use fixture_margin_secs;
+
 /// Execution margin for healthy fixture starts on stalled runners. §REQ-cross-platform.8
 pub(super) const FIXTURE_MARGIN: &str = concat!(fixture_margin_secs!(), "s");
 
 /// [`FIXTURE_MARGIN`], for a bound a test writes in code rather than in a fixture.
 /// §REQ-cross-platform.8
-#[cfg(unix)]
 pub(super) const FIXTURE_MARGIN_DURATION: Duration = Duration::from_secs(fixture_margin_secs!());
 
 // ---------------------------------------------------------------------------

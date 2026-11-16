@@ -81,7 +81,7 @@ if _fault_kind in ('permanent', 'unrelated'):
     def _sleep(seconds):
         global _elapsed
         _elapsed += seconds
-        if _elapsed > 12:
+        if _elapsed > 2 * _FIXTURE_MARGIN:
             raise RuntimeError('fault injector: exceeded the fixture bound')
 
     def _finished():

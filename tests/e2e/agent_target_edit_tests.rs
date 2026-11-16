@@ -31,6 +31,9 @@ write(root / 'runtime' / 'digest.md', 'written by an invocation\n')
 /// [`TARGET_AGENT`], except that d exits 1 after c successfully completes this visit.
 /// Its poll of c's record waits out a refused read. §FS-rhei-agent-visit-pairing.5.1
 const D_FAILS_AGENT: &str = concat!(
+    "_FIXTURE_MARGIN = ",
+    super::helpers::fixture_margin_secs!(),
+    "\n",
     include_str!("fixtures/shared_access_refused.py"),
     include_str!("fixtures/agent_target_edit_c_record.py"),
     r#"root = pathlib.Path(env('RHEI_ROOT'))
@@ -47,6 +50,7 @@ if target == 'mock:mock:d':
 const NOTE_PREFIX: &str = "note: task plan.1 state 'work': reusing this visit's finished spawn (";
 
 /// `binding` is the state's `target:` or `all_targets:` line.
+/// Its execution margin matches the ordering fixture. §FS-rhei-agent-visit-pairing.5.1
 fn machine(binding: &str) -> String {
     format!(
         r#"name: agent-target-edit
@@ -56,7 +60,7 @@ states:
     initial: true
     description: Produce the digest
     {binding}
-    agent_timeout: 10s
+    agent_timeout: {FIXTURE_MARGIN}
     outputs:
       - name: digest
         path: runtime/digest.md

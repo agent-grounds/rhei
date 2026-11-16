@@ -20,6 +20,8 @@ pub(super) fn setup(name: &str, machine: &str, agent_body: &str) -> (TestDir, Pa
     (dir, plan, machine)
 }
 
+/// Healthy agent starts share the ordering fixture's margin at both settings
+/// levels; a profile wins over the fallback. §FS-rhei-agent-visit-pairing.5.1
 pub(super) fn write_settings(root: &Path, agent: &Path, with_models: bool) {
     let settings = root.join(".agent-grounds/rhei");
     fs::create_dir_all(&settings).expect("create settings directory");
@@ -36,9 +38,9 @@ pub(super) fn write_settings(root: &Path, agent: &Path, with_models: bool) {
         settings.join("settings.json"),
         format!(
             r#"{{
-  "defaults": {{ "agent": "mock", "agent_timeout": "10s" }},
+  "defaults": {{ "agent": "mock", "agent_timeout": "{FIXTURE_MARGIN}" }},
   "agents": {{
-    "mock": {{ "command": {}, "stdin_prompt": true, "timeout": "10s" }}
+    "mock": {{ "command": {}, "stdin_prompt": true, "timeout": "{FIXTURE_MARGIN}" }}
   }}{}
 }}"#,
             fixture_command(agent),

@@ -11,6 +11,9 @@ use serde_json::Value;
 /// reads of c's record wait out a refusal, so the snapshot at d's deliberate
 /// exit is always written. §FS-rhei-agent-visit-pairing.5.1
 pub(super) const STARTUP_SCHEDULER: &str = concat!(
+    "_FIXTURE_MARGIN = ",
+    super::super::helpers::fixture_margin_secs!(),
+    "\n",
     include_str!("fixtures/shared_access_refused.py"),
     include_str!("fixtures/agent_target_edit_c_record.py"),
     r#"import json
@@ -27,7 +30,7 @@ target = os.environ.get('RHEI_TARGET', '')
 
 
 def wait_for(description, predicate):
-    deadline = time.monotonic() + 5
+    deadline = time.monotonic() + _FIXTURE_MARGIN
     while time.monotonic() < deadline:
         if predicate():
             return
@@ -52,7 +55,7 @@ try:
 except SystemExit as outcome:
     if target == 'mock:mock:d' and outcome.code == 1:
         # §FS-rhei-agent-visit-pairing.5.1: a refusal is read again; only an absent record is None.
-        c_record, _ = _read_c_record(root, time.monotonic() + 5, "snapshot of c's record at d's exit")
+        c_record, _ = _read_c_record(root, time.monotonic() + _FIXTURE_MARGIN, "snapshot of c's record at d's exit")
         (runtime / 'c-at-d-exit.json').write_text(json.dumps(c_record))
     raise
 "#

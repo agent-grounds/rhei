@@ -241,10 +241,10 @@ fn run_agent_mode(
         let ready = if opts.dry_run() || opts.until_idle() {
             ready
         } else {
-            // Nor one a deadline sleep kept for a bound a retry or an advance has not
+            // Nor one a deadline sleep kept for a spent bound or refused log name not
             // lifted since. §FS-rhei-run.3.6.1
             let kept_spent = empty_visit_holds.release_unspent(&mut stalled_tasks, |id| {
-                spawn_bound_still_spent(&loaded, &spawns, id)
+                spawn_still_halted(&loaded, &spawns, id)
             });
             without_provider_held_tickets(ready, &loaded, settings, &rhei_scope, &spawns, kept_spent)
         };
@@ -768,9 +768,9 @@ fn run_agent_mode(
                             );
                             awaiting_deadline_announced = Some(deadline);
                         }
-                        // A spent bound stays out of the passes the sleep opens. §FS-rhei-run.3.6.1
+                        // A spent bound or a refused log name stays out of the sleep's passes. §FS-rhei-run.3.6.1
                         empty_visit_holds.keep_held(&mut stalled_tasks, |id| {
-                            spawn_bound_still_spent(&loaded, &spawns, id)
+                            spawn_still_halted(&loaded, &spawns, id)
                         });
                         progress_since_stall_reset = false;
                         interruptible_sleep(
@@ -972,7 +972,7 @@ fn run_agent_mode(
                 }
                 // The same rule as the sequential loop's sleep. §FS-rhei-run.3.6.1
                 empty_visit_holds.keep_held(&mut stalled_tasks, |id| {
-                    spawn_bound_still_spent(&loaded, &spawns, id)
+                    spawn_still_halted(&loaded, &spawns, id)
                 });
                 progress_since_stall_reset = false;
                 interruptible_sleep(

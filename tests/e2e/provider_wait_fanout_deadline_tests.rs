@@ -165,8 +165,6 @@ fn assert_nothing_started(fixture: &ProviderFixture) {
 /// `--until-idle` reports NEAR, on the console and in the stream: the anthropic
 /// arm of the issue, here `codex/openai`, can spawn then. §FS-rhei-run.5.1
 #[test]
-#[ignore = "red until #729: --until-idle reports the fan-out's later arm (FAR) as its next \
-            attempt; implement removes this"]
 fn until_idle_reports_a_fan_out_due_when_its_first_held_arm_frees() {
     let at = Deadlines::from_now();
     let fixture = fan_out_held_to_two_deadlines("fan-out-deadline-idle", &at);
@@ -195,8 +193,6 @@ fn until_idle_reports_a_fan_out_due_when_its_first_held_arm_frees() {
 /// The continuous run announces a sleep to NEAR, about an hour, not to FAR, in
 /// the sequential loop and the `--parallel` worker pool alike. §FS-rhei-run.5.1
 #[test]
-#[ignore = "red until #729: the continuous run sleeps to the fan-out's later arm (about \
-            7200s); implement removes this"]
 fn the_continuous_run_sleeps_until_a_fan_outs_first_held_arm_frees() {
     for (name, extra) in [("sequential", &[][..]), ("pool", &["--parallel", "2"][..])] {
         let at = Deadlines::from_now();

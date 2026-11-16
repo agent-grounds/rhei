@@ -226,11 +226,14 @@ fn task_has_pending_agent_invocations(
 /// pair, is printed on the sink `pairing_notes` names. A reader that only asks
 /// passes `None`: the ready filter asks on every slice of a provider wait, and
 /// would otherwise repeat the note each time. §FS-rhei-run.5.1
+///
+/// `artifact_root` is the ticket's own root, where its outputs and results sit:
+/// its owning rhei's execution root in a Panta project. §AR-rhei-panta.5
 // §FS-rhei-agents.3.2 §FS-rhei-agent-visit-pairing.4 §FS-rhei-agent-visit-pairing.5 §FS-rhei-run.3
 #[allow(clippy::too_many_arguments)]
 fn agent_invocations_to_spawn(
-    loaded: &LoadedPlan,
-    workspace_root: &Path,
+    rhei: &rhei_core::ast::Rhei,
+    artifact_root: &Path,
     runtime_dir: &Path,
     task: &rhei_core::ast::Task,
     machine: &rhei_validator::StateMachine,
@@ -244,10 +247,9 @@ fn agent_invocations_to_spawn(
         return invocations;
     }
     let current_state_raw = task.state.as_str();
-    let metadata = loaded.rhei.metadata.as_ref();
-    let artifact_root = loaded.task_root(&task.id.to_string(), workspace_root);
+    let metadata = rhei.metadata.as_ref();
     let completion = InvocationCompletion {
-        artifact_root: &artifact_root,
+        artifact_root,
         runtime_dir,
         task,
         state_name,
@@ -255,7 +257,7 @@ fn agent_invocations_to_spawn(
         machine,
         metadata,
         state_def,
-        finishes_ticket: selected_forward_transition(&loaded.rhei, machine, task)
+        finishes_ticket: selected_forward_transition(rhei, machine, task)
             .is_some_and(|to| is_terminal_state(&to, machine)),
         visit_count: render_visit_count(
             metadata,
@@ -264,7 +266,7 @@ fn agent_invocations_to_spawn(
             current_state_raw,
             machine,
         ),
-        moves: ticket_move_count(&artifact_root, runtime_dir, &task.id.to_string()),
+        moves: ticket_move_count(artifact_root, runtime_dir, &task.id.to_string()),
         invocations: &invocations,
         pairing: std::cell::OnceCell::new(),
     };

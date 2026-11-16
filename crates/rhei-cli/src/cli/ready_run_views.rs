@@ -136,19 +136,7 @@ fn provider_holds_ticket(
     if !invocations.iter().any(held) {
         return false;
     }
-    let task_id = task.id.to_string();
-    let task_root = spawns.tasks.artifact_root(&task_id);
-    let runtime_dir = machines.agent_runtime_dir(&task_id, task_root, spawns.runtime_dir);
-    let pending = agent_invocations_to_spawn(
-        loaded,
-        spawns.tasks.workspace_root,
-        &runtime_dir,
-        task,
-        machine,
-        &state,
-        state_def,
-        invocations,
-        None,
-    );
+    let pending =
+        spawns.invocations_still_to_spawn(&loaded.rhei, task, machine, &state, state_def, invocations);
     !pending.is_empty() && pending.iter().all(held)
 }

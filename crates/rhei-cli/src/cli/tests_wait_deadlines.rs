@@ -175,8 +175,6 @@ transitions:
     /// last: its `pi/anthropic` arm waits until NEAR, its `pi/openai` arm until
     /// FAR, the record Task 2 on that identity carries. §FS-rhei-run.5.1
     #[test]
-    #[ignore = "red until #729: one ticket's arms fold to their latest deadline (FAR); \
-                implement removes this"]
     fn a_fan_out_ticket_is_due_when_its_first_held_arm_frees() {
         let mut rhei = rhei_core::parse(
             "# Rhei: Limits\n\n## Tasks\n\n### Task 1: Fan-out\n**State:** fix\n\n\

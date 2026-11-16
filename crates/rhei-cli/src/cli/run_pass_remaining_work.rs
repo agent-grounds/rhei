@@ -272,13 +272,29 @@ fn agent_deadline_since(
             let provider = if state_def.program.is_some() {
                 None
             } else {
-                resolve_agent_invocations_for_task(machine, &state, settings, spawns.opts, Some(task))
-                    .ok()?
-                    .iter()
-                    .filter_map(|resolved| {
-                        resolved_provider_eligibility_deadline(rhei, machines, resolved, now)
-                    })
-                    .max()
+                let invocations = resolve_agent_invocations_for_task(
+                    machine,
+                    &state,
+                    settings,
+                    spawns.opts,
+                    Some(task),
+                )
+                .ok()?;
+                let waits = |resolved: &ResolvedAgent| {
+                    resolved_provider_eligibility_deadline(rhei, machines, resolved, now)
+                };
+                // No arm waits, no completion read: this scan runs on every pass.
+                if invocations.iter().any(|resolved| waits(resolved).is_some()) {
+                    // The first arm still to be spawned to come free makes the ticket ready, and a
+                    // finished arm adds no deadline. §FS-rhei-run.5.1
+                    spawns
+                        .invocations_still_to_spawn(rhei, task, machine, &state, state_def, invocations)
+                        .iter()
+                        .filter_map(waits)
+                        .min()
+                } else {
+                    None
+                }
             };
             // No run waits for a spawn a spent poll bound refuses, so its provider
             // window adds nothing either. §FS-rhei-run.5.1 §FS-rhei-run.3.7.4

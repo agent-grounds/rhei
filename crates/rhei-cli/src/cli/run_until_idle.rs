@@ -44,12 +44,14 @@ fn merge_blockers(left: Option<rhei_tui::IdleBlocker>, right: Option<rhei_tui::I
 /// where a blocker's idle-compatibility is decided, and here the order is
 /// load-bearing: this walk answers *which* wait, and a ticket with two of them
 /// must be named by the one that outranks. The deliberate-wait judgment answers
-/// a different question — *is* this deliberate — and that is a disjunction over
-/// the same rungs, so its order does not affect its answer and it does not walk
-/// this one. For the three structural entries — a supervisor's hold, an open
-/// descendant subtree and an unsatisfied `**Prior:**` — this walk follows the
-/// classified blocker at the other end, so a ticket held behind a gate reports
-/// the gate rather than a wait of its own.
+/// a different question — *is* this deliberate — and only its two clocks form a
+/// disjunction; its structural rungs are decisive exactly as they are here, so
+/// the two agree on which tickets wait. For the three structural entries — a
+/// supervisor's hold, an open descendant subtree and an unsatisfied
+/// `**Prior:**` — this walk follows the classified blocker at the other end, so
+/// a ticket held behind a gate reports the gate rather than a wait of its own,
+/// and one held behind a prior that names no wait reports none, whatever its own
+/// clock says. §FS-rhei-run.5.1.1
 ///
 /// The descendant rung carries the one exception the same point publishes: a
 /// supervising ticket is classified by its own gate and its own `**Assignee:**`
@@ -139,22 +141,11 @@ impl<'a> IdleBlockerScan<'a> {
         if task.assignee.is_some() {
             return None;
         }
-        // Ahead of this ticket's own clock, because that is where the halt
-        // classification puts it: a poll behind an unsatisfied prior is held
-        // by the prior, not by its clock. §FS-rhei-run-report.3.1
-        for dep_id in &task.prior {
-            let Some(dep_state) = self.state_map.get(dep_id).cloned() else {
-                continue;
-            };
-            if dependency_is_satisfied(&dep_state, self.machines.for_task(dep_id)) {
-                continue;
-            }
-            let Some(dep_task) = self.tasks.iter().copied().find(|c| &c.id == dep_id) else {
-                continue;
-            };
-            if let Some(blocker) = self.classify(dep_task) {
-                return Some(blocker);
-            }
+        // Ahead of this ticket's own clock, where the halt classification puts it: a poll behind
+        // an unsatisfied prior is held by the prior, even one naming no wait. §FS-rhei-run.5.1.1
+        let priors = live_unsatisfied_priors(task, &self.tasks, &self.state_map, self.machines)?;
+        if !priors.is_empty() {
+            return priors.into_iter().find_map(|prior| self.classify(prior));
         }
         // Neither clock is the wait of a ticket something no clock releases holds.
         // §FS-rhei-run.5.1.1

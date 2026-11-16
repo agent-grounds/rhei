@@ -1664,9 +1664,11 @@ asks it for the continuous sleep, the worker pool's pass-loop sleep and
 run has one deadline scan whichever mode executes it. The halt classification
 ([§FS-rhei-run-report.3.1](rhei-run-report.spec.md#31-layout)) and the judgement that what remains is deliberately
 waiting ([§FS-rhei-run.3](rhei-run.spec.md#3-execution-loop) step 9) ask it before naming a clock as the ticket's
-wait, after their own claim, gate, hold, subtree and prior rungs. So a ticket
-missing its input reads the same with a live record or a pending poll as with
-none: reported for the input, exit non-zero, not idle, `next_attempt_at` null.
+wait, after their own claim, gate, hold, subtree and prior rungs, which decide:
+a ticket an unsatisfied `**Prior:**` holds waits only when that prior does, so
+one behind a cancelled prior is never idle, whatever its clock. A ticket missing
+its input reads the same with a live record or a pending poll as with none:
+reported for the input, exit non-zero, not idle, `next_attempt_at` null.
 
 This changes nothing about a ticket the ready scan would otherwise take and
 its spawn site spawn. An expired provider record on such a ticket still means

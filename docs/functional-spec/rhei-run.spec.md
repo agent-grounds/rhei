@@ -1518,7 +1518,7 @@ States that declare a [`poll:`](rhei-states.spec.md#2-polling-states) block are 
 - Releases the `--parallel` slot so other ready tasks may run.
 - Does not hold a timer thread; the next pass re-scans and picks the task up again only once `pollNextAttemptAt` is in the past.
 
-If, at the end of a pass, every remaining non-terminal task is either in a gating state, blocked behind a gating dependency, or blocked by a pending `pollNextAttemptAt`, `rhei run` sleeps until the earliest `pollNextAttemptAt` across all blocked poll tasks (bounded below by 1 s to avoid busy-looping) and then begins a new pass. If no poll deadline is pending and only gating remains, the run exits as it does today. A poll whose reverted attempts have spent `poll.max_attempts` is not blocked by its `pollNextAttemptAt`, because no attempt follows it ([§FS-rhei-run.3.7.4](rhei-run.spec.md#374-the-charge)).
+If, at the end of a pass, every remaining non-terminal task is either in a gating state, blocked behind a gating dependency, or blocked by a pending `pollNextAttemptAt`, `rhei run` sleeps until the earliest `pollNextAttemptAt` among the poll tasks that deadline alone holds ([§FS-rhei-run.5.1.1](rhei-run.spec.md#511-a-blocker-no-clock-releases)), in every mode the run executes in (bounded below by 1 s to avoid busy-looping) and then begins a new pass. If no poll deadline is pending and only gating remains, the run exits as it does today. A poll whose reverted attempts have spent `poll.max_attempts` is not blocked by its `pollNextAttemptAt`, because no attempt follows it ([§FS-rhei-run.3.7.4](rhei-run.spec.md#374-the-charge)).
 
 Provider-limit waits join this same deadline scan. For one task, eligibility is
 the later of its applicable poll deadline and provider-limit deadline. A task's
@@ -1645,10 +1645,33 @@ gives when the ticket carries no record at all. It prints no
 to repair, and the stop's `next_attempt_at` is present and null
 ([§FS-rhei-run-json.2.1](rhei-run-json.spec.md#21-records)).
 
-This changes nothing about a ticket the ready scan would otherwise take. An
-expired provider record on such a ticket still means "eligible now", so a
-deadline that moved between a worker-pool refill and the outer check causes
-one rescan rather than a false halt ([§FS-rhei-run.3.3](rhei-run.spec.md#33-provider-limit-parking)), and a poll deadline
+The spawn site has the last word on whether the run starts a ticket the ready
+scan takes, so a ticket it refuses is held the same way. A visit that has spent
+its attempt budget ([§FS-rhei-agents.3.2.3](rhei-agents.spec.md#323-attempt-budget)), like a poll whose reverted attempts
+have spent `poll.max_attempts` ([§FS-rhei-run.3.7.4](rhei-run.spec.md#374-the-charge)), is released by
+`rhei retry` ([§FS-rhei-retry](rhei-retry.spec.md#fs-rhei-retry-rhei-retry)) and by no clock, and so is a ticket a strict run
+refused ([§FS-rhei-seal.8.4](rhei-seal.spec.md#84-the-refusal)). None of them contributes a deadline, from its own
+record or from another ticket's: a provider record is a deadline for every
+ticket on its execution identity ([§FS-rhei-run.3.3](rhei-run.spec.md#33-provider-limit-parking)), and it is one only for a
+ticket the run would spawn once it passes. A run whose remaining work is such a
+ticket halts on the refusal it printed instead of rescanning it every second.
+
+**One question, every reader of a clock.** A poll deadline or a provider record
+is a ticket's wait only when nothing this point names holds the ticket, and
+every place the run reads a clock asks that one question. The deadline scan
+asks it for the continuous sleep, the worker pool's pass-loop sleep and
+`--until-idle`'s next attempt; the callback mode sleeps on the same scan, so a
+run has one deadline scan whichever mode executes it. The halt classification
+([§FS-rhei-run-report.3.1](rhei-run-report.spec.md#31-layout)) and the judgement that what remains is deliberately
+waiting ([§FS-rhei-run.3](rhei-run.spec.md#3-execution-loop) step 9) ask it before naming a clock as the ticket's
+wait, after their own claim, gate, hold, subtree and prior rungs. So a ticket
+missing its input reads the same with a live record or a pending poll as with
+none: reported for the input, exit non-zero, not idle, `next_attempt_at` null.
+
+This changes nothing about a ticket the ready scan would otherwise take and
+its spawn site spawn. An expired provider record on such a ticket still means
+"eligible now", so a deadline that moved between a worker-pool refill and the
+outer check causes one rescan rather than a false halt ([§FS-rhei-run.3.3](rhei-run.spec.md#33-provider-limit-parking)), and a poll deadline
 already past at the instant the pass read its ready set still keeps the pass
 loop alive ([§FS-rhei-run.3.6](rhei-run.spec.md#36-stall-release) item 3).
 

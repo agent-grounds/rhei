@@ -245,7 +245,8 @@ the summary prints five stacked groups:
    marker, and keeps counting toward `could not advance`. This is where a
    person-waiting poll parts from a gate: a gate outranks both because nothing
    but a human moves it either way, while a poll is machinery that a claim or a
-   prior really does stop.
+   prior really does stop. A blocker no clock releases ([§FS-rhei-run.5.1.1](rhei-run.spec.md#511-a-blocker-no-clock-releases))
+   stops it too, and the ticket is classified by that blocker instead.
 
    Nothing about the run's exit status follows from this. Whether work remains
    that a human must act on is the judgment in [§FS-rhei-run.4](rhei-run.spec.md#4-dry-run), unchanged: a
@@ -342,6 +343,10 @@ the summary prints five stacked groups:
    with automatic resumption as the next action. It does not count as failed or
    `could not advance`; an assignee, prior, or gate that independently prevents
    it from reaching the retry keeps the existing higher-priority classification.
+   A blocker no clock releases — a missing required input, a spent attempt
+   budget, a strict run's refusal ([§FS-rhei-run.5.1.1](rhei-run.spec.md#511-a-blocker-no-clock-releases)) — means the retry would
+   not start it either, so such a ticket is classified by that blocker exactly
+   as it is without the record, and never reads `rhei resumes it automatically`.
 
    The blocker and next action come from a **plan-wide classification** of why
    each non-terminal task node is not moving, in this order: a supervisor's
@@ -380,9 +385,12 @@ the summary prints five stacked groups:
    for the same reason: it *is* why the ticket was never scheduled, and
    "rerun to pick it up" sends the operator back to a run that halts
    identically — but only when the missing file is what readiness stopped at:
-   a `poll:` state whose next attempt is still ahead, and a supervisor still
-   draining its subtree, are refused before inputs are read at all, and writing
-   the file releases neither. The path is named, and named absolutely, because
+   a supervisor still draining its subtree is refused before inputs are read at
+   all, and writing the file does not release it. A clock is no such stop: a
+   pending poll attempt or a provider record is the ticket's wait only when
+   nothing else holds it ([§FS-rhei-run.5.1.1](rhei-run.spec.md#511-a-blocker-no-clock-releases)), so a ticket missing its input is
+   reported for the input whatever clock it carries, because writing the file
+   is what releases it. The path is named, and named absolutely, because
    the file the operator wrote and the file readiness looked for can differ — a
    rhei that is a member of a Panta project resolves its inputs against its own
    execution root ([§AR-rhei-panta.5](../architecture/rhei-panta.spec.md#5-execution-root-and-per-rhei-runtime)), not the project's, so *which root* is the

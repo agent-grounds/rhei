@@ -150,15 +150,16 @@ fn no_advancement_summary(
     format!("No tasks could be advanced in the --rhei scope ({}){}.", scope_label(scope), detail)
 }
 
+/// The callback mode's deadline: the earliest pending poll among the tickets
+/// [`agent_deadline_since`] reads, so a run has one deadline scan whatever mode
+/// it executes in. §FS-rhei-run.5.1 §FS-rhei-run.5.1.1
 fn earliest_pending_poll_deadline(
     rhei: &rhei_core::ast::Rhei,
     machines: &rhei_validator::MachineSet,
     scope: &RheiScope,
     spawns: &SpawnSiteRoots<'_>,
 ) -> Option<u64> {
-    let mut tasks = Vec::new();
-    collect_plan_tasks(&rhei.tasks, &mut tasks);
-    tasks
+    tickets_only_a_clock_holds(rhei, machines, spawns)
         .into_iter()
         // §FS-rhei-panta.6.1: a narrowed run never advances out-of-scope
         // tickets, so their poll deadlines must not keep it alive.
@@ -195,7 +196,9 @@ fn earliest_pending_agent_deadline(
 ///
 /// A poll whose next spawn its site would refuse for a spent bound is stalled,
 /// not pending, so it contributes nothing, and `spawns` is where that spawn's
-/// record is read and its agents resolved. §FS-rhei-run.3.7.4
+/// record is read and its agents resolved (§FS-rhei-run.3.7.4). A visit whose
+/// attempt budget is spent is the same refusal, so no provider window it
+/// carries adds anything either (§FS-rhei-agents.3.2.3).
 ///
 /// A provider window is judged at the instant `spawns` was read, as its poll
 /// is. §FS-rhei-run.5.1
@@ -205,10 +208,11 @@ fn earliest_pending_agent_deadline(
 /// published contract. A deadline on a ticket something else holds is real, but
 /// its expiry releases nothing: a timer woken for it finds the same gate, the
 /// same claim, the same unfinished prior, the same missing input. So the
-/// candidates are the run's own ready set with the poll clock set aside, never a
-/// second list of the scan's reasons. The scope filter is the same idea one step
-/// out: a deadline on work this command may not run wakes it for nothing either.
-/// §FS-rhei-run.5.1.1 §FS-rhei-panta.6.1
+/// candidates are the tickets only a clock can be holding, the run's own ready
+/// set with the poll clock set aside and the one blocker question asked of it,
+/// never a second list of the scan's reasons. The scope filter is the same idea
+/// one step out: a deadline on work this command may not run wakes it for
+/// nothing either. §FS-rhei-run.5.1.1 §FS-rhei-panta.6.1
 fn agent_deadline_since(
     rhei: &rhei_core::ast::Rhei,
     machines: &rhei_validator::MachineSet,
@@ -218,9 +222,7 @@ fn agent_deadline_since(
     since: u64,
 ) -> Option<u64> {
     let now = spawns.read_at;
-    // No live spawn set reaches this scan, so only a claim is in flight beneath a
-    // supervisor here. §FS-rhei-supervision.3.2
-    runnable_tasks_in_view(rhei, machines, spawns, &HashSet::new(), ReadySetView::ClockAside)
+    tickets_only_a_clock_holds(rhei, machines, spawns)
         .into_iter()
         .filter(|task| task_in_rhei_scope(scope, &task.id.to_string()))
         .filter_map(|task| {
@@ -255,10 +257,6 @@ fn agent_deadline_since(
                     None
                 }
             };
-            // No run waits for a spawn a spent poll bound refuses, so its provider
-            // window adds nothing either. §FS-rhei-run.5.1 §FS-rhei-run.3.7.4
-            let provider = provider
-                .filter(|_| poll.is_some() || !spawns.poll_bound_spent(rhei, machine, task, &state));
             match (poll, provider) {
                 (Some(poll), Some(provider)) => Some(poll.max(provider)),
                 (Some(deadline), None) | (None, Some(deadline)) => Some(deadline),
@@ -430,7 +428,12 @@ impl<'a> DeliberateWaitJudgment<'a> {
         // §FS-rhei-run.5.1: a poll whose bound is spent waits for nothing, and every clock
         // here is judged at the instant the plan was read, as the ready scan judged it.
         let (now, since) = (self.spawns.read_at, self.spawns.pending_since());
-        if self.spawns.pending_poll_deadline(self.rhei, machine, task, &state, since).is_some() {
+        // A clock is the ticket's wait only while nothing a clock cannot release holds it.
+        // §FS-rhei-run.5.1.1
+        let clock_can_wait = || !blocker_no_clock_releases(task, self.rhei, self.machines, self.spawns);
+        if self.spawns.pending_poll_deadline(self.rhei, machine, task, &state, since).is_some()
+            && clock_can_wait()
+        {
             return true;
         }
         // The fourth deliberate wait, belonging with the other three: the
@@ -439,6 +442,7 @@ impl<'a> DeliberateWaitJudgment<'a> {
         if task_provider_limit(self.rhei, self.machines, task)
             .and_then(|limit| limit.deadline_epoch())
             .is_some_and(|deadline| deadline > now)
+            && clock_can_wait()
         {
             return true;
         }

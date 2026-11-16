@@ -120,27 +120,22 @@ fn missing_state_inputs_for_ready_set(
 /// Whether the ready-set scan refused this ticket *before* it ever looked at
 /// the state's `inputs:`.
 ///
-/// Two skips in [`find_ready_tasks`] come first and have no halt cause of their
-/// own: a `poll:` state whose next attempt is still in the future, and a
-/// supervisor that has released its subtree or still has work draining beneath
-/// it. Either can be true at the same time as a missing input, and naming the
-/// input then is the less useful of two true readings — the operator writes the
-/// file, reruns, and the ticket still does not schedule.
+/// One skip in [`find_ready_tasks`] comes first and has no halt cause of its
+/// own: a supervisor that has released its subtree or still has work draining
+/// beneath it. It can be true at the same time as a missing input, and naming
+/// the input then is the less useful of two true readings — the operator writes
+/// the file, reruns, and the ticket still does not schedule.
+///
+/// A `poll:` state whose next attempt is still ahead is no such skip, though the
+/// scan meets it first: the clock releases nothing while the input is missing,
+/// so writing the file is what the ticket waits on. §FS-rhei-run.5.1.1
 // §FS-rhei-run-report.3.1 §FS-rhei-supervision.3.2
 fn ready_scan_stops_before_inputs(
     task: &rhei_core::ast::Task,
     rhei: &rhei_core::ast::Rhei,
     machines: &rhei_validator::MachineSet,
     machine: &rhei_validator::StateMachine,
-    state_name: &str,
-    spawns: &SpawnSiteRoots<'_>,
 ) -> bool {
-    // The scan's own poll skip at the scan's own instant, so a spent bound reaches
-    // the inputs here too. §FS-rhei-run.5.1
-    let since = spawns.pending_since();
-    if spawns.pending_poll_deadline(rhei, machine, task, state_name, since).is_some() {
-        return true;
-    }
     if !task_is_supervising(task, machine) {
         return false;
     }

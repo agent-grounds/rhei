@@ -1,6 +1,7 @@
 // Every halted ticket of a run classified at once, and the lines the run's
 // halt message and dry run print from those classifications. The
-// classification of one ticket is `ready_halt_causes.rs`.
+// classification of one ticket is `ready_halt_classify.rs`, and the causes it
+// chooses among are `ready_halt_causes.rs`.
 
 // §AR-source-file-size.3 §FS-rhei-run-report.3.1 §FS-rhei-run.4
 

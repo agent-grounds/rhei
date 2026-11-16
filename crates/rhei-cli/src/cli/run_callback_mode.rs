@@ -446,9 +446,20 @@ fn run_callback_mode(
         (terminal_count, total_tasks)
     } else if transitions_made == 0 {
         let loaded = load_run_plan(input)?;
+        // The ready scan's own reading, so the line gives a ticket the halt block's reason.
+        // §FS-rhei-run-report.3.1
+        let spawns = SpawnSiteRoots::new(
+            &workspace_root,
+            &runtime_dir,
+            &loaded,
+            &live.machines,
+            Some(&live.settings),
+            opts,
+        )
+        .judged_at(last_read_at);
         run_info!(
             "{}",
-            no_advancement_summary(&loaded.rhei, &live.machines.set, &rhei_scope)
+            no_advancement_summary(&loaded.rhei, &live.machines.set, &rhei_scope, &spawns)
         );
         (0usize, 0usize)
     } else {

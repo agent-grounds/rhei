@@ -98,6 +98,7 @@ fn no_advancement_summary(
     rhei: &rhei_core::ast::Rhei,
     machines: &rhei_validator::MachineSet,
     scope: &RheiScope,
+    spawns: &SpawnSiteRoots<'_>,
 ) -> String {
     if scope.is_none() {
         return "No tasks could be advanced.".to_string();
@@ -126,12 +127,14 @@ fn no_advancement_summary(
             // §FS-rhei-run-report.3.1 §FS-rhei-states.2.5
             let machine = machines.for_task(&task.id);
             let state = normalized_state_name(task.state.as_str(), machine);
+            let person = || {
+                let label = machine.states.get(&state).and_then(|def| def.waiting_on_person());
+                label.map(str::to_string)
+            };
+            // A blocker no clock releases answers before the person too: the poll
+            // no more resumes itself out of it than out of a prior. §FS-rhei-run.5.1.1
             let waiting_on = first_blocking_prior(task, &state_map, machines, scope).or_else(|| {
-                machine
-                    .states
-                    .get(&state)
-                    .and_then(|def| def.waiting_on_person())
-                    .map(str::to_string)
+                person().filter(|_| !blocker_no_clock_releases(task, rhei, machines, spawns))
             })?;
             Some(format!("Task {} waiting on {}", task.id, waiting_on))
         })

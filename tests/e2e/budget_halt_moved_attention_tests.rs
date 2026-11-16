@@ -252,3 +252,55 @@ fn a_ticket_refused_where_it_stands_keeps_the_bounds_row() {
     assert!(blocker.contains("project invocations"), "the bound holds it: {blocker:?}");
     assert_eq!(next, RENEWS);
 }
+
+/// A polling fan-out: the arm that runs self-loops the poll, so the ticket stays in
+/// the state the bound refused the other arm in.
+const POLL_MACHINE: &str = r#"name: fan-out-poll
+version: 1
+states:
+  work:
+    initial: true
+    description: Work
+    all_targets: ["mock:mock:alpha", "mock:mock:beta"]
+    poll: { interval: 1h, max_attempts: 5 }
+  done: { description: Done, final: true }
+transitions:
+  - { from: work, to: work, condition: pollAttempts < pollMaxAttempts }
+  - { from: work, to: done }
+"#;
+
+/// The ticket still polls in the state the bound refused it in, with its next
+/// attempt an hour away. At that deadline the bound refuses it again, so its row
+/// is the bound's, not `waiting on its poll` (agent-grounds/rhei#736).
+/// §FS-rhei-run-report.3.1
+#[test]
+fn a_poll_refused_where_it_stands_keeps_the_bounds_row_over_its_deadline() {
+    let (dir, plan, machine) = fan_out("budget-poll-refused", POLL_MACHINE, 1);
+    let args = ["--no-tui", "--no-callbacks", "--parallel", "2", "--until-idle"];
+
+    let result = run_at("run", &plan, &machine, Some(NOON), &args);
+
+    assert!(!result.status.success(), "the bound holds the ticket: {}", result.stderr);
+    assert_spawn_count(&dir, 1, "the day's allowance buys one arm");
+    assert_refused_before_the_move(&dir);
+    assert_eq!(state_of_plan(&plan), "work", "premise: the poll self-looped");
+    let text = fs::read_to_string(&plan).expect("read the plan");
+    assert!(text.contains("pollNextAttemptAt"), "premise: a poll deadline:\n{text}");
+    assert_bounds_keeps_the_halt(&dir);
+    let report = report(&dir);
+    let bound_row = "| plan.1 | work | project invocations bound of 1 (machine), renews \
+                     2026-09-25T00:00:00Z | renews automatically |";
+    assert!(report.contains(bound_row), "the bound holds it:\n{report}");
+    assert!(!report.contains("waiting on its poll"), "{report}");
+
+    let lines: Vec<&str> = text.lines().collect();
+    let at = lines.iter().position(|line| line.trim() == "pollNextAttemptAt:").unwrap();
+    let deadline = lines[at + 1];
+    fs::write(&plan, text.replace(deadline, "        work: 1")).expect("rewind the deadline");
+    run_at("run", &plan, &machine, Some(NOON), &args);
+    assert_spawn_count(
+        &dir,
+        1,
+        "the deadline passing resumes nothing, as the row must not promise",
+    );
+}

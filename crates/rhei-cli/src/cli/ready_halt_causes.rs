@@ -153,8 +153,9 @@ impl HaltCause {
     /// halt may stand in for it.
     ///
     /// Only a ticket the scheduler was starting reaches a bound, so the first group
-    /// is what the classifier says of one it merely saw not move: a poll's person
-    /// or a manual claim would not release it. A manual-only ticket with no agent
+    /// is what the classifier says of one it merely saw not move: a poll's person,
+    /// a poll's own deadline or a manual claim would not release it — at that
+    /// deadline the bound refuses it again. A manual-only ticket with no agent
     /// configured is never started, so it has no halt and keeps its row.
     ///
     /// The second group means something moved the ticket after the halt, or that a
@@ -168,6 +169,7 @@ impl HaltCause {
     fn yields_to_bound_halt(&self) -> bool {
         match self {
             HaltCause::WaitingOnPerson { .. }
+            | HaltCause::WaitingOnPoll { .. }
             | HaltCause::ManualOnly { .. }
             | HaltCause::MissingOutputs { .. }
             | HaltCause::NoTransition
@@ -178,7 +180,6 @@ impl HaltCause {
             | HaltCause::WaitingOnDescendants { .. }
             | HaltCause::Gate
             | HaltCause::GateHoldingSubtree { .. }
-            | HaltCause::WaitingOnPoll { .. }
             | HaltCause::ProviderLimited { .. }
             | HaltCause::HeldBySupervisor { .. }
             | HaltCause::SupervisorHasNoTerminalEdge { .. }

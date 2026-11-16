@@ -263,8 +263,9 @@ the summary prints five stacked groups:
    was fine, under a `!` the run's own `waiting on poll` count contradicted.
    The same limit holds as for a person-waiting poll, and further: a live claim,
    an unsatisfied prior and an active provider limit each still classify the
-   ticket, and a poll whose deadline for its current state has passed or was
-   never recorded is not waiting on anything and keeps its ordinary row.
+   ticket, a bound's row stands while the ticket is in the state the bound
+   refused it in, and a poll whose deadline for its current state has passed
+   or was never recorded is not waiting on anything and keeps its ordinary row.
    A blocker no clock releases — a missing required input, a spent attempt
    budget, a strict run's refusal ([§FS-rhei-run.5.1.1](rhei-run.spec.md#511-a-blocker-no-clock-releases)) — means the next attempt
    would not start it either, so such a ticket is classified by that blocker

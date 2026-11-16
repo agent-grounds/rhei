@@ -1,9 +1,11 @@
 // A plain poll held only by its own future deadline (#736): the Waiting group,
-// the count line, the elapsed-deadline edge no plain run produces on demand,
+// the count line, the two edges no plain run produces on demand — an elapsed
+// deadline, and a bound that refused the ticket in the state it still polls in —
 // and the missing input that outranks the deadline. Included into `mod
-// run_summary_tests` in `run_summary.rs`, so the indentation is the module's and
-// `approval_plan_report` comes from `tests_run_summary.rs`. The console,
-// `--dry-run` and report rows are in `tests/e2e/until_idle_poll_wait_row_tests.rs`.
+// run_summary_tests` in `run_summary.rs`, so the indentation is the module's,
+// `approval_plan_report` comes from `tests_run_summary.rs` and the event helpers
+// from `tests_run_summary_bound_halt.rs`. The console, `--dry-run` and report
+// rows are in `tests/e2e/until_idle_poll_wait_row_tests.rs`.
 
 // §FS-rhei-run-report.3.1 §FS-rhei-run.5.1
 
@@ -70,6 +72,30 @@
         let row = report.attention.iter().find(|row| row.id == "1").expect("an Attention row");
         assert_eq!(row.reason, "not scheduled before the run halted, still in 'ci-watch'");
         let markdown = report.render_markdown();
+        assert!(!markdown.contains("waiting on its poll"), "{markdown}");
+    }
+
+    /// A bound refused the ticket in `ci-watch` and it still polls there with a
+    /// future deadline — a fan-out's order: one arm assigned, the other refused,
+    /// the first released. At that deadline the bound refuses it again, so the
+    /// bound's row stands and the poll row would promise a resumption that never
+    /// comes. §FS-rhei-run-report.3.1
+    #[test]
+    fn a_bound_halt_in_the_poll_state_outranks_its_future_deadline() {
+        use rhei_tui::EventSink;
+        let sink = SummarySink::new();
+        emit_assign_into(&sink, "1", "ci-watch", "ci-watch");
+        sink.emit(bound_halt_record(Some("ci-watch")));
+        emit_release_into(&sink, "1", "ci-watch", "ci-watch");
+
+        let report = plain_poll_report_with(FUTURE_DEADLINE, &sink);
+
+        assert!(report.waiting.is_empty(), "a bound-halted ticket is not in Waiting");
+        let row = report.attention.iter().find(|row| row.id == "1").expect("an Attention row");
+        assert!(row.reason.contains("ticket travel"), "{:?}", row.reason);
+        assert_eq!(row.next, BOUND_REMEDY);
+        let markdown = report.render_markdown();
+        assert!(markdown.contains("| could not advance | 1 |"), "{markdown}");
         assert!(!markdown.contains("waiting on its poll"), "{markdown}");
     }
 

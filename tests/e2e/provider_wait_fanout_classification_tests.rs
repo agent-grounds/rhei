@@ -115,7 +115,6 @@ fn observe(case: &str, near: u64, far: u64) -> Observation {
 /// setup, no-spawn and already-correct deadline checks fail independently.
 /// §FS-rhei-run.5.1 §FS-rhei-run-report.3.1 §FS-rhei-run-json.2.1
 #[test]
-#[ignore = "red until #735: a free fan-out arm leaves only the poll holding it; implement removes this"]
 fn until_idle_classifies_a_polling_fan_out_with_a_free_arm_like_its_control() {
     let now = epoch_now();
     let near = now + 3600;

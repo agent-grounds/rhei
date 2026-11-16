@@ -230,38 +230,14 @@ fn agent_deadline_since(
         .filter_map(|task| {
             let machine = machines.for_task(&task.id);
             let state = normalized_state_name(task.state.as_str(), machine);
-            let state_def = machine.states.get(&state)?;
             let poll = spawns.pending_poll_deadline(rhei, machine, task, &state, since);
-            let provider = if state_def.program.is_some() {
-                None
-            } else {
-                let invocations = resolve_agent_invocations_for_task(
-                    machine,
-                    &state,
-                    settings,
-                    spawns.opts,
-                    Some(task),
-                )
-                .ok()?;
-                let held = |resolved: &ResolvedAgent| {
-                    resolved_provider_eligibility_deadline(rhei, machines, resolved, spawns.read_at)
-                        .is_some()
-                };
-                // No arm waits, no completion read: this scan runs on every pass.
-                if invocations.iter().any(held) {
-                    // A free arm leaves no deadline, else the earliest held one. §FS-rhei-run.5.1
-                    spawns
-                        .invocations_still_to_spawn(rhei, task, machine, &state, state_def, invocations)
-                        .iter()
-                        .map(|resolved| {
-                            provider_wait_of(rhei, machines, spawns, (machine, task, &state), resolved)
-                        })
-                        .collect::<Option<Vec<_>>>()
-                        .and_then(|deadlines| deadlines.into_iter().min())
-                } else {
-                    None
-                }
-            };
+            // Scheduling and classification judge the same pending arms; this
+            // reading also retains eligible expired records for a rescan. §FS-rhei-run.5.1
+            let provider = provider_waits_holding_ticket(rhei, machines, task, settings, spawns, |resolved| {
+                provider_wait_of(rhei, machines, spawns, (machine, task, &state), resolved)
+            })
+            .ok()?
+            .and_then(|deadlines| deadlines.into_iter().min());
             match (poll, provider) {
                 (Some(poll), Some(provider)) => Some(poll.max(provider)),
                 (Some(deadline), None) | (None, Some(deadline)) => Some(deadline),
@@ -447,7 +423,7 @@ impl<'a> DeliberateWaitJudgment<'a> {
         }
         // §FS-rhei-run.5.1: a poll whose bound is spent waits for nothing, and every clock
         // here is judged at the instant the plan was read, as the ready scan judged it.
-        let (now, since) = (self.spawns.read_at, self.spawns.pending_since());
+        let since = self.spawns.pending_since();
         // A clock is the ticket's wait only while nothing a clock cannot release holds it.
         // §FS-rhei-run.5.1.1
         let clock_can_wait = || !blocker_no_clock_releases(task, self.rhei, self.machines, self.spawns);
@@ -456,12 +432,9 @@ impl<'a> DeliberateWaitJudgment<'a> {
         {
             return true;
         }
-        // The fourth deliberate wait, belonging with the other three: the
-        // report already places a parked ticket in Waiting and never in
-        // Attention. §FS-rhei-run.3.3 §FS-rhei-run-report.3.1
-        if task_provider_limit(self.rhei, self.machines, task)
-            .and_then(|limit| limit.deadline_epoch())
-            .is_some_and(|deadline| deadline > now)
+        // Only an effective hold across pending invocations is a deliberate
+        // provider wait, as the halt and idle classifiers read it. §FS-rhei-run.5.1
+        if provider_wait_holding_ticket(self.rhei, self.machines, task, self.spawns).is_some()
             && clock_can_wait()
         {
             return true;

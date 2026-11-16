@@ -109,6 +109,72 @@ fn tickets_only_a_clock_holds<'a>(
         .collect()
 }
 
+/// When `resolved`'s provider records let this ticket spawn: their deadline, or
+/// "now" once they have run out, so a deadline that moved between a refill and
+/// the outer check costs one rescan (§FS-rhei-run.3.3). Run-out records that
+/// were all observed before this visit's last spawn of `resolved` started are no
+/// deadline at all: that spawn ran past every one of them, so waking for them
+/// would only release a stall. A record a spawn writes is observed after it
+/// started, so a ticket that spawn parked or backed off keeps its "now".
+// §FS-rhei-run.5.1.1
+fn provider_wait_of(
+    rhei: &rhei_core::ast::Rhei,
+    machines: &rhei_validator::MachineSet,
+    spawns: &SpawnSiteRoots<'_>,
+    ticket: (&rhei_validator::StateMachine, &rhei_core::ast::Task, &str),
+    resolved: &ResolvedAgent,
+) -> Option<u64> {
+    let eligible =
+        resolved_provider_eligibility_deadline(rhei, machines, resolved, spawns.read_at)?;
+    if eligible > spawns.read_at {
+        return Some(eligible);
+    }
+    let identity = resolved_provider_identity(resolved)?;
+    let Some(started) = last_spawn_started(spawns, rhei, ticket, resolved) else {
+        return Some(eligible);
+    };
+    let mut tasks = Vec::new();
+    visit_tasks(&rhei.tasks, &mut tasks);
+    let met = tasks
+        .into_iter()
+        .filter_map(|task| task_provider_limit(rhei, machines, task))
+        .filter(|limit| limit.identity == identity)
+        .all(|limit| {
+            let observed = chrono::DateTime::parse_from_rfc3339(&limit.observed_at);
+            observed.is_ok_and(|observed| observed.timestamp() < started)
+        });
+    (!met).then_some(eligible)
+}
+
+/// When `agent`'s last spawn of this ticket's current visit started, in Unix
+/// seconds, as its spawn record says; `None` when this visit has not spawned it.
+// §FS-rhei-run.5.1.1 §FS-rhei-agents.8.4
+fn last_spawn_started(
+    spawns: &SpawnSiteRoots<'_>,
+    rhei: &rhei_core::ast::Rhei,
+    (machine, task, state_name): (&rhei_validator::StateMachine, &rhei_core::ast::Task, &str),
+    agent: &ResolvedAgent,
+) -> Option<i64> {
+    let task_id = task.id.to_string();
+    let task_root = spawns.tasks.artifact_root(&task_id);
+    let (meta, state) = (rhei.metadata.as_ref(), task.state.as_str());
+    let visits = render_visit_count(meta, &task.id, state_name, state, machine);
+    let runtime_dir = spawns.machines.agent_runtime_dir(&task_id, task_root, spawns.runtime_dir);
+    let identity = resolved_agent_log_identity(agent);
+    let (plan, _) = plan_named_spawn(
+        machine,
+        task_root,
+        &runtime_dir,
+        &task_id,
+        state_name,
+        visits,
+        identity.as_deref(),
+        &spawns.machines.reset,
+    )
+    .ok()?;
+    Some(chrono::DateTime::parse_from_rfc3339(&plan.previous?.started).ok()?.timestamp())
+}
+
 /// Program polls that retain every autonomous-run eligibility constraint but
 /// may still be waiting for a persisted retry deadline. This is an engine
 /// selection probe only; the scheduler continues to use [`find_runnable_tasks`].

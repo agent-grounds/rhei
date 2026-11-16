@@ -224,7 +224,6 @@ fn agent_deadline_since(
     spawns: &SpawnSiteRoots<'_>,
     since: u64,
 ) -> Option<u64> {
-    let now = spawns.read_at;
     tickets_only_a_clock_holds(rhei, machines, spawns)
         .into_iter()
         .filter(|task| task_in_rhei_scope(scope, &task.id.to_string()))
@@ -244,16 +243,19 @@ fn agent_deadline_since(
                     Some(task),
                 )
                 .ok()?;
-                let waits = |resolved: &ResolvedAgent| {
-                    resolved_provider_eligibility_deadline(rhei, machines, resolved, now)
+                let held = |resolved: &ResolvedAgent| {
+                    resolved_provider_eligibility_deadline(rhei, machines, resolved, spawns.read_at)
+                        .is_some()
                 };
                 // No arm waits, no completion read: this scan runs on every pass.
-                if invocations.iter().any(|resolved| waits(resolved).is_some()) {
+                if invocations.iter().any(held) {
                     // A free arm leaves no deadline, else the earliest held one. §FS-rhei-run.5.1
                     spawns
                         .invocations_still_to_spawn(rhei, task, machine, &state, state_def, invocations)
                         .iter()
-                        .map(waits)
+                        .map(|resolved| {
+                            provider_wait_of(rhei, machines, spawns, (machine, task, &state), resolved)
+                        })
                         .collect::<Option<Vec<_>>>()
                         .and_then(|deadlines| deadlines.into_iter().min())
                 } else {

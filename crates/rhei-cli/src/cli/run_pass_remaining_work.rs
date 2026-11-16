@@ -172,46 +172,6 @@ fn earliest_pending_poll_deadline(
         .min()
 }
 
-/// Whether a deadline is the *only* thing between this task and this
-/// invocation — the filter that turns a schedule hint into a published
-/// contract.
-///
-/// A deadline on a task something else is holding is real, but its expiry
-/// releases nothing: a timer woken for it finds the same gate, the same claim,
-/// the same unfinished prior. The scope filter its callers already apply is the
-/// same idea one step out — a deadline on work this command may not run wakes
-/// it for nothing either.
-// §FS-rhei-run.5.1 §FS-rhei-panta.6.1
-fn deadline_alone_would_release(
-    task: &rhei_core::ast::Task,
-    rhei: &rhei_core::ast::Rhei,
-    machines: &rhei_validator::MachineSet,
-    state_map: &HashMap<&TaskId, String>,
-) -> bool {
-    // A claim is an operator's to release, and the scheduler never schedules a
-    // claimed ticket however due it is. §FS-rhei-run-report.3.1
-    if task.assignee.is_some() {
-        return false;
-    }
-    // A parent is held by its subtree, not by its own clock.
-    // §FS-rhei-plan-language.3
-    if !descendants_are_terminal(task, machines) {
-        return false;
-    }
-    // §FS-rhei-supervision.3.2: nothing under a held supervisor is dispatched.
-    if held_by_supervisor(task, rhei, machines).is_some() {
-        return false;
-    }
-    task.prior.iter().all(|dep_id| {
-        state_map
-            .get(dep_id)
-            // §FS-rhei-panta.6.1: the prior's own machine says whether it
-            // satisfies, and a prior this plan does not carry never does.
-            .map(|state| dependency_is_satisfied(state, machines.for_task(dep_id)))
-            .unwrap_or(false)
-    })
-}
-
 /// Earliest effective eligibility instant in agent mode. A task subject to
 /// both polling and a provider limit waits for the later one; the run wakes for
 /// the earliest task that can actually become runnable, and only a task whose
@@ -239,6 +199,16 @@ fn earliest_pending_agent_deadline(
 ///
 /// A provider window is judged at the instant `spawns` was read, as its poll
 /// is. §FS-rhei-run.5.1
+///
+/// Only a ticket whose deadline is the *only* thing between it and this
+/// invocation contributes — the filter that turns a schedule hint into a
+/// published contract. A deadline on a ticket something else holds is real, but
+/// its expiry releases nothing: a timer woken for it finds the same gate, the
+/// same claim, the same unfinished prior, the same missing input. So the
+/// candidates are the run's own ready set with the poll clock set aside, never a
+/// second list of the scan's reasons. The scope filter is the same idea one step
+/// out: a deadline on work this command may not run wakes it for nothing either.
+/// §FS-rhei-run.5.1.1 §FS-rhei-panta.6.1
 fn agent_deadline_since(
     rhei: &rhei_core::ast::Rhei,
     machines: &rhei_validator::MachineSet,
@@ -248,26 +218,15 @@ fn agent_deadline_since(
     since: u64,
 ) -> Option<u64> {
     let now = spawns.read_at;
-    let mut tasks = Vec::new();
-    collect_plan_tasks(&rhei.tasks, &mut tasks);
-    let state_map: HashMap<&TaskId, String> = tasks
-        .iter()
-        .map(|task| {
-            (&task.id, normalized_state_name(task.state.as_str(), machines.for_task(&task.id)))
-        })
-        .collect();
-    tasks
-        .iter()
-        .copied()
+    // No live spawn set reaches this scan, so only a claim is in flight beneath a
+    // supervisor here. §FS-rhei-supervision.3.2
+    runnable_tasks_in_view(rhei, machines, spawns, &HashSet::new(), ReadySetView::ClockAside)
+        .into_iter()
         .filter(|task| task_in_rhei_scope(scope, &task.id.to_string()))
-        .filter(|task| deadline_alone_would_release(task, rhei, machines, &state_map))
         .filter_map(|task| {
             let machine = machines.for_task(&task.id);
             let state = normalized_state_name(task.state.as_str(), machine);
             let state_def = machine.states.get(&state)?;
-            if state_def.terminal || state_def.gating {
-                return None;
-            }
             let poll = spawns.pending_poll_deadline(rhei, machine, task, &state, since);
             let provider = if state_def.program.is_some() {
                 None

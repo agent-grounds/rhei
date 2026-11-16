@@ -1,10 +1,14 @@
 /// Which temporal view the shared readiness scan exposes. The scheduler sees
-/// only work due now; execution-mode selection may also see a program poll
-/// whose persisted deadline is its sole remaining delay. §FS-rhei-run.3
+/// only work due now; [`ReadySetView::ClockAside`] sets the poll clock aside
+/// and keeps every other eligibility rule. §FS-rhei-run.3
 #[derive(Clone, Copy, Eq, PartialEq)]
 enum ReadySetView {
     RunnableNow,
-    ProgramModeProbe,
+    /// The ready set once every `pollNextAttemptAt` has passed: what
+    /// execution-mode selection reads for a program poll whose persisted
+    /// deadline is its sole remaining delay, and what the deadline scan reads
+    /// for every ticket whose deadline is. §FS-rhei-run.3 §FS-rhei-run.5.1.1
+    ClockAside,
 }
 
 /// Find tasks that `rhei run` may schedule autonomously.
@@ -32,14 +36,22 @@ fn find_runnable_tasks_with_options<'a>(
     spawns: &SpawnSiteRoots<'_>,
     spawned: &HashSet<String>,
 ) -> Vec<&'a rhei_core::ast::Task> {
-    find_ready_tasks_in_view(
-        rhei,
-        machines,
-        spawns,
-        spawned,
-        ReadySetView::RunnableNow,
-        Some(spawns.opts),
-    )
+    runnable_tasks_in_view(rhei, machines, spawns, spawned, ReadySetView::RunnableNow)
+}
+
+/// The run scheduler's ready set in `view`, under the options `spawns` carries,
+/// less every ticket the run will not take however ready it is. One function for
+/// the scheduler and the deadline scan, so a ticket the scan holds back for a
+/// reason no clock releases is one no deadline is ever taken for.
+/// §FS-rhei-run.3 step 2 §FS-rhei-run.5.1.1
+fn runnable_tasks_in_view<'a>(
+    rhei: &'a rhei_core::ast::Rhei,
+    machines: &rhei_validator::MachineSet,
+    spawns: &SpawnSiteRoots<'_>,
+    spawned: &HashSet<String>,
+    view: ReadySetView,
+) -> Vec<&'a rhei_core::ast::Task> {
+    find_ready_tasks_in_view(rhei, machines, spawns, spawned, view, Some(spawns.opts))
         .into_iter()
         .filter(|task| task.assignee.is_none())
         // §FS-rhei-seal.8.4: a refused ticket holds no non-concurrent state from its siblings.
@@ -61,7 +73,7 @@ fn find_runnable_program_polls_for_mode_selection<'a>(
         machines,
         spawns,
         &HashSet::new(),
-        ReadySetView::ProgramModeProbe,
+        ReadySetView::ClockAside,
         Some(spawns.opts),
     )
     .into_iter()

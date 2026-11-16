@@ -267,7 +267,7 @@ fn find_ready_tasks<'a>(
 }
 
 /// Apply the one readiness implementation through either its ordinary
-/// runnable-now view or the program mode probe that alone overlooks a future
+/// runnable-now view or the clock-aside view that alone overlooks a future
 /// poll deadline. Every other eligibility rule remains shared. §FS-rhei-run.3
 fn find_ready_tasks_in_view<'a>(
     rhei: &'a rhei_core::ast::Rhei,

@@ -59,6 +59,56 @@ fn runnable_tasks_in_view<'a>(
         .collect()
 }
 
+/// Whether something holds this ticket that no clock releases, so no poll
+/// deadline or provider-limit record is its wait, its own or its execution
+/// identity's: a required input the ready scan cannot find, a strict run's
+/// refusal, or a spent attempt budget its spawn site refuses the next spawn for.
+/// Each is read as the scan and the spawn site read it, never restated.
+///
+/// The one question every reader of a clock asks. The deadline scan asks it of
+/// the ready set with the clock set aside, which has already answered the claim,
+/// the gate, the supervisor, the subtree and the priors; the halt classification
+/// and the deliberate-wait judgment ask it after their own rungs for those.
+/// §FS-rhei-run.5.1.1 §FS-rhei-run-report.3.1
+fn blocker_no_clock_releases(
+    task: &rhei_core::ast::Task,
+    rhei: &rhei_core::ast::Rhei,
+    machines: &rhei_validator::MachineSet,
+    spawns: &SpawnSiteRoots<'_>,
+) -> bool {
+    let task_id = task.id.to_string();
+    let machine = machines.for_task(&task.id);
+    let state = normalized_state_name(task.state.as_str(), machine);
+    // §FS-rhei-seal.8.4: only a person resumes a refused ticket.
+    strict_ticket_refused(&task_id)
+        || !state_inputs_exist_for_ready_set(
+            spawns.tasks.workspace_root,
+            spawns.tasks.artifact_root(&task_id),
+            rhei,
+            machine,
+            task,
+            &state,
+            Some(spawns.opts),
+        )
+        || spawns.attempt_budget_spent(rhei, machine, task, &state)
+}
+
+/// The tickets a clock alone can be holding: the run's ready set with the poll
+/// clock set aside, less every one a blocker no clock releases holds. Only these
+/// contribute a deadline, in every mode the run executes in. §FS-rhei-run.5.1.1
+fn tickets_only_a_clock_holds<'a>(
+    rhei: &'a rhei_core::ast::Rhei,
+    machines: &rhei_validator::MachineSet,
+    spawns: &SpawnSiteRoots<'_>,
+) -> Vec<&'a rhei_core::ast::Task> {
+    // No live spawn set reaches a deadline scan, so only a claim is in flight
+    // beneath a supervisor here. §FS-rhei-supervision.3.2
+    runnable_tasks_in_view(rhei, machines, spawns, &HashSet::new(), ReadySetView::ClockAside)
+        .into_iter()
+        .filter(|task| !blocker_no_clock_releases(task, rhei, machines, spawns))
+        .collect()
+}
+
 /// Program polls that retain every autonomous-run eligibility constraint but
 /// may still be waiting for a persisted retry deadline. This is an engine
 /// selection probe only; the scheduler continues to use [`find_runnable_tasks`].

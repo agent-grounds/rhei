@@ -313,23 +313,71 @@ impl<'a> SpawnSiteRoots<'a> {
     ) -> bool {
         let Some(state_def) = machine.states.get(state_name) else { return false };
         let Some(budget) = poll_attempt_budget(state_def) else { return false };
-        let agents = if state_def.program.is_some() {
+        if state_def.program.is_some() {
+            return self.next_spawns_spent(rhei, machine, task, state_name, None, budget);
+        }
+        let mut read = None;
+        let Some(settings) = self.settings_or_merged(&mut read) else { return false };
+        self.budget_spent_under(rhei, machine, task, state_name, settings, budget)
+    }
+
+    /// Whether every spawn this ticket's state would make next is one its spawn
+    /// site refuses for a spent attempt budget: the visit's own `attempts:`, or a
+    /// poll's bound as [`Self::poll_bound_spent`] reads it. Only `rhei retry`
+    /// releases such a ticket, so no clock it carries is its wait. A state whose
+    /// agents or settings do not resolve answers `false`, as the bound's does.
+    // §FS-rhei-run.5.1.1 §FS-rhei-agents.3.2.3
+    fn attempt_budget_spent(
+        &self,
+        rhei: &rhei_core::ast::Rhei,
+        machine: &rhei_validator::StateMachine,
+        task: &rhei_core::ast::Task,
+        state_name: &str,
+    ) -> bool {
+        let Some(state_def) = machine.states.get(state_name) else { return false };
+        if state_def.poll.is_some() {
+            return self.poll_bound_spent(rhei, machine, task, state_name);
+        }
+        let mut read = None;
+        let Some(settings) = self.settings_or_merged(&mut read) else { return false };
+        // The budget the spawn site resolves, through the same chain. §FS-rhei-agents.3.2.1
+        let budget = resolve_attempt_budget(Some(state_def), settings);
+        self.budget_spent_under(rhei, machine, task, state_name, settings, budget)
+    }
+
+    /// [`Self::next_spawns_spent`] for the agents `settings` resolves for this
+    /// state, or for its program. Agents that do not resolve answer `false`.
+    fn budget_spent_under(
+        &self,
+        rhei: &rhei_core::ast::Rhei,
+        machine: &rhei_validator::StateMachine,
+        task: &rhei_core::ast::Task,
+        state_name: &str,
+        settings: &RheiSettings,
+        budget: AttemptBudget,
+    ) -> bool {
+        let program = machine.states.get(state_name).is_some_and(|def| def.program.is_some());
+        let agents = if program {
             None
         } else {
-            let mut read = None;
-            let settings = match self.settings {
-                Some(settings) => settings,
-                None => match load_merged_settings(self.tasks.workspace_root) {
-                    Ok(settings) => &*read.insert(settings),
-                    Err(_) => return false,
-                },
-            };
             let resolved =
                 resolve_agent_invocations_for_task(machine, state_name, settings, self.opts, Some(task));
             let Ok(resolved) = resolved else { return false };
             Some(resolved)
         };
         self.next_spawns_spent(rhei, machine, task, state_name, agents.as_deref(), budget)
+    }
+
+    /// The run's settings, or for a reading no run is behind the merged settings
+    /// read now into `read`; `None` when they do not load.
+    fn settings_or_merged<'s>(
+        &'s self,
+        read: &'s mut Option<RheiSettings>,
+    ) -> Option<&'s RheiSettings> {
+        match self.settings {
+            Some(settings) => Some(settings),
+            None => load_merged_settings(self.tasks.workspace_root).ok().map(|loaded| &*read.insert(loaded)),
+        }
     }
 
     /// Whether every spawn this ticket's state would make next is refused for

@@ -156,6 +156,11 @@ impl<'a> IdleBlockerScan<'a> {
                 return Some(blocker);
             }
         }
+        // Neither clock is the wait of a ticket something no clock releases holds.
+        // §FS-rhei-run.5.1.1
+        if blocker_no_clock_releases(task, self.rhei, self.machines, self.spawns) {
+            return None;
+        }
         // Both clocks are judged at the instant the plan was read, as the ready
         // scan and the deliberate-wait judgment judge them. §FS-rhei-run.5.1
         let now = self.spawns.read_at;

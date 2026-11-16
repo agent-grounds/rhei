@@ -171,6 +171,70 @@ transitions:
         );
     }
 
+    /// A fan-out ticket is due when the first of its held arms frees, not the
+    /// last: its `pi/anthropic` arm waits until NEAR, its `pi/openai` arm until
+    /// FAR, the record Task 2 on that identity carries. §FS-rhei-run.5.1
+    #[test]
+    #[ignore = "red until #729: one ticket's arms fold to their latest deadline (FAR); \
+                implement removes this"]
+    fn a_fan_out_ticket_is_due_when_its_first_held_arm_frees() {
+        let mut rhei = rhei_core::parse(
+            "# Rhei: Limits\n\n## Tasks\n\n### Task 1: Fan-out\n**State:** fix\n\n\
+             ### Task 2: Other\n**State:** other\n",
+        )
+        .expect("parse plan");
+        let now = current_unix_secs();
+        let (near, far) = (now + 3600, now + 7200);
+        let limit = |provider: &str, at: u64| ProviderLimit {
+            identity: ProviderIdentity { agent: "pi".into(), provider: provider.into() },
+            kind: ProviderWaitKind::Limit,
+            signal: "signal".into(),
+            observed_at: deadline(now),
+            next_attempt_at: deadline(at),
+        };
+        let (one, _) =
+            set_provider_limit_metadata(None, &parse_task_id("1"), "fix", &limit("anthropic", near));
+        let (both, _) = set_provider_limit_metadata(
+            Some(&one),
+            &parse_task_id("2"),
+            "other",
+            &limit("openai", far),
+        );
+        rhei.metadata = Some(both);
+        let machine = rhei_validator::StateMachine::from_yaml_str(
+            r#"name: fan-out-deadlines
+version: 1
+states:
+  fix:
+    initial: true
+    all_targets:
+      - pi:anthropic:claude-opus-5-5
+      - pi:openai:gpt-6
+  other:
+    target: pi:openai:gpt-6
+  completed:
+    final: true
+transitions:
+  - { from: fix, to: completed }
+  - { from: other, to: completed }
+"#,
+        )
+        .expect("fan-out state machine");
+        let machines = rhei_validator::MachineSet::single(machine);
+        let settings = RheiSettings { agents: built_in_agents(), ..RheiSettings::default() };
+        let dir = tempfile::tempdir().expect("tmpdir");
+        let runtime = dir.path().join("runtime");
+        let spawns = SpawnSiteRoots {
+            settings: Some(&settings),
+            ..SpawnSiteRoots::plan_only(dir.path(), &runtime)
+        };
+        assert_eq!(
+            earliest_pending_agent_deadline(&rhei, &machines, &settings, &None, &spawns),
+            Some(near),
+            "the anthropic arm can spawn at NEAR ({near}); FAR ({far}) is only the openai arm's"
+        );
+    }
+
     /// The provider-limit term of the plan-wide deliberate-wait judgment.
     ///
     /// The judgment and the deadline scan diverged over provider limits: the

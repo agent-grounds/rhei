@@ -283,6 +283,7 @@ mod provider_unavailable_pi_guard_tests;
 mod provider_unavailable_pi_reference_tests;
 mod provider_unavailable_pi_support;
 mod provider_unavailable_pi_tests;
+mod provider_wait_fanout_deadline_tests;
 mod provider_wait_quiet_support;
 mod provider_wait_quiet_tests;
 mod registry_location_tests;

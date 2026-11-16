@@ -486,13 +486,14 @@ fn visit_tasks<'a>(tasks: &'a [rhei_core::ast::Task], out: &mut Vec<&'a rhei_cor
     }
 }
 
-/// Latest authored deadline for one execution identity in the tasks' current
-/// states. Stale-state records do not participate. §FS-rhei-run.3.3
-fn provider_deadline_for_identity(
+/// The record establishing the latest deadline for one execution identity in
+/// the tasks' current states. Classification uses its kind and provider, so an
+/// identity-wide hold says the same thing wherever it is read. §FS-rhei-run.3.3
+fn provider_limit_for_identity(
     rhei: &rhei_core::ast::Rhei,
     machines: &rhei_validator::MachineSet,
     identity: &ProviderIdentity,
-) -> Option<u64> {
+) -> Option<ProviderLimit> {
     let mut tasks = Vec::new();
     visit_tasks(&rhei.tasks, &mut tasks);
     tasks
@@ -500,9 +501,21 @@ fn provider_deadline_for_identity(
         .filter_map(|task| {
             let state = normalized_state_name(task.state.as_str(), machines.for_task(&task.id));
             let limit = provider_limit_for_task_state(rhei.metadata.as_ref(), &task.id, &state)?;
-            (limit.identity == *identity).then(|| limit.deadline_epoch()).flatten()
+            let deadline = limit.deadline_epoch()?;
+            (limit.identity == *identity).then_some((deadline, limit))
         })
-        .max()
+        .max_by_key(|(deadline, _)| *deadline)
+        .map(|(_, limit)| limit)
+}
+
+/// Latest authored deadline for an identity, from the same record the wait
+/// classification reads. Stale-state records do not participate. §FS-rhei-run.3.3
+fn provider_deadline_for_identity(
+    rhei: &rhei_core::ast::Rhei,
+    machines: &rhei_validator::MachineSet,
+    identity: &ProviderIdentity,
+) -> Option<u64> {
+    provider_limit_for_identity(rhei, machines, identity)?.deadline_epoch()
 }
 
 /// Latest active deadline for one execution identity. Expired records do not

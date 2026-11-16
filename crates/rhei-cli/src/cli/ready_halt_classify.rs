@@ -132,9 +132,9 @@ fn classify_halt(
     }
     // Below here a clock is the wait only of a ticket no other blocker holds. §FS-rhei-run.5.1.1
     let clock_can_wait = !blocker_no_clock_releases(task, rhei, machines, spawns);
-    // Active as of the instant the plan was read, as the scan judged it. §FS-rhei-run.5.1
-    if let Some(limit) = task_provider_limit(rhei, machines, task)
-        .filter(|limit| limit.deadline_epoch().is_some_and(|deadline| deadline > spawns.read_at))
+    // Only a hold across every pending invocation names a provider in the
+    // explanation, as in the idle blocker and scheduler. §FS-rhei-run.5.1
+    if let Some(limit) = provider_wait_holding_ticket(rhei, machines, task, spawns)
         .filter(|_| clock_can_wait)
     {
         return HaltCause::ProviderLimited {

@@ -262,9 +262,14 @@ transitions:
             set_provider_limit_metadata(None, &parse_task_id("1"), "working", &limit);
         rhei.metadata = Some(metadata);
         let machines = rhei_validator::MachineSet::single(provider_machine(false));
+        let settings = RheiSettings { agents: built_in_agents(), ..RheiSettings::default() };
+        let spawns = SpawnSiteRoots {
+            settings: Some(&settings),
+            ..SpawnSiteRoots::plan_only(Path::new("."), Path::new("runtime"))
+        };
 
         assert!(
-            remaining_work_is_only_gating_or_poll_blocked(&rhei, &machines, &None, &SpawnSiteRoots::plan_only(Path::new("."), Path::new("runtime"))),
+            remaining_work_is_only_gating_or_poll_blocked(&rhei, &machines, &None, &spawns),
             "a parked task resumes when its deadline elapses, with nothing for an \
              operator to repair"
         );

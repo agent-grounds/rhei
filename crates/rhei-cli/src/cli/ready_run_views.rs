@@ -229,7 +229,7 @@ fn without_provider_held_tickets<'a>(
         .iter()
         .copied()
         .filter(|task| !kept_spent.contains(&task.id.to_string()))
-        .filter(|task| !provider_holds_ticket(task, loaded, settings, spawns))
+        .filter(|task| provider_wait_holding_ticket(&loaded.rhei, &spawns.machines.set, task, spawns).is_none())
         .collect();
     if free.is_empty()
         && !ready.is_empty()
@@ -254,36 +254,60 @@ fn spawn_still_halted(loaded: &LoadedPlan, spawns: &SpawnSiteRoots<'_>, task_id:
     spawns.next_spawns_halt(&loaded.rhei, machine, task, &state).is_some()
 }
 
-/// Whether a provider wait holds this ticket at the instant `spawns` was read:
-/// it has an invocation still to be spawned, and each such invocation waits on
-/// an active deadline of its execution identity. One on a free identity keeps
-/// the ticket ready; one the pre-spawn completion check finds satisfied keeps
-/// nothing ready. A program or gating state has no provider to wait on.
-/// §FS-rhei-run.3 step 2 §FS-rhei-run.3.3
-fn provider_holds_ticket(
+/// The waits holding every invocation still to be spawned. A free pending arm
+/// defeats the hold; an empty pending set holds nothing. Scheduling,
+/// classification and deadline composition all ask this one question, with
+/// their own reading of an identity's wait (active, or eligible for a rescan).
+/// Resolution errors propagate so the deadline scan never mistakes an invalid
+/// invocation for a ticket held only by its poll. A program or gating state has
+/// no provider to wait on. §FS-rhei-run.5.1
+fn provider_waits_holding_ticket<W>(
+    rhei: &rhei_core::ast::Rhei,
+    machines: &rhei_validator::MachineSet,
     task: &rhei_core::ast::Task,
-    loaded: &LoadedPlan,
     settings: &RheiSettings,
     spawns: &SpawnSiteRoots<'_>,
-) -> bool {
-    let machines = spawns.machines;
+    wait: impl Fn(&ResolvedAgent) -> Option<W>,
+) -> MietteResult<Option<Vec<W>>> {
     let machine = machines.for_task(&task.id);
     let state = normalized_state_name(task.state.as_str(), machine);
-    let Some(state_def) = machine.states.get(&state) else { return false };
+    let Some(state_def) = machine.states.get(&state) else { return Ok(None) };
     if state_def.program.is_some() || state_def.gating {
-        return false;
+        return Ok(None);
     }
-    let resolved =
-        resolve_agent_invocations_for_task(machine, &state, settings, spawns.opts, Some(task));
-    let Ok(invocations) = resolved else { return false };
-    let held = |resolved: &ResolvedAgent| {
-        resolved_provider_deadline(&loaded.rhei, &machines.set, resolved, spawns.read_at).is_some()
-    };
+    let invocations =
+        resolve_agent_invocations_for_task(machine, &state, settings, spawns.opts, Some(task))?;
     // Nothing held, nothing to drop: the completion check is read only for a wait.
-    if !invocations.iter().any(held) {
-        return false;
+    if !invocations.iter().any(|resolved| wait(resolved).is_some()) {
+        return Ok(None);
     }
     let pending =
-        spawns.invocations_still_to_spawn(&loaded.rhei, task, machine, &state, state_def, invocations);
-    !pending.is_empty() && pending.iter().all(held)
+        spawns.invocations_still_to_spawn(rhei, task, machine, &state, state_def, invocations);
+    if pending.is_empty() {
+        return Ok(None);
+    }
+    Ok(pending.iter().map(wait).collect())
+}
+
+/// The effective active provider hold, represented by the first pending arm
+/// that will free. Every pending arm must wait, and each identity reads its
+/// latest record across the plan, retaining that record's kind for all halt
+/// and idle surfaces. All clocks use `spawns.read_at`. §FS-rhei-run.5.1
+fn provider_wait_holding_ticket(
+    rhei: &rhei_core::ast::Rhei,
+    machines: &rhei_validator::MachineSet,
+    task: &rhei_core::ast::Task,
+    spawns: &SpawnSiteRoots<'_>,
+) -> Option<ProviderLimit> {
+    let mut read = None;
+    let settings = spawns.settings_or_merged(&mut read)?;
+    provider_waits_holding_ticket(rhei, machines, task, settings, spawns, |resolved| {
+        let identity = resolved_provider_identity(resolved)?;
+        provider_limit_for_identity(rhei, machines, &identity)
+            .filter(|limit| limit.deadline_epoch().is_some_and(|deadline| deadline > spawns.read_at))
+    })
+    .ok()
+    .flatten()?
+    .into_iter()
+    .min_by_key(|limit| limit.deadline_epoch())
 }

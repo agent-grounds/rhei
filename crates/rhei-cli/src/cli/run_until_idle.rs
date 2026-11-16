@@ -158,14 +158,9 @@ impl<'a> IdleBlockerScan<'a> {
         if blocker_no_clock_releases(task, self.rhei, self.machines, self.spawns) {
             return None;
         }
-        // Both clocks are judged at the instant the plan was read, as the ready
-        // scan and the deliberate-wait judgment judge them. §FS-rhei-run.5.1
-        let now = self.spawns.read_at;
-        // §FS-rhei-run.3.3: the fourth deliberate wait, ranked where the halt
-        // classification ranks it — above the poll, because a parked ticket's
-        // own line already reads as the provider's.
-        if let Some(limit) = task_provider_limit(self.rhei, self.machines, task)
-            .filter(|limit| limit.deadline_epoch().is_some_and(|deadline| deadline > now))
+        // An effective provider hold outranks the poll; a record on one arm
+        // cannot hold a ticket with a free pending arm. §FS-rhei-run.5.1
+        if let Some(limit) = provider_wait_holding_ticket(self.rhei, self.machines, task, self.spawns)
         {
             // The record's own kind names the wait. §FS-rhei-run-json.2.1
             return Some(match limit.kind {

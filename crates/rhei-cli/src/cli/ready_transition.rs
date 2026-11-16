@@ -289,20 +289,9 @@ fn find_ready_tasks_in_view<'a>(
 
     for task in &all_tasks {
         let task = *task;
-        // §FS-rhei-supervision.3.2: a supervisor is scheduled *between* its
-        // descendants, and everything under a held one waits — the one
-        // declared refinement of the eligibility rule below.
-        match supervision_verdict_for(task, &index, machines, rhei.metadata.as_ref(), spawned) {
-            SupervisionVerdict::Held { .. } | SupervisionVerdict::SupervisorWaiting => continue,
-            SupervisionVerdict::SupervisorReady => {}
-            // §FS-rhei-plan-language.3: a non-leaf task is workable only once
-            // its subtree is terminal — the same rule for `rhei next` and
-            // `rhei run`, so a parent is never worked beside its own child.
-            SupervisionVerdict::Unsupervised => {
-                if !descendants_are_terminal(task, machines) {
-                    continue;
-                }
-            }
+        // §FS-rhei-supervision.3.2: readiness and timed eligibility share the subtree judgment.
+        if !subtree_admits_to_ready_set(task, &index, machines, rhei.metadata.as_ref(), spawned) {
+            continue;
         }
         let machine = machines.for_task(&task.id);
         let current_state = task.state.as_str();

@@ -394,11 +394,11 @@ fn supervision_verdict_for(
 /// Whether this task is work anyone can be handed right now, as far as the
 /// subtree beneath it is concerned.
 ///
-/// The ready set's subtree rule, named so the surfaces that *explain* a refusal
-/// ask the same question the scan did: a supervisor owed a visit is work while
-/// its subtree is open, a released or draining one is not, a held descendant is
-/// not, and anything unsupervised keeps the non-leaf rule it always had.
-// §FS-rhei-supervision.3.2
+/// The subtree rule shared by the ready scan, deadline scan and surfaces that
+/// explain a refusal: a supervisor owed a visit is work while its subtree is
+/// open, a released or draining one is not, a held descendant is not, and
+/// anything unsupervised keeps the non-leaf rule it always had.
+/// §FS-rhei-supervision.3.2 §FS-rhei-run.5.1
 fn subtree_admits_to_ready_set(
     task: &rhei_core::ast::Task,
     index: &std::collections::HashMap<TaskId, &rhei_core::ast::Task>,

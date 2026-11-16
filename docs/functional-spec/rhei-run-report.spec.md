@@ -248,6 +248,26 @@ the summary prints five stacked groups:
    prior really does stop. A blocker no clock releases ([§FS-rhei-run.5.1.1](rhei-run.spec.md#511-a-blocker-no-clock-releases))
    stops it too, and the ticket is classified by that blocker instead.
 
+   A ticket that **only its own poll deadline holds** — a poll state that
+   declares no `waiting_on`, whose `pollNextAttemptAt` for the state it is in
+   is still in the future — joins the group too, with the same calm marker:
+   rhei picks it up again by itself once that instant passes ([§FS-rhei-run.5.1](rhei-run.spec.md#51-polling-states)),
+   and there is nothing for the operator to do. Its reason is `waiting on its
+   poll until <instant>`, the instant written exactly as the idle line's `next
+   attempt` writes it, and its next action is `nothing to do on Task <id>; rhei
+   resumes it itself`. The console, `--dry-run` and the durable report's
+   `## Waiting` row print that one row, and the group's count line names the
+   kind as `N waiting on a poll`. Without it the ticket fell through to `not
+   scheduled before the run halted`, whose three remedies — rerun it, claim it
+   with `rhei next`, check its agent — each sent the reader after a ticket that
+   was fine, under a `!` the run's own `waiting on poll` count contradicted.
+   The same limit holds as for a person-waiting poll, and further: a live claim,
+   an unsatisfied prior and an active provider limit each still classify the
+   ticket, and a poll whose deadline for its current state has passed or was
+   never recorded is not waiting on anything and keeps its ordinary row.
+   Only the per-ticket row moves; the run's `idle_blocker` and `run.json`
+   ([§FS-rhei-run-json.2.1](rhei-run-json.spec.md#21-records)) read as before.
+
    Nothing about the run's exit status follows from this. Whether work remains
    that a human must act on is the judgment in [§FS-rhei-run.4](rhei-run.spec.md#4-dry-run), unchanged: a
    person-waiting poll is a poll, and it already counted as deliberate waiting

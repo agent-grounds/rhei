@@ -1844,4 +1844,5 @@ mod run_summary_tests {
     include!("tests_run_summary_bound_halt.rs");
     include!("tests_run_summary_cancelled_prior.rs");
     include!("tests_run_summary_fallbacks.rs");
+    include!("tests_run_summary_poll_wait.rs");
 }

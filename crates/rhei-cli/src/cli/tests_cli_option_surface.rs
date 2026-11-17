@@ -110,7 +110,6 @@ fn run_help_says_parallel_counts_tasks_and_their_fan_out_arms_run_alongside() {
 /// `seal` keeps its own description, which names what its flag does there.
 /// §FS-rhei-plan-language.1.3
 #[test]
-#[ignore = "red until #742: --state-machine help claims built-in default when omitted; implement removes this"]
 fn state_machine_help_describes_the_override_of_automatic_lookup() {
     fn state_machine_helps(command: &clap::Command, path: String, out: &mut Vec<(String, String)>) {
         if let Some(arg) = command.get_arguments().find(|arg| arg.get_long() == Some("state-machine")) {

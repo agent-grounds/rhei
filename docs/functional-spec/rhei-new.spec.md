@@ -282,6 +282,15 @@ and depth when the machine declares profiles ([§FS-rhei-states.9.2](rhei-states
 created in rhei `billing` starts in `billing`'s initial state even when the
 project default machine starts somewhere else.
 
+The global `--state-machine <path>` is the whole-scope override described in
+[§FS-rhei-plan-language.1.3](rhei-plan-language.spec.md#13-state-machine-resolution).
+When supplied, that file governs every rhei in scope, ahead of both an owning
+rhei's and the project's automatically discovered `states.yaml`. It governs
+both the omitted-state initial selection (including profile resolution) and
+the check on an explicit `--state`, even when its filename is not `states.yaml`.
+An explicit state absent from the governing machine is refused before any
+authored content changes.
+
 `--state` names a different starting state, and is checked against that same
 machine. This is initial authoring, which is the one moment the plan language
 permits a state to be written directly; every change after it goes through
@@ -657,6 +666,13 @@ previous content to lose, and a failed create removes it whole ([§FS-rhei-new.5
 
 The validation pass runs twice: once *before* the write and once after it. What
 decides the outcome is the difference between them.
+
+Both passes use the same state-machine resolution as the create's state
+selection ([§FS-rhei-new.3.2](rhei-new.spec.md#32-state)), including the global
+`--state-machine <path>` override for every rhei in scope. A workspace that is
+valid under that override must not be reported as already failing validation
+because automatic lookup would have selected a different machine. A successful
+create in a previously valid workspace leaves it valid under the same override.
 
 The difference is taken over error *strings*, which only works while an error
 says the same thing about the same fault however the rest of the project

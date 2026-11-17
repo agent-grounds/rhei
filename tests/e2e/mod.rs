@@ -243,6 +243,7 @@ mod native_pty_support;
 mod new_description_marker_tests;
 mod new_directory_adoption_tests;
 mod new_guard_tests;
+mod new_state_machine_override_tests;
 mod new_tests;
 mod new_write_tests;
 mod next_claim_atomicity_tests;

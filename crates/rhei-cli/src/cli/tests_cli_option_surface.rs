@@ -102,3 +102,54 @@ fn run_help_says_parallel_counts_tasks_and_their_fan_out_arms_run_alongside() {
         "`--parallel` keeps its default of one task:\n{help}"
     );
 }
+
+/// Every `--state-machine` help line says what an omitted flag gets: the
+/// automatic `states.yaml` lookup, which the flag overrides — never "the
+/// built-in default", which is only the lookup's last step. The commands are
+/// walked from clap, so a copy declared later is held to the same line.
+/// `seal` keeps its own description, which names what its flag does there.
+/// §FS-rhei-plan-language.1.3
+#[test]
+#[ignore = "red until #742: --state-machine help claims built-in default when omitted; implement removes this"]
+fn state_machine_help_describes_the_override_of_automatic_lookup() {
+    fn state_machine_helps(command: &clap::Command, path: String, out: &mut Vec<(String, String)>) {
+        if let Some(arg) = command.get_arguments().find(|arg| arg.get_long() == Some("state-machine")) {
+            let help = arg.get_help().map(ToString::to_string).unwrap_or_default();
+            out.push((path.clone(), help));
+        }
+        for sub in command.get_subcommands() {
+            state_machine_helps(sub, format!("{path} {}", sub.get_name()), out);
+        }
+    }
+
+    let mut found = Vec::new();
+    state_machine_helps(&cli_command(), "rhei".to_string(), &mut found);
+    assert!(
+        found.iter().any(|(path, _)| path == "rhei") && found.len() > 2,
+        "expected the top-level `--state-machine` and its subcommand copies, found: {found:?}"
+    );
+
+    let wrong: Vec<_> = found
+        .iter()
+        .filter(|(path, _)| path != "rhei seal")
+        .filter(|(_, help)| {
+            let help = help.to_lowercase();
+            help.contains("built-in default")
+                || !(help.contains("overrid")
+                    && help.contains("automatic")
+                    && help.contains("states.yaml")
+                    && help.contains("lookup"))
+        })
+        .collect();
+    assert!(
+        wrong.is_empty(),
+        "each `--state-machine` help should describe overriding the automatic states.yaml \
+         lookup (§FS-rhei-plan-language.1.3), not a built-in default when omitted; wrong: {wrong:#?}"
+    );
+
+    let seal = found.iter().find(|(path, _)| path == "rhei seal").map(|(_, help)| help);
+    assert!(
+        seal.is_some_and(|help| !help.to_lowercase().contains("built-in default")),
+        "`rhei seal --state-machine` keeps its own true wording, got: {seal:?}"
+    );
+}

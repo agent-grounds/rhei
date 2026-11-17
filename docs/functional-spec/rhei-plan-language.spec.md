@@ -257,6 +257,11 @@ loads the named YAML file for every plan and rhei in scope, and that file's
 invocation. Nothing in a plan names a machine, so there is nothing for the
 override's `name` to disagree with and no mismatch error.
 
+Every command that takes `--state-machine` describes it in its `--help` by
+that rule: the flag overrides the automatic `states.yaml` lookup below. The
+help never says the built-in machine is what an omitted flag gets, because an
+omitted flag gets the lookup, and the built-in machine is only its last step.
+
 Otherwise a rhei's machine is the first of these that resolves:
 
 1. The `states.yaml` in the rhei's **own execution root**, when present —

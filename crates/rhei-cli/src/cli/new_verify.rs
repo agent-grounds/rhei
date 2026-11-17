@@ -20,8 +20,8 @@ struct CreateFailure {
 /// with, so the same set difference decides that case too: a create is not
 /// answerable for a parse error it did not introduce.
 // §FS-rhei-new.5.2
-fn create_validation_errors(target: &Path) -> Vec<String> {
-    match validation_pass(target, None) {
+fn create_validation_errors(target: &Path, state_machine_path: Option<&Path>) -> Vec<String> {
+    match validation_pass(target, state_machine_path) {
         Ok(pass) => pass.errors,
         Err(report) => vec![report.to_string()],
     }
@@ -40,6 +40,7 @@ fn new_write_failure(
     write: &NewWrite,
     inherited: &[String],
     before: Option<&BTreeSet<String>>,
+    state_machine_path: Option<&Path>,
 ) -> Option<CreateFailure> {
     // First: it is the only check that does not need the project to load under
     // its state machines, and a write that deleted work is undone either way.
@@ -47,7 +48,7 @@ fn new_write_failure(
     if let Some(failure) = vanished_ids_failure(target, before) {
         return Some(failure);
     }
-    match validation_pass(target, None) {
+    match validation_pass(target, state_machine_path) {
         Ok(pass) => {
             let introduced = errors_introduced_over(inherited, pass.errors);
             if !introduced.is_empty() {

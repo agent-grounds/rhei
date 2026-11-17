@@ -18,12 +18,15 @@ struct TicketParent {
     label: String,
 }
 
+/// Select the ticket's state under the invocation's governing machine.
+/// §FS-rhei-new.3.2
 fn new_ticket_write(
     target: &Path,
     options: &NewOptions,
     parent: &str,
     description: Option<&str>,
     decision: NewDecision,
+    state_machine_path: Option<&Path>,
 ) -> MietteResult<NewWrite> {
     reject_malformed_export_flags(options)?;
     reject_task_tooling_flags(options, target)?;
@@ -62,7 +65,9 @@ fn new_ticket_write(
         resolve_ticket_kind(options.kind.as_deref(), &structure.structure, &placement.rhei_id)?;
 
     let qualified = format!("{}.{}", placement.rhei_id, local_id);
-    let machines = resolve_state_machines_for_create(target, &loaded, &placement.rhei_id)?;
+    let machines = resolve_state_machines_for_scope(
+        target, &loaded, state_machine_path, Some(&placement.rhei_id),
+    )?;
     let machine = machines.machine_for_task_str(&qualified);
     let state = resolve_ticket_state(options.state.as_deref(), machine, &kind, depth)?;
 
@@ -152,41 +157,6 @@ help = format!(
          in it decide the new ticket's number, and its `## Tasks` section decides where the \
          block goes."
     ))
-}
-
-/// Resolve the project's state machines the way every command does, except that
-/// a rhei this create is not writing to keeps its unloadable machine to itself.
-///
-/// A `states.yaml` someone is in the middle of editing is a mid-edit state.
-/// Resolved strictly, it stops every create in the project, basin capture
-/// included — and basin capture is the one thing that has to survive somebody
-/// else's half-finished work. The rhei being written to is different: the new
-/// ticket's starting state comes out of its machine, so that one must resolve.
-///
-/// The project still fails validation for it — both passes, identically — so
-/// the create keeps its write and says the failure is not its own.
-// §FS-rhei-new.5.2 §FS-rhei-plan-language.1.3
-fn resolve_state_machines_for_create(
-    input: &Path,
-    loaded: &LoadedPlan,
-    target_rhei: &str,
-) -> MietteResult<ResolvedMachineSet> {
-    let default = resolve_state_machine_for_loaded_plan(input, None)?;
-    let mut per_rhei = BTreeMap::new();
-    let mut roots: Vec<(&String, &PathBuf)> =
-        loaded.is_panta_project().then(|| loaded.rhei_roots.iter().collect()).unwrap_or_default();
-    roots.sort();
-    for (rhei_id, root) in roots {
-        match resolve_rhei_machine(rhei_id, root) {
-            Ok(Some(resolved)) => {
-                per_rhei.insert(rhei_id.clone(), resolved);
-            }
-            Ok(None) => {}
-            Err(report) if rhei_id == target_rhei => return Err(report),
-            Err(_) => {}
-        }
-    }
-    Ok(ResolvedMachineSet { default, per_rhei })
 }
 
 /// Refuse a `**Prior:**` or `**Consumes:**` that points into a rhei the lenient

@@ -41,7 +41,9 @@ enum NewDecision {
     Authoritative,
 }
 
-fn new_command(options: &NewOptions) -> MietteResult<()> {
+/// Carry the invocation's machine override through state selection and validation.
+/// §FS-rhei-new.3.2 §FS-rhei-new.5.2
+fn new_command(options: &NewOptions, state_machine_path: Option<&Path>) -> MietteResult<()> {
     reject_unusable_title(&options.title)?;
     reject_mode_confusion(options)?;
     let description = resolve_new_description(options)?;
@@ -62,10 +64,15 @@ fn new_command(options: &NewOptions) -> MietteResult<()> {
     // §FS-rhei-new.4
     let scope_lock = lock_new_create(&target)?;
 
-    let (write, _destination_lock) =
-        decide_under_destination_lock(&target, options, description.as_deref(), &scope_lock)?;
+    let (write, _destination_lock) = decide_under_destination_lock(
+        &target,
+        options,
+        description.as_deref(),
+        &scope_lock,
+        state_machine_path,
+    )?;
 
-    apply_new_write(&target, &write, options)
+    apply_new_write(&target, &write, options, state_machine_path)
 }
 
 /// Decide the write, establish the destination's permanent sidecar, and decide
@@ -78,12 +85,14 @@ fn new_command(options: &NewOptions) -> MietteResult<()> {
 /// sidecar are prepared without publishing plan data, then the whole decision
 /// is repeated under that identity. Re-deciding rather than failing keeps the command's promise: a
 /// create waits for a busy project instead of handing the caller back the race.
+/// Both decisions use the same invocation override. §FS-rhei-new.3.2
 // §FS-rhei-new.4
 fn decide_under_destination_lock(
     target: &Path,
     options: &NewOptions,
     description: Option<&str>,
     scope_lock: &NewCreateLock,
+    state_machine_path: Option<&Path>,
 ) -> MietteResult<(NewWrite, Option<NewCreateLock>)> {
     /// Enough for any real contention: the scope lock already excludes other
     /// creates, so only a rewriting command can move the file, and it holds its
@@ -91,12 +100,14 @@ fn decide_under_destination_lock(
     const ATTEMPTS: usize = 3;
 
     for _ in 0..ATTEMPTS {
-        let provisional =
-            decide_new_write(target, options, description, NewDecision::Provisional)?;
+        let provisional = decide_new_write(
+            target, options, description, NewDecision::Provisional, state_machine_path,
+        )?;
         prepare_destination_lock_parent(&provisional.path)?;
         let destination_lock = lock_new_destination(scope_lock, &provisional.path)?;
-        let authoritative =
-            decide_new_write(target, options, description, NewDecision::Authoritative)?;
+        let authoritative = decide_new_write(
+            target, options, description, NewDecision::Authoritative, state_machine_path,
+        )?;
         if same_path(&authoritative.path, &provisional.path) {
             return Ok((authoritative, destination_lock));
         }
@@ -124,15 +135,19 @@ fn prepare_destination_lock_parent(path: &Path) -> MietteResult<()> {
 }
 
 /// The mode split: `--under` creates a ticket, its absence creates a rhei.
+/// Ticket state selection retains the invocation override. §FS-rhei-new.3.2
 // §FS-rhei-new.1
 fn decide_new_write(
     target: &Path,
     options: &NewOptions,
     description: Option<&str>,
     decision: NewDecision,
+    state_machine_path: Option<&Path>,
 ) -> MietteResult<NewWrite> {
     match options.under.as_deref() {
-        Some(parent) => new_ticket_write(target, options, parent, description, decision),
+        Some(parent) => {
+            new_ticket_write(target, options, parent, description, decision, state_machine_path)
+        }
         None => new_rhei_write(target, options, description, decision),
     }
 }
@@ -249,11 +264,12 @@ struct AppliedWrite {
 fn perform_new_write(
     target: &Path,
     write: &NewWrite,
+    state_machine_path: Option<&Path>,
 ) -> MietteResult<AppliedWrite> {
     // Both passes run before the write as well, so what follows can be read as
     // a difference rather than as a verdict on the whole project.
     // §FS-rhei-new.5.1 §FS-rhei-new.5.2
-    let inherited = create_validation_errors(target);
+    let inherited = create_validation_errors(target, state_machine_path);
     let before = create_plan_ids(target);
 
     let previous = fs::read_to_string(&write.path).ok();
@@ -263,7 +279,7 @@ fn perform_new_write(
     }
     write_plan_file_atomically(&write.path, &write.contents)?;
 
-    let failure = new_write_failure(target, write, &inherited, before.as_ref());
+    let failure = new_write_failure(target, write, &inherited, before.as_ref(), state_machine_path);
     Ok(AppliedWrite { previous, created_dirs, inherited, failure })
 }
 
@@ -289,8 +305,9 @@ fn apply_new_write(
     target: &Path,
     write: &NewWrite,
     options: &NewOptions,
+    state_machine_path: Option<&Path>,
 ) -> MietteResult<()> {
-    let applied = perform_new_write(target, write)?;
+    let applied = perform_new_write(target, write, state_machine_path)?;
     if options.dry_run {
         return report_new_dry_run(write, applied, options.json);
     }

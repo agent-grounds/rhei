@@ -422,6 +422,23 @@ fn resolve_state_machines_for_loaded_plan(
     loaded: &LoadedPlan,
     state_machine_path: Option<&Path>,
 ) -> MietteResult<ResolvedMachineSet> {
+    resolve_state_machines_for_scope(input, loaded, state_machine_path, None)
+}
+
+/// Shared precedence for strict commands and ticket creation. An override
+/// governs every rhei before any member machine is inspected.
+/// §FS-rhei-plan-language.1.3 §FS-rhei-new.3.2
+///
+/// With `required_rhei`, tolerate unloadable machines in other rheis: only the
+/// destination must resolve for state selection. Both validation passes still
+/// report those inherited errors. Without it, every machine must resolve.
+/// §FS-rhei-new.5.2
+fn resolve_state_machines_for_scope(
+    input: &Path,
+    loaded: &LoadedPlan,
+    state_machine_path: Option<&Path>,
+    required_rhei: Option<&str>,
+) -> MietteResult<ResolvedMachineSet> {
     let default = resolve_state_machine_for_loaded_plan(input, state_machine_path)?;
 
     if state_machine_path.is_some() {
@@ -433,8 +450,13 @@ fn resolve_state_machines_for_loaded_plan(
         let mut roots: Vec<(&String, &PathBuf)> = loaded.rhei_roots.iter().collect();
         roots.sort();
         for (rhei_id, root) in roots {
-            if let Some(resolved) = resolve_rhei_machine(rhei_id, root)? {
-                per_rhei.insert(rhei_id.clone(), resolved);
+            match resolve_rhei_machine(rhei_id, root) {
+                Ok(Some(resolved)) => {
+                    per_rhei.insert(rhei_id.clone(), resolved);
+                }
+                Ok(None) => {}
+                Err(_) if required_rhei.is_some_and(|required| required != rhei_id) => {}
+                Err(report) => return Err(report),
             }
         }
     }

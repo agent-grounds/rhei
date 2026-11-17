@@ -157,7 +157,8 @@ fn dispatch(cli: Cli) -> MietteResult<()> {
         Commands::Init { dir, here, title, no_agents, force } => {
             init_command(dir.as_deref(), title.as_deref(), no_agents, force, here)
         }
-        Commands::New { options } => new_command(&options),
+        // §FS-rhei-new.3.2 §FS-rhei-new.5.2
+        Commands::New { options } => new_command(&options, before_subcommand.as_deref()),
         command @ Commands::Migrate { .. } => dispatch_target_command(command, before_subcommand),
         Commands::Budget { command } => budget_command(command),
         command @ Commands::Validate { .. } => dispatch_target_command(command, before_subcommand),

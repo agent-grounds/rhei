@@ -104,7 +104,6 @@ fn issue_741_override_fixture_requires_flag_and_automatic_lookup_still_works() {
 
 /// §FS-rhei-new.3.2 §FS-rhei-new.5.2: the explicit state is legal only under the flag.
 #[test]
-#[ignore = "red until #741: new accepts the override-only explicit state; implement removes this"]
 fn issue_741_new_accepts_override_only_explicit_state() {
     let (_root, dir) = land("pending");
     validate_with_override(&dir);
@@ -118,7 +117,6 @@ fn issue_741_new_accepts_override_only_explicit_state() {
 
 /// §FS-rhei-new.3.2 §FS-rhei-new.5.2: the override has no pending state.
 #[test]
-#[ignore = "red until #741: new starts in the override's queued state; implement removes this"]
 fn issue_741_new_uses_override_initial_state() {
     let (_root, dir) = land("queued");
     validate_with_override(&dir);
@@ -133,7 +131,6 @@ fn issue_741_new_uses_override_initial_state() {
 /// §FS-rhei-new.5.2: pending is legal under both machines; only the existing
 /// parent's land-check state distinguishes the before/after validation passes.
 #[test]
-#[ignore = "red until #741: both validation passes use the override; implement removes this"]
 fn issue_741_new_uses_override_for_before_and_after_validation() {
     let (_root, dir) = land("pending");
     validate_with_override(&dir);
@@ -166,7 +163,6 @@ fn issue_741_new_uses_override_for_before_and_after_validation() {
 /// §FS-rhei-new.3.2: an override is not merely the project default; a member's
 /// own states.yaml must not shadow it during either create decision.
 #[test]
-#[ignore = "red until #741: override beats Panta member lookup; implement removes this"]
 fn issue_741_new_override_beats_panta_member_machine() {
     let dir = unique_temp_dir("rhei-741-new-panta-override");
     fs::create_dir_all(dir.join("land/tasks")).expect("member workspace tasks");
@@ -192,7 +188,6 @@ fn issue_741_new_override_beats_panta_member_machine() {
 /// §FS-rhei-new.3.2: pending belongs to the built-in machine, but is invalid
 /// under this override. Refusal preserves all authored fixture bytes.
 #[test]
-#[ignore = "red until #741: new refuses states absent from override; implement removes this"]
 fn issue_741_new_refuses_state_outside_override_without_authored_changes() {
     let (_root, dir) = land("queued");
     validate_with_override(&dir);

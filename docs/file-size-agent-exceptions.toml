@@ -565,10 +565,10 @@ path = "crates/rhei-cli/src/cli/run_agent_sequential_completion.rs"
 match = "exact"
 rules = ["source"]
 kind = "deferred"
-max_accepted = { value = 600, unit = "lines" }
+max_accepted = { value = 620, unit = "lines" }
 until = "Sequential and parallel handlers consume a shared post-exit completion decision and this file retains only sequential emission and routing."
 reason = """
-Sequential post-exit routing still combines mode-specific event emission with the completion decision; a shared post-exit decision value must exist before either responsibility can move without duplicating transition ordering.
+Sequential post-exit routing still combines mode-specific event emission with the completion decision; a shared post-exit decision value must exist before either responsibility can move without duplicating transition ordering. #745 added the call into the settle path both modes share for a recognized give-up on a non-zero exit, which needs this handler's own output-check inputs.
 """
 [[exceptions]]
 path = "crates/rhei-cli/src/cli/run_parallel_agent_exit.rs"

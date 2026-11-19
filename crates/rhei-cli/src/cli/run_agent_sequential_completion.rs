@@ -150,6 +150,33 @@ fn handle_sequential_agent_completion(
                 // invocation moved its own ticket to. §FS-rhei-agents.3.2
                 task.state.as_str(),
             );
+            // A recognized give-up settles next, through the pool's own path, naming what the
+            // output check finds unwritten. §FS-rhei-agents.3.2.1 §FS-rhei-agents.5.2.1
+            if !status.success() && provider_unavailable.is_some() {
+                let missing = collect_missing_required_outputs_for_resolved_invocation(
+                    &task_workspace_root,
+                    machine,
+                    loaded.rhei.metadata.as_ref(),
+                    task,
+                    current_state,
+                    selected_to.as_deref(),
+                    resolved,
+                );
+                let stall = AgentStall {
+                    input,
+                    reloaded: &reloaded,
+                    task_id: task_id_str,
+                    state: current_state,
+                    spawn_record: &spawn_record,
+                    missing: &missing,
+                    outlook: retry_outlook,
+                    verdict: provider_unavailable.as_ref(),
+                };
+                if settle_nonzero_unavailable(stall, &mut release, sink)? {
+                    progress.stalled_tasks.insert(task_id_str.clone());
+                    return Ok(());
+                }
+            }
             let outputs_ok = status.success()
                 && state_outputs_exist_for_resolved_invocation(
                     &task_workspace_root,

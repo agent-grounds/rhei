@@ -406,9 +406,12 @@ fn ambiguous_reference(
     )
 }
 
-/// The descriptor a plan path or workspace directory points at.
+/// The descriptor a plan path or workspace directory points at. A Panta member
+/// names its project's run, just as it does when starting one. §FS-rhei-run-headless.3
 fn descriptor_for_path(path: &Path) -> MietteResult<RunDescriptor> {
-    let workspace = execution_workspace_root(&normalize_workspace_input(path));
+    let workspace = workspace::panta_member(path)
+        .map(|(project, _)| project)
+        .unwrap_or_else(|| execution_workspace_root(&normalize_workspace_input(path)));
     // Retain exclusion while resolving the authoritative descriptor. §FS-rhei-recover.4
 
     // §FS-rhei-errors.6

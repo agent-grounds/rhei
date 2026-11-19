@@ -168,7 +168,7 @@ Panta: {panta-title} › rhei `{rhei-id}`: {rhei-title} › {Kind} {ancestor-id}
 
 Facts earlier tickets left for whoever came next, newest first.
 
-… {n} earlier notes not shown — read {store path}
+… {n} earlier notes not shown — read {store path}; a task's last record there is its live one
 - [{task-id}] {entry}
 - [{task-id}] {entry}
 ```
@@ -373,7 +373,7 @@ Two fixed sub-sections follow the existing authority text and transition list.
 - Under each execution root: `runtime/results/<task-id>.md` (results),
   `runtime/exports/<task-id>/<name>.md` (exports), `runtime/supervise/<task-id>[/<state>].md` (briefs),
   `runtime/state-transitions.log` (order of events)
-- Notes left for later tickets: `{project note store}`
+- Notes left for later tickets: `{project note store}` — append-only; a task's last record there is its live one
 - Agent transcripts: `{logs directory of this run}`
 - Read-only commands, always safe: `rhei list [--rhei <id>] [--terminal] [--has-prior <id>] [--parent <id>]`,
   `rhei render <plan> --format json --pretty`
@@ -383,7 +383,7 @@ Two fixed sub-sections follow the existing authority text and transition list.
 What you write is what the next agent and the human see.
 - `runtime/results/<task-id>.md`: the first line is the one-line summary every later Plan History shows; detail below it.
 - You may append progress paragraphs to your own task body — files touched, commands run, decisions made — and append child tasks under your own task. Do not edit `**State:**` lines or any other task's body.
-- You may leave **one** note for later tickets anywhere in this project: `rhei note --task {qualified task id} "<fact>"`, at most 3 lines, for something the next ticket would otherwise rediscover. A second call replaces it, and spending it on `--restate <id>` or `--strike <id>` in place of the fact leaves you none of your own. Never edit `runtime/notes.md` by hand.
+- You may leave **one** note for later tickets anywhere in this project: `rhei note --task {qualified task id} "<fact>"`, at most 3 lines, for something the next ticket would otherwise rediscover. A second call replaces it: `runtime/notes.md` keeps every record, and a task's last record there is its live one. Spending it on `--restate <id>` or `--strike <id>` in place of the fact leaves you none of your own. Never edit `runtime/notes.md` by hand.
 - Write progress as plain paragraphs or lists, never Markdown headings: a heading inside a task body declares a child task, so one such as `#### Notes` breaks the plan; the run reverts your task body to what it was before this attempt and spends the attempt.
 ```
 
@@ -402,7 +402,9 @@ later tickets` names `runtime/notes.md` at the **project** execution root
 ([§FS-rhei-note.3.1](rhei-note.spec.md#31-where-it-lives)), the one memory path that is not under each execution root, which is
 why it gets a line of its own rather than joining the list above; the line is
 rendered whether or not the store exists yet, because a verb that creates it on
-first write needs the path named before there is anything to read.
+first write needs the path named before there is anything to read. It and the
+trail bullet state the fold's step 2 beside the path, as the overflow line of
+[§FS-rhei-memory.4.5](rhei-memory.spec.md#45-fencing-and-rendering) does and for its reason.
 `Leaving a trail`
 describes artifacts and permitted edits; it says nothing about when to stop or
 how completion is detected, which stay with the completion condition
@@ -686,8 +688,11 @@ are never silently omitted here.
    a cap with another number; it cannot introduce selection by relevance, and
    a cap of `0` removes the section rather than the overflow line.
 5. `### Project Notes` is capped at **24 lines** of entries, with the overflow
-   line `… {n} earlier notes not shown — read <store path>` emitted **first**,
-   where `{n}` counts the live entries the cap dropped. One entry is bounded at
+   line `… {n} earlier notes not shown — read <store path>; a task's last
+   record there is its live one` emitted **first**, as one line, where `{n}`
+   counts the live entries the cap dropped. That file also keeps every
+   superseded record unmarked ([§FS-rhei-note.3.4](rhei-note.spec.md#34-nothing-rewrites-it)), so the line states the fold's
+   step 2 ([§FS-rhei-memory.4.2](rhei-memory.spec.md#42-position)) that tells a live entry from one it replaced. One entry is bounded at
    **3 lines** at write time ([§FS-rhei-note.4](rhei-note.spec.md#4-refusals)); the block's cap is on lines rather than on
    entries because an entry cap alone does not bound the line cost. 24 is
    smaller than every other cap here except `### Siblings`, because this is the

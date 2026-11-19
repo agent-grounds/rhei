@@ -39,7 +39,7 @@ fn render_leaving_a_trail(render_context: &RuntimeTemplateContext<'_>) -> String
 What you write is what the next agent and the human see.
 - `runtime/results/<task-id>.md`: the first line is the one-line summary every later Plan History shows; detail below it.
 - You may append progress paragraphs to your own task body \u{2014} files touched, commands run, decisions made \u{2014} and append child tasks under your own task. Do not edit `**State:**` lines or any other task's body.
-- You may leave **one** note for later tickets anywhere in this project: `rhei note --task {task_id} \"<fact>\"`, at most 3 lines, for something the next ticket would otherwise rediscover. A second call replaces it, and spending it on `--restate <id>` or `--strike <id>` in place of the fact leaves you none of your own. Never edit `runtime/notes.md` by hand.
+- You may leave **one** note for later tickets anywhere in this project: `rhei note --task {task_id} \"<fact>\"`, at most 3 lines, for something the next ticket would otherwise rediscover. A second call replaces it: `runtime/notes.md` keeps every record, and a task's last record there is its live one. Spending it on `--restate <id>` or `--strike <id>` in place of the fact leaves you none of your own. Never edit `runtime/notes.md` by hand.
 - Write progress as plain paragraphs or lists, never Markdown headings: a heading inside a task body declares a child task, so one such as `#### Notes` breaks the plan; the run reverts your task body to what it was before this attempt and spends the attempt.
 "
     )
@@ -82,11 +82,10 @@ fn render_reading_the_rhei(render_context: &RuntimeTemplateContext<'_>) -> Strin
         out.push_str(&format!("  - `{id}` \u{2014} `{}`\n", memory_path(render_context, other)));
     }
     out.push_str(READING_THE_RHEI_ARTIFACTS);
-    // The store is the other path that is not under each execution root: one
-    // file for the whole project, named whether or not it exists yet, because
-    // the verb creates it on first write. §FS-rhei-memory.3.4 §FS-rhei-note.3.1
+    // The store is the one project-wide path, named before the verb creates it,
+    // with the fold rule its raw records need. §FS-rhei-memory.3.4 §FS-rhei-note.3.1
     out.push_str(&format!(
-        "- Notes left for later tickets: `{}`\n",
+        "- Notes left for later tickets: `{}` \u{2014} append-only; {NOTE_FOLD_RULE}\n",
         memory_path(render_context, &memory.note_store)
     ));
     // Transcripts are the one artifact that does not live per rhei: a run writes

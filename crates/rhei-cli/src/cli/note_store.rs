@@ -195,6 +195,11 @@ fn fold_note_store(contents: &str) -> Vec<NoteEntry> {
     live
 }
 
+/// The fold's step 2 as every pointer to the raw store states it: the file
+/// keeps every record, and only a task's last one is live.
+/// §FS-rhei-memory.4.5 §FS-rhei-memory.3.4 §FS-rhei-memory.4.2
+const NOTE_FOLD_RULE: &str = "a task's last record there is its live one";
+
 /// One entry as the block prints it, continuation lines indented under it.
 // §FS-rhei-memory.3.1
 fn render_note_entry(entry: &NoteEntry) -> String {
@@ -231,8 +236,10 @@ fn render_project_notes(entries: &[NoteEntry], store_path: &str) -> String {
     );
     let dropped = entries.len() - kept.len();
     if dropped > 0 {
+        // The file keeps superseded records unmarked, so the line states the fold's
+        // rule beside the path. §FS-rhei-memory.4.5
         out.push_str(&format!(
-            "\u{2026} {dropped} earlier notes not shown \u{2014} read {store_path}\n"
+            "\u{2026} {dropped} earlier notes not shown \u{2014} read {store_path}; {NOTE_FOLD_RULE}\n"
         ));
     }
     for entry in kept {

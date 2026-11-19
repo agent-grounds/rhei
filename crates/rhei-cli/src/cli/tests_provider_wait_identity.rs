@@ -1,7 +1,7 @@
 mod provider_wait_identity {
     //! The provider a `pi` outage wait is keyed on when the invocation resolves
     //! none, and the refusal recognition it must not widen (agent-grounds/rhei#664).
-    // §FS-rhei-agents.2.5 §FS-rhei-agents.2.3 §FS-rhei-run.3.3
+    // §FS-rhei-provider-unavailability.1 §FS-rhei-agents.2.3 §FS-rhei-run.3.3
     use super::*;
 
     fn settings() -> RheiSettings {

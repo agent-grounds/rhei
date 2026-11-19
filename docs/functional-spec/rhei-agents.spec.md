@@ -1251,7 +1251,7 @@ Recognition requires all of the following:
 - the resolved provider is one of `openai` or `anthropic`, matched exactly and
   case-sensitively. **The resolved agent registry id is not tested**. Only the
   provider the invocation resolves is tested, never one derived from a `pi`
-  model to key a wait ([§FS-rhei-agents.2.5](rhei-agents.spec.md#25-recognized-provider-unavailability)), so `pi:openai/gpt-5` is not
+  model to key a wait ([§FS-rhei-provider-unavailability.1](rhei-provider-unavailability.spec.md#1-pi)), so `pi:openai/gpt-5` is not
   recognized and `pi:openai:gpt-5` is;
 - the invocation exited non-zero and was neither timed out nor interrupted;
 - after stripping terminal-control decoration and trimming surrounding
@@ -1331,60 +1331,15 @@ informational only and never a provider refusal, by the rules of
 
 ### 2.5. Recognized Provider Unavailability
 
-A `pi` session can lose its provider and still exit `0`: in `--mode json`, the
-mode rhei runs it in for cost accounting ([§FS-rhei-cost-accounting.4](rhei-cost-accounting.spec.md#4-extraction-flow)), pi sets
-no failing exit code when its own retries give up. Rhei recognizes that ending
-as the provider being unavailable rather than as the worker's attempt.
-Recognition requires all of the following:
-
-- the resolved family is `pi`. The agent registry id is not tested, so a custom
-  entry with `family: pi` is recognized;
-- some provider keys the wait ([§FS-rhei-run.3.3](rhei-run.spec.md#33-provider-limit-parking)). It is the provider the
-  invocation resolves ([§FS-rhei-agents.1.4](rhei-agents.spec.md#14-resolution-order)). When the invocation resolves no provider,
-  it is the text before the first `/` of the model rhei hands the agent (the
-  model-flag value of [§FS-rhei-agents.1.1.2](rhei-agents.spec.md#112-agents)), provided both that text and the rest
-  are non-empty; it is taken verbatim and case-sensitively, and everything after
-  that first `/`, further slashes included, stays the model. So
-  `pi:openai-codex/gpt-6.1-sol` is recognized and waits on `openai-codex`, the
-  same wait as `pi:openai-codex:openai-codex/gpt-6.1-sol`, and
-  `pi:openrouter/vendor/model` waits on `openrouter`. A provider the invocation
-  resolves wins over the model's prefix: `pi:openai:openai-codex/x` waits on
-  `openai`. The derived provider keys the wait and nothing else: the model, the
-  resolved provider, and everything read from them — pricing, `RHEI_PROVIDER`,
-  `{model.provider}`, snapshots, accounting — are as they would be without it,
-  and refusal recognition never tests it ([§FS-rhei-agents.2.3](rhei-agents.spec.md#23-recognized-provider-refusals));
-- the invocation exited `0` and was neither timed out nor interrupted;
-- a required output is missing ([§FS-rhei-agents.3.2.1](rhei-agents.spec.md#321-runtime-semantics) step 4);
-- among the stdout JSON events, the last `auto_retry_end` has `success: false`
-  and an `attempt` equal to the `maxAttempts` of the last `auto_retry_start`
-  before it, and the last assistant `message_end` comes before it with
-  `stopReason: "error"`.
-
-The last condition is pi's own verdict; rhei keeps no error grammar of its own.
-pi retries only an error it classes as transient — a network failure, `429`, a
-`5xx`, an overload — and its count reaches `maxAttempts` only when those retries
-are used up. An error pi does not retry, such as a context overflow, an
-exhausted quota or a `400`, ends the count below `maxAttempts` and stays
-charged, because waiting will not fix it. Two endings still reach the count: an
-error pi does not retry arriving on its last retry, and `finalError: "Retry
-cancelled"` from an abort during the last backoff. Both are recognized, and the
-cap of six ([§FS-rhei-agents.3.2.3](rhei-agents.spec.md#323-attempt-budget)) bounds what they cost.
-
-Not recognized, and charged as today: `stopReason: "error"` with no
-`auto_retry_end` (pi's auto-retry off, or a first error it does not retry); an
-`auto_retry_end` with `success: true` or an `attempt` below `maxAttempts`; the
-same stream from any other family; an invocation that resolves no provider
-and whose model has no `/` or an empty half, such as `pi:gpt-6.1-sol`; a
-timed-out or interrupted session; and a session whose required outputs are all
-on disk, which moves exactly as it does today. Stderr and non-JSON stdout
-contribute nothing.
-
+An agent can lose its provider in the middle of a session: the provider stops
+answering, the agent's own retries run out, and the agent ends the session. Rhei
+recognizes that ending as the provider being unavailable rather than as the
+worker's attempt, for `pi` and `claude-code`, each from its own stream and on
+its own verdict; [§FS-rhei-provider-unavailability](rhei-provider-unavailability.spec.md#fs-rhei-provider-unavailability-recognizing-a-provider-outage-from-an-agents-own-stream) is the recognition contract.
 The recognized result is the `provider_unavailable` ending of
-[§FS-rhei-agents.8.4](rhei-agents.spec.md#84-spawn-records); whether it spends an attempt is [§FS-rhei-agents.3.2.3](rhei-agents.spec.md#323-attempt-budget). It
-is not a refusal ([§FS-rhei-agents.2.3](rhei-agents.spec.md#23-recognized-provider-refusals)): the session exits `0`, no reset instant
-is printed, and `pi`'s providers are outside that closed set. Only `pi` is
-recognized, because its stream is the only one there is evidence for; another
-family joins by a specification change backed by its own stream.
+[§FS-rhei-agents.8.4](rhei-agents.spec.md#84-spawn-records); whether it spends an attempt is [§FS-rhei-agents.3.2.3](rhei-agents.spec.md#323-attempt-budget), and
+the wait it writes is [§FS-rhei-run.3.3](rhei-run.spec.md#33-provider-limit-parking). It is not a refusal
+([§FS-rhei-agents.2.3](rhei-agents.spec.md#23-recognized-provider-refusals)), and where one stream matches both, the refusal wins.
 
 ## 3. Prompt Composition
 
@@ -1743,30 +1698,47 @@ Under `orchestrator` authority, `rhei run`:
    Timeout transitions fire per [Timeout Handling](#7-timeout-handling). Agents
    that fork long-running descendants should install their own cleanup; the
    engine kills only the direct subprocess.
-3. On non-zero exit, routes through the exit-code / error transition path
-   documented in the [Execution Loop](#52-execution-loop). The artifact check is
-   skipped.
+3. On non-zero exit, the session is first checked for a recognized provider
+   refusal ([§FS-rhei-agents.2.3](rhei-agents.spec.md#23-recognized-provider-refusals)) and then for a recognized `claude-code` give-up
+   ([§FS-rhei-provider-unavailability.2](rhei-provider-unavailability.spec.md#2-claude-code)). Either one settles before any routing, with or
+   without `--continue-on-error`, and fires no transition, error transition or
+   callback. A refusal parks under [§FS-rhei-run.3.3](rhei-run.spec.md#33-provider-limit-parking). A give-up first runs the
+   same output check as step 4, so the list of required artifacts still
+   unwritten is computed exactly as on exit `0`, and then settles as the
+   recognized unavailability of step 4 does: the same rewrite of the spawn
+   record, the same warning, wait and exhaustion lines, and the same
+   `task_outputs_missing` record, each naming the unwritten artifacts the way a
+   `pi` ending's do. Any other non-zero exit routes through the exit-code /
+   error transition path documented in the [Execution Loop](#52-execution-loop),
+   and the artifact check is skipped.
 4. On exit code `0`:
    - Verify every required output artifact exists, plus the terminal result
      when the selected transition lands on a `final: true` state. The result
      is reported in the same list under the artifact name `result`, with the
      same resolved-path rendering, because it is enforced by the same rule.
-   - If any is missing and the session is a recognized provider unavailability
-     ([§FS-rhei-agents.2.5](rhei-agents.spec.md#25-recognized-provider-unavailability)), this check is where that is decided, and nothing
-     earlier decides it: the spawn record was written `exited` and charged when
-     the subprocess ended, like every exit-`0` record, and this check rewrites
-     it to `provider_unavailable` ([§FS-rhei-agents.8.4](rhei-agents.spec.md#84-spawn-records)). The task stays in its
+   - If any is missing and the session is a recognized `pi` provider
+     unavailability ([§FS-rhei-provider-unavailability.1](rhei-provider-unavailability.spec.md#1-pi)), this check is where that is
+     decided, and nothing earlier decides it: the spawn record was written
+     `exited` and charged when the subprocess ended, like every exit-`0`
+     record, and this check rewrites it to `provider_unavailable`
+     ([§FS-rhei-agents.8.4](rhei-agents.spec.md#84-spawn-records)). A recognized `claude-code` give-up reaches this
+     settlement from step 3 instead, on its non-zero exit, and settles it the
+     same way. The task stays in its
      state, no transition fires, and in place of the warning and halt line below
      the engine logs `warning: the provider was unavailable for task {id} in
-     state '{state}': pi gave up retrying ({finalError}); {charge}`. `{charge}`
+     state '{state}': {family} gave up retrying ({signal}); {charge}`, where
+     `{family}` is the resolved family, `pi` or `claude-code`, and `{signal}`
+     is its give-up text ([§FS-rhei-agents.2.5](rhei-agents.spec.md#25-recognized-provider-unavailability)). `{charge}`
      is `no attempt charged (free {n} of 6 on this visit)`, `attempt charged,
      because the provider answered this session`, or `attempt charged, because
      this visit's 6 free endings are spent` (§FS-rhei-agents.3.2.3). While the
      visit has an attempt left the next line is `waiting: {agent} on {provider}
      starts again after {nextAttemptAt}` and the wait of §FS-rhei-run.3.3 is
      written; when the charge spent the last attempt, the exhaustion line of
-     [§FS-rhei-agents.3.2.3](rhei-agents.spec.md#323-attempt-budget) is printed in its place, word for word, and no wait is
-     written, because no spawn follows it.
+     [§FS-rhei-agents.3.2.3](rhei-agents.spec.md#323-attempt-budget) is printed in its place, word for word, naming the
+     unwritten artifacts of the output check, and no wait is written, because
+     no spawn follows it. That holds for a `claude-code` give-up on its
+     non-zero exit as for a `pi` ending on exit `0`.
    - Otherwise, if any is missing, the task stays in its current state and the engine
      logs `warning: agent exited 0 but required outputs are missing for task
      {id} in state '{state}': <name1> (<path1>), <name2> (<path2>)` — with
@@ -1806,7 +1778,7 @@ Under `orchestrator` authority, `rhei run`:
      signal ended it)`. The record's `ending` decides before its `code` does, so
      a `provider_limited` record reads `was provider-limited` whatever its code,
      and a `provider_unavailable` one `found its provider unavailable
-     ({signal})` with its `signal`, never `exited 0`. A record whose `code` is absent is the
+     ({signal})` with its `signal`, never `exited 0` or `exited 1`. A record whose `code` is absent is the
      one sentence the code cannot supply: the subprocess did not exit, it was
      ended — on Unix by a signal — and it is never described as `exited 0`.
      `{ending}` says how the attempt ended and nothing more. It never adds
@@ -1990,19 +1962,22 @@ provider-limit recognition.
 A recognized provider unavailability ([§FS-rhei-agents.2.5](rhei-agents.spec.md#25-recognized-provider-unavailability)) does not spend the
 budget either, within a bound of its own. The reason is the refusal's: the
 provider never answered, so the worker never began the work it was asked to do.
-That reason draws the line. The ending is free only when no assistant message
-of the session ended without error. A session the provider did answer had begun
+That reason draws the line. The ending is free only when the provider answered
+nothing in the session; what counts as an answer is the family's, and a
+`claude-code` `<synthetic>` message never does ([§FS-rhei-provider-unavailability.3](rhei-provider-unavailability.spec.md#3-what-a-recognized-ending-costs)).
+A session the provider did answer had begun
 the work and may have changed the checkout, so it is charged however it ended,
 as a timed-out attempt is; it is still recorded as unavailable and still waits.
 One count, the spawn record's `unavailable` ([§FS-rhei-agents.8.4](rhei-agents.spec.md#84-spawn-records)), covers every
 such ending of the visit, charged or not, and only the first six can be free.
 From the seventh on each is charged, and the visit's own budget and its
-exhaustion halt take over. Six is about an hour of backoff ([§FS-rhei-run.3.3](rhei-run.spec.md#33-provider-limit-parking)),
-so an outage shorter than that costs a visit no attempt and a longer one halts
-it, naming `rhei retry`. The six are built in, with no setting. The count is
+exhaustion halt take over. Six endings are about an hour of waiting plus the
+sessions themselves, so a longer outage halts the visit, naming `rhei retry`
+([§FS-rhei-provider-unavailability.3](rhei-provider-unavailability.spec.md#3-what-a-recognized-ending-costs)). The six are built in, with no setting. The count is
 kept with the visit, so it holds across runs and a new visit starts it at 0; a
 `rhei retry` grant adds attempts and never free endings. Poll counters are
-neither advanced nor refunded by it, and each free spawn is still an invocation.
+neither advanced nor refunded by it, and each free spawn is still an invocation
+whose spend is settled as any spawn's: it frees an attempt, not spend.
 
 An agent **killed together with its run** ([§FS-rhei-agents.8.1.1](rhei-agents.spec.md#811-an-agent-killed-with-its-run)) spends nothing
 the first time, since its run's death ended it, but the spawn record's `killed`
@@ -2237,6 +2212,11 @@ is unchanged: poll states do not receive this visit-budget recovery advice.
       [§FS-rhei-run.3.3](rhei-run.spec.md#33-provider-limit-parking) and continue the scheduling loop. This path fires no
       transition or callback and is the same with or without
       `--continue-on-error`.
+    - Otherwise, if the result is a recognized provider unavailability
+      ([§FS-rhei-provider-unavailability.2](rhei-provider-unavailability.spec.md#2-claude-code)), settle it in place under
+      [Runtime Semantics](#321-runtime-semantics) step 3 and continue the
+      scheduling loop. This path also fires no transition or callback and is the
+      same with or without `--continue-on-error`.
     - Without `--continue-on-error`: log the error and stop.
     - With `--continue-on-error`: log the error, skip this task, continue.
 13. Repeat until every claimable task has advanced or stalled. A pass ends when
@@ -2261,7 +2241,11 @@ is unchanged: poll states do not receive this visit-budget recovery advice.
    b. Process the result using the same rules as sequential mode: if an external actor already changed the task state, respect it; otherwise, on exit `0`, let `rhei run` evaluate and execute the next matching forward transition; on non-zero exit, apply the error path.
    c. Scan for newly claimable tasks (dependencies may have been unblocked).
    d. If new tasks are claimable and fewer than N tasks are in flight, spawn every invocation of each newly scheduled task ([§FS-rhei-run.5.3](rhei-run.spec.md#53-what---parallel-counts)).
-   A recognized provider limit releases the reporting slot immediately. The
+   A recognized provider limit releases the reporting slot immediately, and so
+   does a recognized provider unavailability on a non-zero exit
+   ([§FS-rhei-provider-unavailability.2](rhei-provider-unavailability.spec.md#2-claude-code)), which settles through the same shared path as in
+   sequential mode, right after the refusal check, so the two modes cannot give
+   different answers. The
    refill scan excludes queued invocations with the same active provider-limit
    identity, but may fill the slot with unrelated work. Workers already
    running under that identity are not stopped and each result is classified
@@ -2877,8 +2861,11 @@ A provider-limited record keeps the subprocess's real non-zero `code`, uses
 resolved worker identity, and any usage the worker reported remain ordinary
 auditable spawn evidence.
 
-A `provider_unavailable` record keeps code `0` and adds `signal`, pi's
-`finalError` ([§FS-rhei-agents.2.5](rhei-agents.spec.md#25-recognized-provider-unavailability)). It is written `exited` and charged when the
+A `provider_unavailable` record keeps the subprocess's real exit code — `0` for
+`pi`, the non-zero exit for `claude-code`, as a `provider_limited` record
+already does — and adds `signal`, the family's own give-up text
+([§FS-rhei-agents.2.5](rhei-agents.spec.md#25-recognized-provider-unavailability)). Readers check `ending` before `code`, so a
+`provider_unavailable` record with code `1` reads correctly. It is written `exited` and charged when the
 subprocess ends, and the output check of [§FS-rhei-agents.3.2.1](rhei-agents.spec.md#321-runtime-semantics) rewrites it in
 place under the record lock, as a withheld edge is rewritten: `ending` becomes
 `provider_unavailable`, `unavailable` counts one more, and a free ending sets

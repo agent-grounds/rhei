@@ -87,7 +87,7 @@ fn classify_provider_unavailable(
 /// The last `auto_retry_end` failed at the `maxAttempts` of the last
 /// `auto_retry_start` before it, and the last assistant `message_end` came
 /// before it with `stopReason: "error"`. Returns pi's `finalError` and whether
-/// any assistant message ended without error. §FS-rhei-agents.2.5
+/// any assistant message ended without error. §FS-rhei-provider-unavailability.1
 fn pi_gave_up_retrying(
     events: impl Iterator<Item = serde_json::Value>,
 ) -> Option<(String, bool)> {

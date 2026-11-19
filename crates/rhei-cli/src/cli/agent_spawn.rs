@@ -22,7 +22,7 @@ struct AgentSpawnOutcome {
     /// generic non-zero completion paths run. §FS-rhei-agents.2.3
     provider_limit: Option<ProviderLimit>,
     /// pi's verdict that its retries gave up on the provider; the output check
-    /// decides whether it is the ending. §FS-rhei-agents.2.5
+    /// decides whether it is the ending. §FS-rhei-provider-unavailability.1
     provider_unavailable: Option<ProviderUnavailable>,
     /// The Codex configuration fallbacks this invocation's own output carried,
     /// distinct and in the order first seen. §FS-rhei-configuration-fallbacks
@@ -444,7 +444,7 @@ fn spawn_and_wait_agent(
             ended_wall,
         )
     });
-    // A sibling of the refusal, read from pi's own events. §FS-rhei-agents.2.5
+    // A sibling of the refusal, read from pi's own events. §FS-rhei-provider-unavailability.1
     let provider_unavailable = captured_lines.lock().ok().and_then(|lines| {
         classify_provider_unavailable(resolved, status, timed_out, interrupted, &lines, ended_wall)
     });

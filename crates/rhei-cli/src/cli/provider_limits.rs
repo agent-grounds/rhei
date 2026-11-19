@@ -40,7 +40,7 @@ impl ProviderLimit {
 /// and the provider the invocation resolves (§FS-rhei-agents.1.4). A `pi`
 /// invocation that resolves none keys on the text before the first `/` of the
 /// model rhei hands it, when both halves are non-empty; that provider keys the
-/// wait and nothing else, so `model_provider` stays unset. §FS-rhei-agents.2.5
+/// wait and nothing else, so `model_provider` stays unset. §FS-rhei-provider-unavailability.1
 fn resolved_provider_identity(resolved: &ResolvedAgent) -> Option<ProviderIdentity> {
     let provider = match &resolved.model_provider {
         Some(provider) => provider.clone(),

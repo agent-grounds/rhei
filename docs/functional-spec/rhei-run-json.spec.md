@@ -143,7 +143,9 @@ changes neither `outcome` nor `exit_code`. It is an addition under
 
 `provider_unavailable` is emitted for the recognized ending of
 [§FS-rhei-agents.2.5](rhei-agents.spec.md#25-recognized-provider-unavailability). When the ending wrote a wait it is emitted in place of
-`task_outputs_missing`, `provider` is the provider that keys the wait
+the outcome the exit alone would have had — `task_outputs_missing` for a `pi`
+session's exit `0`, the `failed` outcome for a `claude-code` session's non-zero
+exit ([§FS-rhei-provider-unavailability.2](rhei-provider-unavailability.spec.md#2-claude-code)) — `provider` is the provider that keys the wait
 ([§FS-rhei-agents.2.5](rhei-agents.spec.md#25-recognized-provider-unavailability)), and
 `next_attempt_at` is the backoff deadline of [§FS-rhei-run.3.3](rhei-run.spec.md#33-provider-limit-parking). When the charge
 spent the visit's last attempt no wait is written and both fields are absent,

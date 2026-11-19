@@ -6,6 +6,8 @@
 
 // §AR-source-file-size.3 §FS-rhei-agent-visit-pairing
 
+include!("tests_first_visit_reuse.rs");
+
 mod visit_pairing {
     use super::super::*;
 

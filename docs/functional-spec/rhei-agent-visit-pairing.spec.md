@@ -131,6 +131,31 @@ task and state, of any identity, exists at the current move count. Such a record
 means the state already ran in this visit, so the records decide, by
 [§FS-rhei-agents.8.4](rhei-agents.spec.md#84-spawn-records) and this point, not the files on disk.
 
+When the actual pre-spawn decision skips an invocation under this first-visit
+rule, `rhei run` prints a human-readable note on standard output. It identifies
+the qualified task id, canonical state, and the resolved output paths accepted
+as that invocation's work, explicitly says that no agent is spawned for it,
+and offers `rhei reset` with the runnable command and whole-rhei scope required
+by [§FS-rhei-reset.5.1](rhei-reset.spec.md#51-offering-reset-as-a-remedy).
+For example, the explanation may say “reusing first-visit outputs (…) for
+<target>; no agent spawned; to redo it, run …”. This is an operator explanation,
+not a machine-parsed format.
+
+The note is emitted once per skipped invocation in a visit during a run, even
+if later passes reconsider it. Readiness predicates, including queries during
+a provider wait, emit no note. An invocation that still owes any required
+output or terminal result and will spawn must not claim first-visit reuse.
+Successful own-record reuse and orphan pairing must not be described as this
+recordless first-visit branch; pairing retains its separate note above.
+
+This announcement does not change eligibility: deliberately seeded work,
+including a seed written before the first transition into the state, remains
+reusable. The same explanation is required when an earlier state on this
+ticket or a sibling ticket wrote the shared output. Such a first visit still
+skips, including in a run that spawns unrelated work, without rewriting the
+accepted files. Re-entry continues to require current-visit proof under
+[§FS-rhei-agents.3.2](rhei-agents.spec.md#32-completion-condition).
+
 ## 7. Nothing Persisted
 
 The orphaned record keeps its name, `worker` and `log`, so it still says which

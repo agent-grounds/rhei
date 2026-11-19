@@ -19,6 +19,8 @@ mod agent_environment_tests;
 mod agent_family_support;
 mod agent_family_tests;
 mod agent_family_transport_tests;
+mod agent_first_visit_reuse_support;
+mod agent_first_visit_reuse_tests;
 mod agent_grounds_settings_tests;
 mod agent_grounds_support;
 mod agent_grounds_templates_tests;

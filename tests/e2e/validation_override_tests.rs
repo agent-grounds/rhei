@@ -9,7 +9,6 @@ use super::validation_override_support::*;
 use super::*;
 
 #[test]
-#[ignore = "red until #753: explain the other rhei's displaced machine; implement removes this"]
 fn validation_override_failure_explains_displaced_member_machine() {
     let dir = unique_temp_dir("rhei-753-failure");
     let project = project(&dir);
@@ -45,7 +44,6 @@ fn validation_override_failure_explains_displaced_member_machine() {
 }
 
 #[test]
-#[ignore = "red until #753: successful equivalent targets explain the override; implement removes this"]
 fn validation_override_success_explains_equivalent_targets() {
     let dir = unique_temp_dir("rhei-753-targets");
     let project = project(&dir);
@@ -86,7 +84,6 @@ fn validation_override_success_explains_equivalent_targets() {
 }
 
 #[test]
-#[ignore = "red until #753: provenance bypasses invalid YAML and groups default owners; implement removes this"]
 fn validation_override_reports_bypassed_yaml_without_loading_it() {
     let dir = unique_temp_dir("rhei-753-bypass");
     let project = project(&dir);
@@ -112,7 +109,6 @@ fn validation_override_reports_bypassed_yaml_without_loading_it() {
 }
 
 #[test]
-#[ignore = "red until #753: identify built-in fallback and exclude the selected source; implement removes this"]
 fn validation_override_names_builtin_and_does_not_replace_itself() {
     let dir = unique_temp_dir("rhei-753-builtin");
     let project = project(&dir);
@@ -138,7 +134,6 @@ fn validation_override_names_builtin_and_does_not_replace_itself() {
 }
 
 #[test]
-#[ignore = "red until #753: explain an override that displaces no member source; implement removes this"]
 fn validation_override_reports_no_displaced_source() {
     let dir = unique_temp_dir("rhei-753-no-displacement");
     let project = project(&dir);
@@ -157,7 +152,6 @@ fn validation_override_reports_no_displaced_source() {
 /// marker, never for new text whose absence would cause a timeout. No file
 /// edits, debounce sleeps or revalidation timing are involved.
 #[test]
-#[ignore = "red until #753: watch passes explain displaced sources exactly once; implement removes this"]
 fn validation_override_watch_pass_explains_displaced_sources_once() {
     use super::provider_limit_support::{wait_for, RunningChild};
 

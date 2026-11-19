@@ -16,9 +16,12 @@ fn assert_spent_halt(fixture: &FallbackFixture, row: &str, spent: u64) {
         format!("{spent} attempts spent on this visit"),
         format!(
             "finding ({})",
-            fixture.plan.join(format!("runtime/exports/{task}/working.md")).display()
+            fixture.plan.join("runtime").join("exports").join(&task).join("working.md").display()
         ),
-        format!("result ({})", fixture.plan.join(format!("runtime/results/{task}.md")).display()),
+        format!(
+            "result ({})",
+            fixture.plan.join("runtime").join("results").join(format!("{task}.md")).display()
+        ),
         format!("`rhei retry {task}`, then rerun"),
     ] {
         assert!(row.contains(&expected), "spent halt lacks {expected:?}: {row}");

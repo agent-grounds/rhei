@@ -102,7 +102,7 @@ transitions:
         let (lines, actionable) = halted_task_report(&rhei, &machines, &None, Path::new("plan.rhei.md"), &spawns);
         assert!(actionable);
         let explanation = lines.join("\n");
-        let owed = format!("result ({})", root.join("runtime/results/1.md").display());
+        let owed = format!("result ({})", root.join("runtime").join("results").join("1.md").display());
         for expected in ["1 attempts spent on this visit", &owed, "rhei retry 1"] {
             assert!(explanation.contains(expected), "shared explanation lacks {expected:?}: {explanation}");
         }

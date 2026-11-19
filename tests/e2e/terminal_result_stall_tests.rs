@@ -226,7 +226,7 @@ if task != 'plan.2':
     let row = report.lines().find(|line| line.starts_with("| plan.2 | work |")).unwrap();
     for expected in [
         "2 attempts spent on this visit".to_string(),
-        format!("result ({})", dir.join("runtime/results/plan.2.md").display()),
+        format!("result ({})", dir.join("runtime").join("results").join("plan.2.md").display()),
         "`rhei retry plan.2`, then rerun".to_string(),
     ] {
         assert!(row.contains(&expected), "the stalled ticket lacks {expected:?}: {row}");

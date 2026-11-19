@@ -38,7 +38,7 @@ transitions:
             fixture_command(&program)
         ),
     );
-    let result = dir.join("runtime/results/plan.1.md");
+    let result = dir.join("runtime").join("results").join("plan.1.md");
     let owed = format!("result ({})", result.display());
     let mut failures = Vec::new();
     for run_number in 1..=2 {

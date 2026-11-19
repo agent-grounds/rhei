@@ -1,7 +1,7 @@
 // What an agent's exit does when its provider made a wait of it: a refusal
-// parks the ticket until its reset, and a `pi` session that lost its provider
-// has its spawn record rewritten and waits out a backoff, or halts a spent
-// visit.
+// parks the ticket until its reset, and a session whose own retries gave up on
+// its provider has its spawn record rewritten and waits out a backoff, or halts
+// a spent visit.
 //
 // Its own part because both ways an agent exit is judged — the single worker
 // and the pool — reach the same decisions and must say the same thing there,
@@ -56,8 +56,26 @@ struct AgentStall<'a> {
     missing: &'a [String],
     /// Decided at the spawn, counting this attempt as charged. §FS-rhei-agents.3.2.1
     outlook: RetryOutlook,
-    /// pi's verdict, read at the exit. §FS-rhei-provider-unavailability.1
+    /// The family's verdict, read at the exit. §FS-rhei-provider-unavailability
     verdict: Option<&'a ProviderUnavailable>,
+}
+
+/// Settle a recognized give-up on a non-zero exit before any routing, with or
+/// without `--continue-on-error`, the one way for the single worker and the
+/// pool; `stall.missing` is the output check's list, run as on exit `0`. Whether
+/// it settled: a record that cannot be rewritten stays `exited` and charged and
+/// routes as any failure. §FS-rhei-agents.3.2.1 §FS-rhei-agents.5.2.1 §FS-rhei-agents.5.2.2
+fn settle_nonzero_unavailable(
+    stall: AgentStall<'_>,
+    release: &mut PendingSlotRelease,
+    sink: &Arc<dyn rhei_tui::EventSink>,
+) -> MietteResult<bool> {
+    let Some(verdict) = stall.verdict else { return Ok(false) };
+    let Some(record) = record_provider_unavailable(stall.spawn_record, verdict) else {
+        return Ok(false);
+    };
+    settle_provider_unavailable(&stall, verdict, &record, release, sink)?;
+    Ok(true)
 }
 
 /// Say what the stall is and what the run does next: a recognized provider
@@ -105,10 +123,11 @@ fn settle_provider_unavailable(
     }
     let warn = |text: String| emit_run_message(sink, rhei_tui::MessageLevel::Warn, text);
     warn(format!(
-        "  warning: the provider was unavailable for task {} in state '{}': pi gave up \
+        "  warning: the provider was unavailable for task {} in state '{}': {} gave up \
          retrying ({}); {}",
         stall.task_id,
         stall.state,
+        verdict.family,
         verdict.signal,
         unavailable_charge(record, verdict)
     ));

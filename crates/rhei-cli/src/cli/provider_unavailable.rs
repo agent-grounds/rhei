@@ -1,11 +1,11 @@
-// What a `pi` session's own events say about a provider that stopped answering,
-// and the wait that verdict earns.
+// What an agent's own stream says about a provider that stopped answering, and
+// the wait that verdict earns: pi's events or Claude Code's, each read by its
+// own parser.
 //
-// Its own part because it is the refusal's sibling, not one of its grammars:
-// the session exits `0`, prints no reset instant, and is judged from pi's
-// `--mode json` events rather than from whole lines. Nothing here decides a
-// charge or prints a line; the output check does, once a required output is
-// missing.
+// Its own part because it is the refusal's sibling, not one of its grammars: no
+// reset instant is printed, and the verdict is the family's own count of its
+// retries rather than a whole line. Nothing here decides a charge or prints a
+// line; the exit handling does.
 
 // §FS-rhei-agents.2.5 §FS-rhei-agents.3.2.3 §FS-rhei-run.3.3
 
@@ -43,26 +43,32 @@ impl ProviderWaitKind {
     }
 }
 
-/// pi's verdict that its own retries gave up on the provider, with what the
-/// wait is keyed on. It decides nothing until the output check finds a required
-/// output missing. §FS-rhei-agents.2.5
+/// A family's verdict that its own retries gave up on the provider, with what
+/// the wait is keyed on. A `pi` verdict decides nothing until the output check
+/// finds a required output missing; a `claude-code` one settles its non-zero
+/// exit. §FS-rhei-agents.2.5
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct ProviderUnavailable {
     identity: ProviderIdentity,
-    /// pi's `finalError`. §FS-rhei-agents.8.4
+    /// The resolved family whose verdict this is, `pi` or `claude-code`.
+    /// §FS-rhei-agents.3.2.1
+    family: &'static str,
+    /// The family's own give-up text. §FS-rhei-agents.8.4
     signal: String,
-    /// Whether any assistant message of the session ended without error: the
-    /// provider answered, so the worker had begun the work. §FS-rhei-agents.3.2.3
+    /// Whether the provider answered anything in the session, as the family
+    /// counts an answer, so the worker had begun the work.
+    /// §FS-rhei-provider-unavailability.3
     answered: bool,
     /// When the session ended, the instant the backoff counts from. §FS-rhei-run.3.3
     observed: std::time::SystemTime,
 }
 
-/// Recognize a `pi` session that lost its provider, from everything but the
-/// missing output, which only the output check knows. The family is tested and
-/// the registry id never is; an invocation with no provider to key the wait on,
-/// resolved or derived from pi's model reference, is not recognized.
-/// §FS-rhei-agents.2.5
+/// Recognize a session whose family's own retries gave up on its provider: pi's
+/// from everything but the missing output, which only the output check knows,
+/// and Claude Code's from its non-zero exit. The family is tested and the
+/// registry id never is; an invocation with no provider to key the wait on is
+/// not recognized, and a timeout or interruption is classified first.
+/// §FS-rhei-provider-unavailability
 fn classify_provider_unavailable(
     resolved: &ResolvedAgent,
     status: std::process::ExitStatus,
@@ -71,17 +77,75 @@ fn classify_provider_unavailable(
     captured_lines: &[(rhei_tui::AgentStream, String)],
     observed: std::time::SystemTime,
 ) -> Option<ProviderUnavailable> {
-    if resolved.family() != "pi" || !status.success() || timed_out || interrupted {
+    if timed_out || interrupted {
         return None;
     }
+    // pi exits 0 on a give-up; Claude Code exits non-zero. §FS-rhei-provider-unavailability.1
+    // §FS-rhei-provider-unavailability.2
+    let family = match (resolved.family(), status.success()) {
+        ("pi", true) => "pi",
+        ("claude-code", false) => "claude-code",
+        _ => return None,
+    };
+    // Resolved, or derived from pi's model reference; never for Claude Code.
+    // §FS-rhei-provider-unavailability.2
     let identity = resolved_provider_identity(resolved)?;
-    // Stderr and non-JSON stdout contribute nothing. §FS-rhei-agents.2.5
+    // Stderr and non-JSON stdout contribute nothing. §FS-rhei-provider-unavailability
     let events = captured_lines
         .iter()
         .filter(|(stream, _)| *stream == rhei_tui::AgentStream::Stdout)
         .filter_map(|(_, line)| serde_json::from_str::<serde_json::Value>(line).ok());
-    let (signal, answered) = pi_gave_up_retrying(events)?;
-    Some(ProviderUnavailable { identity, signal, answered, observed })
+    let (signal, answered) = match family {
+        "pi" => pi_gave_up_retrying(events)?,
+        _ => claude_code_gave_up_retrying(events.collect())?,
+    };
+    Some(ProviderUnavailable { identity, family, signal, answered, observed })
+}
+
+/// Claude Code's own verdict: the last `api_retry` reached its own
+/// `max_retries` on a transient status class (`null`, `429` or a `5xx`), and an
+/// `is_api_error_message` event, and no answer from the model, came after it.
+/// Returns that event's text and whether the model answered anything in the
+/// session; a `<synthetic>` message never counts as an answer.
+/// §FS-rhei-provider-unavailability.2 §FS-rhei-provider-unavailability.3
+fn claude_code_gave_up_retrying(events: Vec<serde_json::Value>) -> Option<(String, bool)> {
+    let is_assistant = |event: &serde_json::Value| event["type"] == "assistant";
+    let answers = |event: &serde_json::Value| {
+        is_assistant(event) && event["message"]["model"] != "<synthetic>"
+    };
+    let answered = events.iter().any(answers);
+    let last_retry = events
+        .iter()
+        .rposition(|event| event["type"] == "system" && event["subtype"] == "api_retry")?;
+    let retry = &events[last_retry];
+    let used_up = retry["attempt"].as_u64().is_some_and(|attempt| {
+        retry["max_retries"].as_u64() == Some(attempt)
+    });
+    // The status class is the protocol's; Claude Code's error names are never read.
+    // §FS-rhei-provider-unavailability.2
+    let transient = match &retry["error_status"] {
+        serde_json::Value::Null => true,
+        status => status.as_u64().is_some_and(|code| code == 429 || (500..600).contains(&code)),
+    };
+    if !used_up || !transient {
+        return None;
+    }
+    let after = &events[last_retry + 1..];
+    if after.iter().any(answers) {
+        return None;
+    }
+    let give_up = after
+        .iter()
+        .rev()
+        .find(|event| is_assistant(event) && event["is_api_error_message"] == true)?;
+    let text: Vec<&str> = give_up["message"]["content"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|block| block["text"].as_str())
+        .collect();
+    let signal = if text.is_empty() { "no error message".to_string() } else { text.join(" ") };
+    Some((signal, answered))
 }
 
 /// The last `auto_retry_end` failed at the `maxAttempts` of the last

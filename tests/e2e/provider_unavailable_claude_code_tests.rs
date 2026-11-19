@@ -64,7 +64,6 @@ fn assert_waits_free(fixture: &ProviderFixture, pass: &Pass, mode: Mode, signal:
 // §FS-rhei-provider-unavailability.2 §FS-rhei-agents.3.2.1 §FS-rhei-agents.8.4 §FS-rhei-run.3.3
 // §FS-rhei-run-json.2.1 §FS-rhei-budgets.6.2
 #[test]
-#[ignore = "red until #745: a claude-code give-up is recognized and waits; implement removes this"]
 fn a_claude_code_session_that_gives_up_on_its_provider_waits_without_spending_an_attempt() {
     let fixture = Outage::claude(REFUSED).fixture("claude-unavailable-waits");
     let first = run_once(&fixture, "first");
@@ -104,7 +103,6 @@ fn a_claude_code_session_that_gives_up_on_its_provider_waits_without_spending_an
 /// without `--continue-on-error`: the run never aborts on it. §FS-rhei-agents.5.2.1
 // §FS-rhei-provider-unavailability.2 §FS-rhei-agents.5.2.2 §FS-rhei-run.3
 #[test]
-#[ignore = "red until #745: every transient give-up waits in every mode; implement removes this"]
 fn every_transient_give_up_waits_through_the_single_worker_and_the_pool() {
     for mode in MODES {
         let fixture = mode.outage(Outage::claude(REFUSED)).fixture(&mode.name("refused"));
@@ -124,7 +122,6 @@ fn every_transient_give_up_waits_through_the_single_worker_and_the_pool() {
 /// `anthropic` that has not started yet is held rather than spending its own
 /// session to find out the same thing. §FS-rhei-run.3.3
 #[test]
-#[ignore = "red until #745: a claude-code give-up holds the next ticket on its login; implement removes this"]
 fn a_give_up_holds_the_next_ticket_on_the_same_login() {
     let outage = Outage { tasks: TWO_TASKS, ..Outage::claude(REFUSED) };
     let fixture = outage.fixture("claude-unavailable-holds");
@@ -142,7 +139,6 @@ fn a_give_up_holds_the_next_ticket_on_the_same_login() {
 /// never an answer. It is still recorded as unavailable and still waits.
 // §FS-rhei-agents.3.2.3 §FS-rhei-provider-unavailability.2
 #[test]
-#[ignore = "red until #745: an answered claude-code give-up is charged and waits; implement removes this"]
 fn a_session_the_model_answered_is_charged_and_still_waits() {
     for mode in MODES {
         let outage = mode.outage(Outage::claude(&answered_first(REFUSED)));
@@ -169,7 +165,6 @@ fn a_session_the_model_answered_is_charged_and_still_waits() {
 /// written. Reached by the seventh ending of a visit, and by an answered one.
 // §FS-rhei-agents.3.2.1 §FS-rhei-agents.3.2.3 §FS-rhei-run-json.2.1
 #[test]
-#[ignore = "red until #745: a charged claude-code give-up on the last attempt halts naming its outputs; implement removes this"]
 fn a_charged_give_up_on_the_last_attempt_halts_naming_the_missing_outputs() {
     let seventh = "attempt charged, because this visit's 6 free endings are spent";
     let answered = "attempt charged, because the provider answered this session";
@@ -219,7 +214,6 @@ fn a_charged_give_up_on_the_last_attempt_halts_naming_the_missing_outputs() {
 /// `result` event to measure, the session still settles a full reserve.
 // §FS-rhei-budgets.6.2 §FS-rhei-agents.3.2.3
 #[test]
-#[ignore = "red until #745: an unmeasured free claude-code give-up settles the reserve; implement removes this"]
 fn a_free_give_up_that_nothing_prices_still_settles_the_reserve() {
     let unpriced = Outage { target: UNPRICED_TARGET, ..Outage::claude(REFUSED) };
     let no_result = Outage::claude(&without(REFUSED, is_result));

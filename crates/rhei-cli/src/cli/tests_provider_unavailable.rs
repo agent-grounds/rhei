@@ -253,6 +253,7 @@ mod provider_unavailable {
     fn verdict(answered: bool) -> ProviderUnavailable {
         ProviderUnavailable {
             identity: ProviderIdentity { agent: "pi".into(), provider: "openai-codex".into() },
+            family: "pi",
             signal: SIGNAL.to_string(),
             answered,
             observed: observed(),
@@ -412,3 +413,6 @@ mod provider_unavailable {
         assert_eq!(ledger_outcome_reason(&spent, Some(0)), "provider unavailable");
     }
 }
+
+// The claude-code parser, beside pi's. §FS-rhei-provider-unavailability.2
+include!("tests_provider_unavailable_claude_code.rs");

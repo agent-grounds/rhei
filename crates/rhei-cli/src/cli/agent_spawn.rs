@@ -21,8 +21,9 @@ struct AgentSpawnOutcome {
     /// A strict provider refusal recognized after output drain and before the
     /// generic non-zero completion paths run. §FS-rhei-agents.2.3
     provider_limit: Option<ProviderLimit>,
-    /// pi's verdict that its retries gave up on the provider; the output check
-    /// decides whether it is the ending. §FS-rhei-provider-unavailability.1
+    /// The family's verdict that its retries gave up on the provider: pi's is the
+    /// ending only once the output check finds a required output missing,
+    /// Claude Code's settles its non-zero exit. §FS-rhei-provider-unavailability
     provider_unavailable: Option<ProviderUnavailable>,
     /// The Codex configuration fallbacks this invocation's own output carried,
     /// distinct and in the order first seen. §FS-rhei-configuration-fallbacks
@@ -444,7 +445,7 @@ fn spawn_and_wait_agent(
             ended_wall,
         )
     });
-    // A sibling of the refusal, read from pi's own events. §FS-rhei-provider-unavailability.1
+    // A sibling of the refusal, read from the family's own events. §FS-rhei-provider-unavailability
     let provider_unavailable = captured_lines.lock().ok().and_then(|lines| {
         classify_provider_unavailable(resolved, status, timed_out, interrupted, &lines, ended_wall)
     });

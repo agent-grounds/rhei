@@ -557,9 +557,52 @@ serve as a persistent source to inspect.
 
 All other failure content is unchanged: the semantic errors and allowed-state
 lists, remedy and help, validation scope, and non-zero exit behavior. Success
-and warning output are unchanged, as are `rhei states` text and JSON output. A
+and warning output are unchanged except for the explicit project override
+context below, as are `rhei states` text and JSON output. A
 conflicting per-rhei declaration under an explicit override remains a
 resolution refusal rather than a semantic validation report.
+
+### 6.1. Explicit project override context
+
+When `rhei validate` uses `--state-machine <file>` on a Panta project, every
+successful or semantically failed validation pass explains that the explicit
+file governs **every rhei in the project**, including members other than the
+named target. This context accompanies the existing single-source failure
+sentence; it does not replace it. A successful pass retains its success line,
+bound lines and warnings and also emits this context. Watch passes follow the
+same rule, once per pass, without repeating it in both scope and result output.
+
+The explanation names the override file and lists the automatic sources it
+displaces, associating each source with its owning rhei ids. Source identity,
+grouping and ordering follow the source-list rules above: project default
+first, then remaining sources by owning rhei id, and shared owners by rhei id.
+An automatic source that is the selected override file is not displaced and
+must not appear in the displaced list, even if the two paths spell the same
+file differently. Distinct files with identical contents remain distinct
+sources. Built-in fallback is described as `the built-in default state machine`,
+never as a fabricated file path. An unused project default must not claim a
+rhei owner. For example, selecting the first member's own file can add:
+
+```text
+State-machine override 'csa-selective/states.yaml' applies to every rhei in the project.
+Automatic sources displaced:
+  - 'csa-loop-design/states.yaml' (rhei: csa-loop-design)
+```
+
+The introductory sentences and ownership entries above define the context's
+text; source paths retain the command's normal path presentation. When no
+automatic source is displaced, it says `No automatic sources displaced.`
+instead of listing replacements. Equivalent member directory, member index,
+current-directory and direct project targets receive the same truthful
+ownership explanation.
+
+This is provenance only. Determine automatic source locations using the lookup
+in [§FS-rhei-plan-language.1.3](rhei-plan-language.spec.md#13-state-machine-resolution), without parsing or validating bypassed YAML.
+A malformed bypassed file therefore cannot turn an otherwise successful
+override validation into a load failure. Validation scope, override precedence,
+semantic errors, allowed states and exit status remain unchanged. Automatic
+lookup without an override and standalone validation retain their existing
+output.
 
 ## 7. Related Specifications
 

@@ -154,7 +154,6 @@ fn member_run_746_standalone_controls() {
 macro_rules! member_reference_test {
     ($name:ident, $command:ident, $reference:expr) => {
         #[test]
-        #[ignore = "red until #746: member references must reach the project run; implement removes this"]
         fn $name() {
             let run = ProjectRun::new();
             // Positive controls pin the live run and the unchanged reference tiers.

@@ -233,6 +233,17 @@ resolves in this order:
 4. An **exact id** among the runs that have ended.
 5. A **unique id prefix** among the runs that have ended.
 
+For `rhei stop` and `rhei attach`, a member of a Panta project names the
+project's run, following [§FS-rhei-panta.6](rhei-panta.spec.md#6-project-scope-and-command-behavior).
+A member directory or its `index.rhei.md` resolves to the enclosing project's
+`runtime/run.json`; omitting the reference while inside that member resolves
+to the same descriptor. This holds when the run was started with work narrowed
+to that member: the descriptor identifies the recorded project run, and stop
+and attach act on that run. They must not look for a separate member descriptor
+or suggest starting another run because that member descriptor is absent.
+Standalone rheis retain their own run descriptor, and id/path/prefix precedence
+above is unchanged.
+
 The first tier is *not known to have ended*, not *live*: an entry whose liveness
 could not be decided resolves there too, with a live run winning an exact tie.
 A run that cannot be checked is precisely the run an operator needs `attach` and

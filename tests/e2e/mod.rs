@@ -256,6 +256,7 @@ mod next_node_kinds_tests;
 mod next_tests;
 mod note_agent_tests;
 mod note_command_tests;
+mod note_replace_tests;
 mod note_reset_tests;
 mod note_store_support;
 mod offered_command_budget_paste_tests;

@@ -39,6 +39,12 @@ rhei note --strike  <TASK_ID>   # take an entry out of composition
 Exactly one of the text positional, `--restate`, and `--strike` is given. Two
 of them together, or none of them, is a usage error ([§FS-rhei-note.4](rhei-note.spec.md#4-refusals)).
 
+`rhei note --help` says what the store does with a second call, because a
+caller who later reads the file sees both records: it carries the sentence
+`A second call replaces this task's entry in every later prompt, but
+runtime/notes.md keeps every record: a task's last record there is its live
+one.` ([§FS-rhei-memory.4.2](rhei-memory.spec.md#42-position) step 2).
+
 The writing task is `--task <ID>` when it is given, and otherwise the value of
 `RHEI_TASK_ID` where rhei itself sets that variable: in a program state's
 subprocess ([§FS-rhei-programs.2](rhei-programs.spec.md#2-environment-variables)), in a `cli:` transition callback, `on_leave` or
@@ -197,6 +203,48 @@ restated auth.2 — now the newest entry, and this task's slot is spent
 $ rhei note --strike auth.1
 struck auth.1 — out of composition; its bytes stay in runtime/notes.md
 ```
+
+### 5.1. A Replacing Call Says What It Replaced
+
+A call whose writing task already holds a record in the store — its slot's
+last record, of any of the three forms ([§FS-rhei-note.2](rhei-note.spec.md#2-the-slot)) — replaces that
+record in composition, and the store keeps both ([§FS-rhei-note.3.4](rhei-note.spec.md#34-nothing-rewrites-it)). The
+success line says so, because the file alone cannot: a writer who reads both
+records there, unmarked, concludes the replacement failed. The writer learns
+what its slot held from the same read under the lock that judges duplicates
+([§FS-rhei-note.3.3](rhei-note.spec.md#33-the-lock)), taken for every form.
+
+The line carries one clause, `replacing {what}`, where `{what}` names the
+replaced record:
+
+| The slot held | `{what}` in a fact's line | `{what}` after a restate or a strike |
+|---|---|---|
+| a fact | `its earlier entry` | `this task's earlier entry` |
+| a restate of `T` | `its restate of T` | `this task's restate of T` |
+| a strike of `T` | `its strike of T` | `this task's strike of T` |
+
+Replacing a strike lifts it, so the struck entry may come back
+([§FS-rhei-memory.4.2](rhei-memory.spec.md#42-position) step 4). When the fold of the store *after* the
+append holds a live entry for `T`, the strike clause gains `, whose entry is
+back in composition`; when it does not — `T` has no entry, or another strike
+still holds it — the clause stops at `T`. A fact's line puts the clause before
+the cost of composition; a restate's or a strike's appends it:
+
+```console
+$ rhei note --task auth.2 "What it actually was."
+noted as auth.2 — 1 line, replacing its earlier entry; composed into later prompts from now on
+
+$ rhei note --task reporting.1 "The rollup reads the refreshed session."
+noted as reporting.1 — 1 line, replacing its strike of auth.2, whose entry is back in composition; composed into later prompts from now on
+
+$ rhei note --task reporting.1 --strike auth.1
+struck auth.1 — out of composition; its bytes stay in runtime/notes.md; replacing this task's earlier entry
+```
+
+A first record by a task prints exactly the lines above this section, with no
+clause.
+
+### 5.2. Streams and Exit Codes
 
 Text goes to stdout and diagnostics to stderr ([§FS-rhei-usage.2.2](rhei-usage.spec.md#22-command-surface)).
 

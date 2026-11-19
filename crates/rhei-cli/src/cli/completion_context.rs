@@ -468,18 +468,30 @@ fn resolve_state_machines_for_scope(
 /// `states.yaml` in this rhei's own execution root, whatever its `name:`.
 /// §FS-rhei-plan-language.1.3
 fn resolve_rhei_machine(rhei_id: &str, root: &Path) -> MietteResult<Option<ResolvedStateMachine>> {
-    // The basin is synthetic: it has no index of its own, holds unfiled
-    // tickets, and runs under the project default. §FS-rhei-panta.2
-    if rhei_id == workspace::BASIN_RHEI_ID {
-        return Ok(None);
-    }
-
-    let candidate = root.join("states.yaml");
-    if candidate.is_file() {
+    if let Some(candidate) = automatic_rhei_machine_path(rhei_id, root) {
         let machine = load_state_machine(Some(&candidate))?;
         return Ok(Some(ResolvedStateMachine { machine, path: Some(candidate) }));
     }
     Ok(None)
+}
+
+/// Locate a member's automatic source without loading bypassed YAML.
+/// Shared by resolution and override provenance. §FS-rhei-validate.6.1 §FS-rhei-plan-language.1.3
+fn automatic_rhei_machine_path(rhei_id: &str, root: &Path) -> Option<PathBuf> {
+    // The basin is synthetic: it has no index of its own, holds unfiled
+    // tickets, and runs under the project default. §FS-rhei-panta.2
+    if rhei_id == workspace::BASIN_RHEI_ID {
+        return None;
+    }
+
+    let candidate = root.join("states.yaml");
+    candidate.is_file().then_some(candidate)
+}
+
+/// Locate the automatic default without parsing it. §FS-rhei-validate.6.1
+fn automatic_default_machine_path(input: &Path) -> Option<PathBuf> {
+    let candidate = auto_state_machine_path(input);
+    candidate.is_file().then_some(candidate)
 }
 
 fn auto_state_machine_path(input: &Path) -> PathBuf {
@@ -520,8 +532,7 @@ fn resolve_state_machine_for_loaded_plan(
 
     // Clauses 1 and 2 name the same file here: a project's own execution root
     // is the project root. §FS-rhei-plan-language.1.3
-    let candidate = auto_state_machine_path(input);
-    if candidate.is_file() {
+    if let Some(candidate) = automatic_default_machine_path(input) {
         let machine = load_state_machine(Some(&candidate))?;
         return Ok(ResolvedStateMachine { machine, path: Some(candidate) });
     }

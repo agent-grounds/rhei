@@ -701,18 +701,8 @@ fn render_validation_diagnostic(
         // the one-source branch above stays byte-for-byte compatible. §FS-rhei-validate.6
         lines.push("I validated this plan using these state-machine sources:".to_string());
         for source in state_machine_sources {
-            let mut ownership = Vec::new();
-            if source.project_default {
-                ownership.push("project default".to_string());
-            }
-            if !source.rheis.is_empty() {
-                ownership.push(format!("rhei: {}", source.rheis.join(", ")));
-            }
-            lines.push(format!(
-                "  - {} ({})",
-                state_machine_label(source.path.as_deref()),
-                ownership.join("; "),
-            ));
+            // Share ownership wording with override provenance. §FS-rhei-validate.6.1
+            lines.push(source.ownership_entry());
             // §FS-rhei-errors.4.1
             if let Some(rendering) = machine_rendering(source.path.as_deref()) {
                 lines.push(format!("    which is {rendering}"));

@@ -56,7 +56,7 @@ struct AgentStall<'a> {
     missing: &'a [String],
     /// Decided at the spawn, counting this attempt as charged. §FS-rhei-agents.3.2.1
     outlook: RetryOutlook,
-    /// pi's verdict, read at the exit. §FS-rhei-agents.2.5
+    /// pi's verdict, read at the exit. §FS-rhei-provider-unavailability.1
     verdict: Option<&'a ProviderUnavailable>,
 }
 

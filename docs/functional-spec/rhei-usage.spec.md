@@ -145,7 +145,7 @@ persisted wait survives restart ([§FS-rhei-run.3.3](rhei-run.spec.md#33-provide
 A `pi` session whose provider becomes unreachable exits `0` once pi's own
 retries give up, because rhei runs it in `--mode json`. When the state's
 required outputs are missing, `rhei run` recognizes that ending
-([§FS-rhei-agents.2.5](rhei-agents.spec.md#25-recognized-provider-unavailability)) instead of charging it as the worker's attempt:
+([§FS-rhei-provider-unavailability.1](rhei-provider-unavailability.spec.md#1-pi)) instead of charging it as the worker's attempt:
 
 ```text
 warning: the provider was unavailable for task plan.1 in state 'fix': pi gave up retrying (fetch failed); no attempt charged (free 1 of 6 on this visit)
@@ -161,7 +161,31 @@ does, and `rhei retry` grants it more attempts. The wait is keyed on the
 provider: `pi:openai-codex/gpt-6.1-sol` waits on `openai-codex`, the provider
 of pi's own model reference, while a bare model with no `/` such as
 `pi:gpt-6.1-sol` names no provider and is charged as before
-([§FS-rhei-agents.2.5](rhei-agents.spec.md#25-recognized-provider-unavailability)).
+([§FS-rhei-provider-unavailability.1](rhei-provider-unavailability.spec.md#1-pi)).
+
+A Claude Code session (`family: claude-code`) caught in the same outage retries
+on its own, gives up and exits `1`. When its last retry used up Claude Code's
+count on a transient status, `rhei run` recognizes that ending too
+([§FS-rhei-provider-unavailability.2](rhei-provider-unavailability.spec.md#2-claude-code)), with the same free count, the same doubling wait and
+the same halt, keyed on the provider the target names:
+
+```text
+warning: the provider was unavailable for task plan.1 in state 'fix': claude-code gave up retrying (API Error: Connection refused — a firewall or proxy may be blocking it (ECONNREFUSED)); no attempt charged (free 1 of 6 on this visit)
+waiting: cld on anthropic starts again after 2026-11-17T02:09:05Z
+```
+
+Its spawn record keeps the real exit code, `1`, and the run carries on with or
+without `--continue-on-error`. That holds when Claude Code's retries run out
+before the state's `agent_timeout`, as they do in a few minutes when
+connections are refused. A hanging outage is different: with Claude Code's
+defaults, ten minutes per try (`API_TIMEOUT_MS`) and ten retries
+(`CLAUDE_CODE_MAX_RETRIES`), the session runs into the state's timeout first,
+and a timed-out session is charged. To have such an outage waited out instead,
+lower `API_TIMEOUT_MS` or `CLAUDE_CODE_MAX_RETRIES` in Claude Code's
+environment or in its settings `env` block, so that the retries end well inside
+`agent_timeout`, and leave `CLAUDE_CODE_RETRY_WATCHDOG` off for rhei workers.
+A session the provider answered before it went away is still charged, as a
+`pi` session is, and an expired login (`401`) is never read as an outage.
 
 Ticket ids in command output are project-qualified — `<rhei-id>.<task-id>`, e.g. `plan.1` for a single-file `plan.rhei.md` — and `rhei list` accepts the same `--rhei <id>` narrowing as `run`, `next`, and `reset` ([§FS-rhei-panta.6](rhei-panta.spec.md#6-project-scope-and-command-behavior)).
 

@@ -78,7 +78,7 @@ mod provider_unavailable {
 
     /// The incident, and the two edges that reach pi's count without being
     /// transient: a non-retried error on the last retry, and an abort during the
-    /// last backoff. All three are pi's verdict. §FS-rhei-agents.2.5
+    /// last backoff. All three are pi's verdict. §FS-rhei-provider-unavailability.1
     #[test]
     fn pi_giving_up_its_retries_is_recognized_with_its_final_error() {
         let incident = classify(&pi(), &stdout(&gave_up(SIGNAL, SIGNAL))).expect("the incident");
@@ -105,7 +105,7 @@ mod provider_unavailable {
     }
 
     /// The incident spelling, whose provider is only pi's own model reference,
-    /// is recognized and keyed as the respelling is. §FS-rhei-agents.2.5
+    /// is recognized and keyed as the respelling is. §FS-rhei-provider-unavailability.1
     #[test]
     fn the_pi_reference_spelling_is_recognized_under_the_respellings_identity() {
         let incident = stdout(&gave_up(SIGNAL, SIGNAL));
@@ -138,7 +138,7 @@ mod provider_unavailable {
     }
 
     /// Every stream that is not pi's retries giving up, and every session that
-    /// is not a pi exit `0` with a provider to key the wait. §FS-rhei-agents.2.5
+    /// is not a pi exit `0` with a provider to key the wait. §FS-rhei-provider-unavailability.1
     #[test]
     fn every_other_ending_is_not_recognized() {
         let incident = stdout(&gave_up(SIGNAL, SIGNAL));

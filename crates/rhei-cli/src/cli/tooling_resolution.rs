@@ -361,7 +361,7 @@ impl ResolvedAgent {
     /// The model rhei hands the agent: the concrete provider model name, or
     /// the model id when the registry has none. The `model_flag` value and the
     /// model a `pi` outage wait derives its provider from, so the two cannot
-    /// drift. §FS-rhei-agents.1.1.2 §FS-rhei-agents.2.5
+    /// drift. §FS-rhei-agents.1.1.2 §FS-rhei-provider-unavailability.1
     fn handed_model(&self) -> Option<&str> {
         self.model_name.as_deref().or(self.model.as_deref())
     }

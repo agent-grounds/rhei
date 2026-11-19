@@ -355,6 +355,11 @@ headless, and JSONL surfaces; no new output record family is introduced.
      the program's way of saying where the ticket goes, so the engine takes the
      edge and writes no result entry of its own
      ([§FS-rhei-states.3.3](rhei-states.spec.md#33-terminal-result)).
+     A non-zero agent exit recognized as a provider refusal
+     ([§FS-rhei-agents.2.3](rhei-agents.spec.md#23-recognized-provider-refusals)) or a provider unavailability
+     ([§FS-rhei-provider-unavailability.2](rhei-provider-unavailability.spec.md#2-claude-code)) never reaches transition selection: it settles in
+     place under [§FS-rhei-agents.3.2.1](rhei-agents.spec.md#321-runtime-semantics) step 3, with or without
+     `--continue-on-error`, and neither branch below applies to it.
    - **The engine ended the work, or the exit named no edge.** Its timeout
      fired; or the subprocess exited non-zero and matched no transition, or
      matched only a `"nonzero"` catch-all, or spent a poll state's attempt
@@ -913,7 +918,7 @@ the same way ([§FS-rhei-agents.2.3](rhei-agents.spec.md#23-recognized-provider-
 
 The execution identity is the pair of resolved agent registry id and resolved
 provider. For a `pi` invocation that resolves no provider, the
-identity's provider is the one [§FS-rhei-agents.2.5](rhei-agents.spec.md#25-recognized-provider-unavailability) derives from its model, so a wait
+identity's provider is the one [§FS-rhei-provider-unavailability.1](rhei-provider-unavailability.spec.md#1-pi) derives from its model, so a wait
 written under `pi:openai-codex/<model>` holds `pi:openai-codex:<model>` and the
 reverse. Model, mode, and task are deliberately not part of it: the signal
 describes a provider session, not one model and not one ticket. The agent
@@ -938,8 +943,9 @@ task's runtime metadata. Failed or repeated provider-limited resumptions retain
 or update it under the rules above.
 
 A recognized provider unavailability ([§FS-rhei-agents.2.5](rhei-agents.spec.md#25-recognized-provider-unavailability)) writes its wait into
-the same record, with `kind: unavailable` beside `identity` and pi's
-`finalError` as its `signal`; a record without `kind` is a limit, and an older
+the same record, with `kind: unavailable` beside `identity` and the family's
+own give-up text as its `signal` — pi's `finalError`, or the text of Claude
+Code's `is_api_error_message` event; a record without `kind` is a limit, and an older
 rhei reads this one as a limit with the same deadline. Its deadline is a
 backoff, not a reset: the visit's `n`-th such ending, counted by the spawn
 record's `unavailable` ([§FS-rhei-agents.8.4](rhei-agents.spec.md#84-spawn-records)), waits `2^(n-1)` minutes after

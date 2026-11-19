@@ -8,6 +8,7 @@
 
     use super::*;
     include!("tests_run_summary_worked_pending.rs");
+    include!("tests_run_summary_spent_visit.rs");
 
     fn machine() -> rhei_validator::StateMachine {
         rhei_validator::StateMachine::builtin_default()

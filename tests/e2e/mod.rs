@@ -390,6 +390,7 @@ mod spawn_record_malformed_tests;
 mod spent_budget_wait_tests;
 mod spent_visit_attention_support;
 mod spent_visit_attention_tests;
+mod spent_visit_program_route_tests;
 mod standing_cycle_tests;
 mod state_machine_load_display_tests;
 mod state_machine_load_help_tests;

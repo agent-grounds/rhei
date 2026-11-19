@@ -38,7 +38,6 @@ transitions:
     }
 
     #[test]
-    #[ignore = "red until #749: shared halt explanation must name spent visit and retry; implement removes this"]
     fn issue749_shared_halt_explanation_names_spent_visit() {
         with_spent_visit(|rhei, machines, spawns| {
             let (lines, actionable) = halted_task_report(rhei, machines, &None, Path::new("plan.rhei.md"), spawns);
@@ -66,4 +65,45 @@ transitions:
                 assert!(matches!(classify(&claimed, interrupted), HaltCause::Claimed { .. }));
             }
         });
+    }
+
+    /// The shared halt explanation reads the recorded program exit, rather
+    /// than the first declared forward edge. §FS-rhei-run-report.3.1 §FS-rhei-programs.3.2
+    #[test]
+    fn issue749_spent_program_shared_explanation_uses_actual_exit_route() {
+        let rhei = rhei_core::parse("# Rhei: Program route\n\n## Tasks\n\n### Task 1: Build\n**State:** build\n").unwrap();
+        let machine = rhei_validator::StateMachine::from_yaml_str(r#"name: spent-program-summary
+version: 1
+states:
+  build:
+    initial: true
+    attempts: 1
+    program: { command: [unused] }
+  inspect: { gating: true }
+  failed: { final: true }
+transitions:
+  - { from: build, to: inspect, exit_code: 0 }
+  - { from: build, to: failed, exit_code: 3 }
+  - { from: inspect, to: failed }
+"#).unwrap();
+        let machines = rhei_validator::MachineSet::single(machine.clone());
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        let runtime = root.join("runtime");
+        let settings = RheiSettings::default();
+        let spawns = SpawnSiteRoots { settings: Some(&settings), ..SpawnSiteRoots::plan_only(root, &runtime) };
+        let (plan, _) = plan_named_spawn(&machine, root, &runtime, "1", "build", 1, None, &spawns.machines.reset).unwrap();
+        plan.record_spawn(SpawnEnding {
+            task_id: "1", state_name: "build", kind: "program", worker: "unused",
+            started: "2026-11-19T10:00:00Z", ended: "2026-11-19T10:00:01Z",
+            duration: "1s", code: Some(3), ending: "exited",
+        });
+        assert!(spawns.attempt_budget_spent(&rhei, &machine, &rhei.tasks[0], "build"));
+        let (lines, actionable) = halted_task_report(&rhei, &machines, &None, Path::new("plan.rhei.md"), &spawns);
+        assert!(actionable);
+        let explanation = lines.join("\n");
+        let owed = format!("result ({})", root.join("runtime/results/1.md").display());
+        for expected in ["1 attempts spent on this visit", &owed, "rhei retry 1"] {
+            assert!(explanation.contains(expected), "shared explanation lacks {expected:?}: {explanation}");
+        }
     }

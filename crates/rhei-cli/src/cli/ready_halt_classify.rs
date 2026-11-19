@@ -164,6 +164,19 @@ fn classify_halt(
     if interrupted {
         return HaltCause::Interrupted;
     }
+    // The spawn planner knows what rerunning cannot release, even when this
+    // run consumed the last attempt. §FS-rhei-run-report.3.1
+    if let Some((attempts, entries)) = spent_visit_halt(task, rhei, machine, &state, spawns) {
+        return HaltCause::SpentVisit {
+            attempts,
+            entries,
+            // Preserve this invocation's diagnostics beside its unmet artifacts.
+            // §FS-rhei-configuration-fallbacks
+            configuration_fallbacks: missing.as_ref()
+                .map(|unwritten| unwritten.configuration_fallbacks.clone())
+                .unwrap_or_default(),
+        };
+    }
     if worked {
         // The run knows exactly what the worker did not write; say so instead
         // of pointing at logs. §FS-rhei-run-report.3.1
@@ -178,7 +191,7 @@ fn classify_halt(
         };
     }
     // Only infer manual-only work when this run neither worked nor interrupted
-    // the ticket. §FS-rhei-run-report.3.1
+    // the ticket, and no spent visit proves its hold. §FS-rhei-run-report.3.1
     if let Ok(Some(to)) = manual_initial_terminal_transition(task, rhei, machine) {
         return HaltCause::ManualOnly { to };
     }
@@ -197,4 +210,56 @@ fn classify_halt(
         // simply never reached. §FS-rhei-run-report.3.1
         _ => HaltCause::NotScheduled,
     }
+}
+
+/// Explain the same spent allowance the clock and spawn site read, without
+/// counting dormant identities, past visits, or capacity a retry grant restored.
+/// The completion reader supplies paths for each active invocation; no settings
+/// are reloaded to guess its identity, and the result uses the same member root.
+/// §FS-rhei-run-report.3.1
+fn spent_visit_halt(
+    task: &rhei_core::ast::Task,
+    rhei: &rhei_core::ast::Rhei,
+    machine: &rhei_validator::StateMachine,
+    state: &str,
+    spawns: &SpawnSiteRoots<'_>,
+) -> Option<(u64, Vec<String>)> {
+    let plans = spawns.next_spawn_plans(rhei, machine, task, state)?;
+    // Poll bounds keep their own exhaustion/recovery semantics. §FS-rhei-retry.3
+    if !matches!(plans.budget, AttemptBudget::Visit(_)) || plans.halt() != Some(SpawnHalt::Spent) {
+        return None;
+    }
+    let root = spawns.tasks.artifact_root(&task.id.to_string());
+    let visit = render_visit_count(rhei.metadata.as_ref(), &task.id, state, task.state.as_str(), machine);
+    let mut attempts = 0;
+    let mut entries = Vec::new();
+    for (agent, plan) in &plans.invocations {
+        // Fan-out allowances are per invocation: report the largest spent count,
+        // never sum them into an allowance no invocation had. §FS-rhei-run-report.3.1
+        let plan = plan.as_ref()?;
+        attempts = attempts.max(plan.charged);
+        let missing = match agent {
+            Some(agent) => missing_required_outputs_for_invocation(
+                root, machine, task, state, visit,
+                selected_forward_transition(rhei, machine, task).as_deref(),
+                invocation_context(agent),
+            ),
+            // Program debt follows its recorded exit, including on zero-spawn
+            // runs; declaration order cannot select it. §FS-rhei-programs.3.2
+            None => missing_previous_program_outputs(
+                root, machine, rhei.metadata.as_ref(), task, state, plan,
+            ),
+        };
+        for missing in missing {
+            // Show the checked root, preserving the reader's template diagnosis.
+            // §FS-rhei-run-report.3.1
+            let path = std::path::absolute(&missing.path).unwrap_or(missing.path);
+            let marker = if missing.unresolved_template { ", unresolved template" } else { "" };
+            let entry = format!("{} ({}{marker})", missing.name, path.display());
+            if !entries.contains(&entry) {
+                entries.push(entry);
+            }
+        }
+    }
+    Some((attempts, entries))
 }

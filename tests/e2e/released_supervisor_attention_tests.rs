@@ -247,7 +247,16 @@ fn a_released_supervisor_over_a_child_that_wrote_nothing_waits_on_its_subtree() 
     assert_released_with_a_live_subtree(&plan, &result);
     let report = report(&dir);
     let child = attention_row(&report, "plan.1.2").expect("the silent child keeps its row");
-    assert!(child.contains("worker exited 0 without work"), "{child}");
+    // The child's spent visit does not change its released parent's wait.
+    // §FS-rhei-run-report.3.1
+    for expected in [
+        "2 attempts spent on this visit".to_string(),
+        format!("work ({})", dir.join("runtime/plan.1.2.work.md").display()),
+        format!("result ({})", dir.join("runtime/results/plan.1.2.md").display()),
+        "`rhei retry plan.1.2`, then rerun".to_string(),
+    ] {
+        assert!(child.contains(&expected), "child lacks {expected:?}: {child}");
+    }
     assert_reads_as_waiting_on_its_subtree(&dir);
 }
 

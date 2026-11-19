@@ -40,6 +40,11 @@ fn task_detail(
     halt_causes: &HashMap<String, HaltCause>,
     activity: &HashMap<String, TaskActivity>,
 ) -> Option<String> {
+    // A run that consumed the last attempt must explain the current hold even
+    // though it also has activity to show. §FS-rhei-run-report.3.1
+    if let Some(cause @ HaltCause::SpentVisit { .. }) = halt_causes.get(id) {
+        return Some(cause.describe(id, state).0);
+    }
     // The tree is the only place a calm parent appears, so its wait outranks its work: a
     // released supervisor has run, where an ordinary parent has not. §FS-rhei-run-report.3.1
     if marker == Marker::Gate

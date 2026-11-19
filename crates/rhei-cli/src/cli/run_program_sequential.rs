@@ -100,15 +100,14 @@ fn run_sequential_program_work_items(
         verify_program_account(&task_workspace_root, task_id_str, current_state)?;
         let budget = resolve_attempt_budget(machine.states.get(current_state.as_str()), settings);
         if let Some(spent_budget) = plan.budget_spent(budget) {
-            let owed = collect_missing_required_outputs(
-                workspace_root,
+            let owed: Vec<_> = missing_previous_program_outputs(
                 &task_workspace_root,
                 machine,
                 loaded.rhei.metadata.as_ref(),
                 task,
                 current_state,
-                selected_forward_transition(&loaded.rhei, machine, task).as_deref(),
-            );
+                &plan,
+            ).iter().map(MissingRequiredOutput::warning_entry).collect();
             run_warn!(
                 "{}",
                 render_spent_visit_halt(

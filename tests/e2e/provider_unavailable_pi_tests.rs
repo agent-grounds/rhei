@@ -157,10 +157,21 @@ fn the_seventh_unavailable_ending_is_charged_and_halts_a_spent_visit() {
     let report = fs::read_to_string(fixture.root.join("runtime/run-report.md")).unwrap();
     let row = report_row(&report, "Attention", TASK);
     assert!(
-        row.starts_with(&format!("| {TASK} | working | worker exited 0 without {finding}")),
+        row.starts_with(&format!(
+            "| {TASK} | working | 2 attempts spent on this visit; still unmet:"
+        )),
         "{report}"
     );
-    assert!(row.contains("| write the file(s) above and rerun, or record"), "{report}");
+    for expected in [
+        format!(
+            "finding ({})",
+            fixture.root.join(format!("runtime/exports/{TASK}/finding.md")).display()
+        ),
+        format!("result ({})", fixture.root.join(format!("runtime/results/{TASK}.md")).display()),
+        format!("| `rhei retry {TASK}`, then rerun |"),
+    ] {
+        assert!(row.contains(&expected), "Attention lacks {expected:?}: {row}");
+    }
     assert!(!report.contains("stalled in non-terminal state"), "{report}");
     let ledger = report_row(&report, "Transition Ledger", TASK);
     assert!(ledger.ends_with("| provider unavailable |"), "{report}");

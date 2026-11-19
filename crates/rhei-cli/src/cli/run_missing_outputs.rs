@@ -273,10 +273,10 @@ fn missing_program_exit_outputs(
     route: &ProgramExitRoute,
     exit_code: i32,
 ) -> Vec<String> {
-    if route.to == state_name {
+    let Some(completion) = program_exit_completion(route, state_name, exit_code) else {
         return Vec::new();
-    }
-    if exit_code == 0 {
+    };
+    if completion.state_outputs {
         return collect_missing_required_outputs(
             workspace_root,
             artifact_root,
@@ -286,9 +286,6 @@ fn missing_program_exit_outputs(
             state_name,
             Some(route.to.as_str()),
         );
-    }
-    if !route.matched.is_declared_route() {
-        return Vec::new();
     }
     missing_terminal_result_output(
         artifact_root,
@@ -300,6 +297,8 @@ fn missing_program_exit_outputs(
     .into_iter()
     .collect()
 }
+
+include!("run_program_completion_debt.rs");
 
 /// Walk all resolved invocations for this state and collect the union of
 /// required output artifacts that do not exist on disk, each rendered as

@@ -8,6 +8,23 @@
 use super::codex_config_fallback_support::*;
 use super::*;
 
+/// Exhaustion keeps the invocation's artifact debt and requires retry before
+/// rerunning, alongside any fallback diagnostic. §FS-rhei-run-report.3.1
+fn assert_spent_halt(fixture: &FallbackFixture, row: &str, spent: u64) {
+    let task = fixture.task_id();
+    for expected in [
+        format!("{spent} attempts spent on this visit"),
+        format!(
+            "finding ({})",
+            fixture.plan.join(format!("runtime/exports/{task}/working.md")).display()
+        ),
+        format!("result ({})", fixture.plan.join(format!("runtime/results/{task}.md")).display()),
+        format!("`rhei retry {task}`, then rerun"),
+    ] {
+        assert!(row.contains(&expected), "spent halt lacks {expected:?}: {row}");
+    }
+}
+
 /// The halt names the fallback beside the missing outputs, in the report, on
 /// the console and on the slot release, and changes nothing else.
 fn assert_fallback_explains_the_halt(name: &str, events: &[String], message: &str, parallel: bool) {
@@ -30,7 +47,7 @@ fn assert_fallback_explains_the_halt(name: &str, events: &[String], message: &st
 
     let attention = section(&fixture.report(), "Attention");
     let row = attention.lines().find(|line| line.contains(&task)).unwrap_or_default();
-    assert!(row.contains("worker exited 0 without finding"), "attention:\n{attention}\n{context}");
+    assert_spent_halt(&fixture, row, 1);
     assert!(
         row.contains(&format!("; {CLAUSE}{}", md(message))),
         "the attention row must name the fallback beside the missing outputs:\n{row}\n{context}"
@@ -116,11 +133,7 @@ fn a_later_attempt_does_not_inherit_an_earlier_fallback() {
     );
     let second = fixture.run_plain();
     let second_report = fixture.report();
-    assert!(
-        second_report.contains("worker exited 0 without finding"),
-        "{second_report}\n{}",
-        second.stderr
-    );
+    assert_spent_halt(&fixture, &section(&second_report, "Attention"), 2);
     assert!(!second_report.contains(CLAUSE), "attempt 2 emitted no fallback:\n{second_report}");
     assert!(
         !second.stderr.contains(CLAUSE) && !second.stdout.contains(CLAUSE),
@@ -150,11 +163,7 @@ fn output_that_only_looks_like_a_fallback_is_not_one() {
         let fixture = fallback_fixture(&format!("codex-fallback-not-{name}"), &script, false);
         let run = fixture.run_plain();
         let report = fixture.report();
-        assert!(
-            report.contains("worker exited 0 without finding"),
-            "{name}:\n{report}\n{}",
-            run.stderr
-        );
+        assert_spent_halt(&fixture, &section(&report, "Attention"), 1);
         assert!(!report.contains(CLAUSE), "{name} is not a fallback:\n{report}");
         assert!(
             !run.stderr.contains(CLAUSE) && !run.stdout.contains(CLAUSE),

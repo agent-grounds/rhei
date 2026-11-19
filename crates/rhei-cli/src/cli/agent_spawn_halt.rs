@@ -21,6 +21,35 @@ enum SpawnHalt {
     Refused,
 }
 
+/// The active invocations' next plans, read once from their current visit.
+/// A missing plan is a planning refusal, never evidence of exhaustion.
+/// Both clock eligibility and the halt explanation use this reading, including
+/// effective retry grants, rather than inspecting historical records themselves.
+/// §FS-rhei-run-report.3.1 §FS-rhei-run.5.1.1
+struct TicketSpawnPlans {
+    budget: AttemptBudget,
+    invocations: Vec<(Option<ResolvedAgent>, Option<SpawnPlan>)>,
+}
+
+impl TicketSpawnPlans {
+    /// Every pending spawn must be halted; a planning refusal outranks spend.
+    /// §FS-rhei-run.3.6.1 §FS-rhei-run-report.3.1
+    fn halt(&self) -> Option<SpawnHalt> {
+        if self.invocations.is_empty() {
+            return None;
+        }
+        self.invocations.iter().try_fold(SpawnHalt::Spent, |all, (_, plan)| {
+            let one = match plan {
+                Some(plan) => (plan.budget_spent(self.budget).is_some()
+                    || plan.kills_spent(self.budget).is_some())
+                .then_some(SpawnHalt::Spent)?,
+                None => SpawnHalt::Refused,
+            };
+            Some(all.max(one))
+        })
+    }
+}
+
 impl SpawnSiteRoots<'_> {
     /// Why every spawn this ticket's state would make next is halted, if each
     /// is: the bound its spawn site holds it to is spent - `poll.max_attempts`
@@ -41,6 +70,20 @@ impl SpawnSiteRoots<'_> {
         task: &rhei_core::ast::Task,
         state_name: &str,
     ) -> Option<SpawnHalt> {
+        self.next_spawn_plans(rhei, machine, task, state_name)?.halt()
+    }
+
+    /// Plan only invocations the spawn site still owes, under its active
+    /// settings, roots, state and visit. Completed arms and dormant identities
+    /// cannot establish or hide a spent current visit.
+    /// §FS-rhei-run-report.3.1 §FS-rhei-run.3.6.1
+    fn next_spawn_plans(
+        &self,
+        rhei: &rhei_core::ast::Rhei,
+        machine: &rhei_validator::StateMachine,
+        task: &rhei_core::ast::Task,
+        state_name: &str,
+    ) -> Option<TicketSpawnPlans> {
         let state_def = machine.states.get(state_name)?;
         let poll = poll_attempt_budget(state_def);
         let mut read = None;
@@ -65,31 +108,12 @@ impl SpawnSiteRoots<'_> {
                     self.opts,
                     Some(task),
                 );
-                Some(resolved.ok()?)
+                Some(self.invocations_still_to_spawn(
+                    rhei, task, machine, state_name, state_def, resolved.ok()?,
+                ))
             }
             (false, None) => return None,
         };
-        self.planned_spawns_halt(rhei, machine, task, state_name, agents.as_deref(), budget)
-    }
-
-    /// Why every spawn this ticket's state would make next is halted, asked as
-    /// its spawn site asks it: the same plan, from the same roots and under the
-    /// same name, held to the same gate. So a reader that asks this never waits
-    /// for a spawn the spawner will refuse. `Spent` only when every one is
-    /// refused for `budget` spent; `Refused` when each is halted and some plan
-    /// is refused outright, such as for a taken log name or an unreadable ledger.
-    ///
-    /// `agents` is `None` for a program state.
-    // §FS-rhei-agents.3.2.3 §FS-rhei-agents.8.4 §FS-rhei-run.3.7.4 §FS-rhei-run.3.6.1
-    fn planned_spawns_halt(
-        &self,
-        rhei: &rhei_core::ast::Rhei,
-        machine: &rhei_validator::StateMachine,
-        task: &rhei_core::ast::Task,
-        state_name: &str,
-        agents: Option<&[ResolvedAgent]>,
-        budget: AttemptBudget,
-    ) -> Option<SpawnHalt> {
         let task_id = task.id.to_string();
         let task_root = self.tasks.artifact_root(&task_id);
         let visit_count = render_visit_count(
@@ -99,8 +123,8 @@ impl SpawnSiteRoots<'_> {
             task.state.as_str(),
             machine,
         );
-        let halt = |runtime_dir: &Path, identity: Option<&str>| {
-            let planned = plan_named_spawn(
+        let plan = |runtime_dir: &Path, identity: Option<&str>| {
+            plan_named_spawn(
                 machine,
                 task_root,
                 runtime_dir,
@@ -109,28 +133,20 @@ impl SpawnSiteRoots<'_> {
                 visit_count,
                 identity,
                 &self.machines.reset,
-            );
-            match planned {
-                // A poll visit its kills have spent halts as one its budget has. §FS-rhei-agents.3.2.3
-                Ok((plan, _)) => (plan.budget_spent(budget).is_some()
-                    || plan.kills_spent(budget).is_some())
-                .then_some(SpawnHalt::Spent),
-                // A name §FS-rhei-agents.8.1 cannot allocate halts until a fresh read finds it free.
-                Err(_) => Some(SpawnHalt::Refused),
-            }
+            ).ok().map(|(plan, _)| plan)
         };
-        match agents {
+        let invocations = match agents {
             // A program records under its ticket's own root. §FS-rhei-programs.5.1
-            None => halt(&task_root.join("runtime"), None),
-            Some([]) => None,
+            None => vec![(None, plan(&task_root.join("runtime"), None))],
             Some(agents) => {
                 let runtime_dir =
                     self.machines.agent_runtime_dir(&task_id, task_root, self.runtime_dir);
-                agents.iter().try_fold(SpawnHalt::Spent, |all, agent| {
-                    let one = halt(&runtime_dir, resolved_agent_log_identity(agent).as_deref())?;
-                    Some(all.max(one))
-                })
+                agents.into_iter().map(|agent| {
+                    let planned = plan(&runtime_dir, resolved_agent_log_identity(&agent).as_deref());
+                    (Some(agent), planned)
+                }).collect()
             }
-        }
+        };
+        Some(TicketSpawnPlans { budget, invocations })
     }
 }

@@ -85,55 +85,46 @@ fn regression(parallel: bool, exit: i32, later: bool) {
 }
 
 #[test]
-#[ignore = "red until #749: last sequential failed attempt needs spent-visit advice; implement removes this"]
 fn issue749_sequential_exit1_last_attempt() {
     regression(false, 1, false);
 }
 
 #[test]
-#[ignore = "red until #749: later sequential failed visit needs retry advice; implement removes this"]
 fn issue749_sequential_exit1_later_run() {
     regression(false, 1, true);
 }
 
 #[test]
-#[ignore = "red until #749: last sequential incomplete attempt needs spent-visit advice; implement removes this"]
 fn issue749_sequential_exit0_last_attempt() {
     regression(false, 0, false);
 }
 
 #[test]
-#[ignore = "red until #749: later sequential incomplete visit needs retry advice; implement removes this"]
 fn issue749_sequential_exit0_later_run() {
     regression(false, 0, true);
 }
 
 #[test]
-#[ignore = "red until #749: last parallel failed attempt needs spent-visit advice; implement removes this"]
 fn issue749_parallel_exit1_last_attempt() {
     regression(true, 1, false);
 }
 
 #[test]
-#[ignore = "red until #749: later parallel failed visit needs retry advice; implement removes this"]
 fn issue749_parallel_exit1_later_run() {
     regression(true, 1, true);
 }
 
 #[test]
-#[ignore = "red until #749: last parallel incomplete attempt needs spent-visit advice; implement removes this"]
 fn issue749_parallel_exit0_last_attempt() {
     regression(true, 0, false);
 }
 
 #[test]
-#[ignore = "red until #749: later parallel incomplete visit needs retry advice; implement removes this"]
 fn issue749_parallel_exit0_later_run() {
     regression(true, 0, true);
 }
 
 #[test]
-#[ignore = "red until #749: spent count must include the exhausted retry grant; implement removes this"]
 fn issue749_exhausted_grant_reports_four_spent_attempts() {
     let fixture = Fixture::new(false, 0);
     fixture.consume(1);

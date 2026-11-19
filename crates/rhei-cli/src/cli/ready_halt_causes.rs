@@ -97,6 +97,17 @@ enum HaltCause {
     /// the run killed had no chance to write what it owed.
     // §FS-rhei-run-report.3.1 §FS-rhei-run.3.2
     Interrupted,
+    /// Every pending invocation has spent its effective current-visit allowance.
+    /// The checked artifacts are rooted at the owning rhei; only retry releases
+    /// this hold, including in the run that consumed its last attempt.
+    /// §FS-rhei-run-report.3.1
+    SpentVisit {
+        attempts: u64,
+        entries: Vec<String>,
+        /// Diagnostics belong to the same invocation, even when it spent the visit.
+        /// §FS-rhei-configuration-fallbacks
+        configuration_fallbacks: Vec<String>,
+    },
     /// A worker ran and left required artifacts unwritten, so the completion
     /// condition refused to advance the ticket. `entries` are the
     /// `name (path)` renderings the run already produced — the ticket's terminal
@@ -187,6 +198,7 @@ impl HaltCause {
             | HaltCause::Claimed { .. }
             | HaltCause::BlockedByPrior { .. }
             | HaltCause::Interrupted
+            | HaltCause::SpentVisit { .. }
             | HaltCause::MissingInputs { .. } => false,
         }
     }
@@ -318,6 +330,14 @@ impl HaltCause {
             HaltCause::Interrupted => (
                 format!("run interrupted while its worker was in state {state}"),
                 "re-run to continue".to_string(),
+            ),
+            // §FS-rhei-run-report.3.1: one cause and recovery on every halt surface.
+            HaltCause::SpentVisit { attempts, entries, configuration_fallbacks } => (
+                format!(
+                    "{attempts} attempts spent on this visit; still unmet: {}",
+                    completion_debt_label(entries)
+                ) + &configuration_fallback_clauses(configuration_fallbacks),
+                format!("`rhei retry {id}`, then rerun"),
             ),
             // Name the files. The whole point of this cause is that the operator
             // does not have to go read a log to learn which one is missing.

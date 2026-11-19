@@ -1653,6 +1653,18 @@ fn build_ledger(
                     reason: ledger_outcome_reason(&rec.outcome, rec.exit_code),
                 });
             }
+            // Keep worker history and append the current hold: its last attempt
+            // may have spent the visit in this very run. §FS-rhei-run-report.3.1
+            if let Some(cause @ HaltCause::SpentVisit { .. }) = halt_causes.get(&row.id) {
+                ledger.push(LedgerEntry {
+                    task: row.id.clone(),
+                    from: row.state.clone(),
+                    to: "-".to_string(),
+                    driver: "blocked",
+                    invocation: "none".to_string(),
+                    reason: cause.describe(&row.id, &row.state).0,
+                });
+            }
             // If the task ended in a terminal-success state past the last spawned
             // transition, a callback or transition rule carried it the rest of the
             // way — record that advance so the ledger reaches the final state.

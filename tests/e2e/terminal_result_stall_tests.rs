@@ -223,10 +223,14 @@ if task != 'plan.2':
     assert_task_state(&plan_path, &machine_path, "1", "completed");
     assert_task_state(&plan_path, &machine_path, "2", "work");
     let report = fs::read_to_string(dir.join("runtime/run-report.md")).expect("run report");
-    assert!(
-        report.contains("| plan.2 | work | worker exited 0 without result ("),
-        "the stalled ticket is reported by the artifact it owes; got:\n{report}"
-    );
+    let row = report.lines().find(|line| line.starts_with("| plan.2 | work |")).unwrap();
+    for expected in [
+        "2 attempts spent on this visit".to_string(),
+        format!("result ({})", dir.join("runtime/results/plan.2.md").display()),
+        "`rhei retry plan.2`, then rerun".to_string(),
+    ] {
+        assert!(row.contains(&expected), "the stalled ticket lacks {expected:?}: {row}");
+    }
 }
 
 const THREE_WORKER_PLAN: &str = r#"# Rhei: Three Workers

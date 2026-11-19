@@ -65,15 +65,14 @@ fn spawn_parallel_program_work_item(
     let budget =
         resolve_attempt_budget(machine.states.get(item.current_state.as_str()), settings);
     if let Some(spent_budget) = plan.budget_spent(budget) {
-        let owed = collect_missing_required_outputs(
-            workspace_root,
+        let owed: Vec<_> = missing_previous_program_outputs(
             &task_workspace_root,
             machine,
             loaded.rhei.metadata.as_ref(),
             task,
             &item.current_state,
-            selected_forward_transition(&loaded.rhei, machine, task).as_deref(),
-        );
+            &plan,
+        ).iter().map(MissingRequiredOutput::warning_entry).collect();
         // `Skipped` is the pool's stall. §FS-rhei-run.3 §FS-rhei-agents.3.2.3
         emit_run_message(
             sink,

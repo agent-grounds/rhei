@@ -148,45 +148,96 @@ fn refuse_duplicate_of_live_entry(text: &str, live: &[NoteEntry]) -> MietteResul
     Ok(())
 }
 
-/// What a successful call says: the record, and what it costs every later
-/// prompt. §FS-rhei-note.5
-fn report_note_written(record: &NoteRecord) {
+/// What the writing task's slot held when this call replaced it: its last
+/// record of any form, and — for a strike — whether the fold after the append
+/// holds the struck task's entry again. §FS-rhei-note.5.1 §FS-rhei-memory.4.2
+struct NoteReplaced {
+    previous: NoteRecord,
+    struck_entry_back: bool,
+}
+
+impl NoteReplaced {
+    /// Read under the lock, from the store as it was (`before`) and as the
+    /// append leaves it (`after`); `None` for a task's first record.
+    // §FS-rhei-note.5.1
+    fn read(before: &str, after: &str, writer: &str) -> Option<NoteReplaced> {
+        let previous =
+            parse_note_store(before).into_iter().rev().find(|record| record.writer() == writer)?;
+        let struck_entry_back = match &previous {
+            NoteRecord::Strikes { target, .. } => {
+                fold_note_store(after).iter().any(|entry| &entry.task == target)
+            }
+            _ => false,
+        };
+        Some(NoteReplaced { previous, struck_entry_back })
+    }
+
+    /// `{what}` of §FS-rhei-note.5.1's table, after the owner a line speaks
+    /// with: `its` in a fact's line, `this task's` after a restate or a strike.
+    fn what(&self, owner: &str) -> String {
+        match &self.previous {
+            NoteRecord::Left { .. } => format!("{owner} earlier entry"),
+            NoteRecord::Restates { target, .. } => format!("{owner} restate of {target}"),
+            NoteRecord::Strikes { target, .. } if self.struck_entry_back => {
+                format!("{owner} strike of {target}, whose entry is back in composition")
+            }
+            NoteRecord::Strikes { target, .. } => format!("{owner} strike of {target}"),
+        }
+    }
+}
+
+/// What a successful call says: the record, what it costs every later prompt,
+/// and what it replaced in the writer's slot, if anything. §FS-rhei-note.5
+// §FS-rhei-note.5.1
+fn report_note_written(record: &NoteRecord, replaced: Option<&NoteReplaced>) {
+    // A restate's or a strike's line takes the clause at its end.
+    let tail = replaced
+        .map(|replaced| format!("; replacing {}", replaced.what("this task's")))
+        .unwrap_or_default();
     match record {
         NoteRecord::Left { task, text } => {
             let lines = text.lines().count().max(1);
             let noun = if lines == 1 { "line" } else { "lines" };
+            // A fact's line puts the clause before the cost of composition.
+            let clause = replaced
+                .map(|replaced| format!(", replacing {};", replaced.what("its")))
+                .unwrap_or_else(|| ",".to_string());
             println!(
-                "noted as {task} \u{2014} {lines} {noun}, composed into later prompts from now on"
+                "noted as {task} \u{2014} {lines} {noun}{clause} composed into later prompts from \
+                 now on"
             );
         }
         NoteRecord::Restates { target, .. } => println!(
-            "restated {target} \u{2014} now the newest entry, and this task's slot is spent"
+            "restated {target} \u{2014} now the newest entry, and this task's slot is \
+             spent{tail}"
         ),
         NoteRecord::Strikes { target, .. } => println!(
-            "struck {target} \u{2014} out of composition; its bytes stay in runtime/notes.md"
+            "struck {target} \u{2014} out of composition; its bytes stay in \
+             runtime/notes.md{tail}"
         ),
     }
 }
 
 /// Append one record under the store's lock, after the one refusal that needs
-/// the store's own bytes to decide.
+/// the store's own bytes to decide, and say what the writer's slot held.
 ///
 /// The read happens inside the hold, so the live entries a duplicate is judged
-/// against are the ones the record is appended after. A refusal restores the
-/// file, which removes it again when this call is what created it.
-// §FS-rhei-note.3.3 §FS-rhei-note.4
+/// against, and the slot the record replaces, are the ones the record is
+/// appended after. It is taken for every form, not only a fact. A refusal
+/// restores the file, which removes it again when this call is what created it.
+// §FS-rhei-note.3.3 §FS-rhei-note.4 §FS-rhei-note.5.1
 fn append_note_record(
     project_root: &Path,
     record: &NoteRecord,
     duplicate_check: Option<&str>,
-) -> MietteResult<()> {
+) -> MietteResult<Option<NoteReplaced>> {
     let mut journal = LockedRuntimeJournal::open(project_root, NOTE_STORE_JOURNAL)?;
     let store = journal.path().to_path_buf();
     let outcome = (|| {
+        // Readers take no lock, so `read_to_string` is how every reader of
+        // the store sees it; the hold is what keeps a second writer out.
+        let contents = fs::read_to_string(journal.path()).unwrap_or_default();
         if let Some(text) = duplicate_check {
-            // Readers take no lock, so `read_to_string` is how every reader of
-            // the store sees it; the hold is what keeps a second writer out.
-            let contents = fs::read_to_string(journal.path()).unwrap_or_default();
             refuse_duplicate_of_live_entry(text, &fold_note_store(&contents))?;
         }
         // One whole item, trailing newline included, so a partial append is the
@@ -196,7 +247,9 @@ fn append_note_record(
         file.write_all(markdown.as_bytes())
             .map_err(|err| file_io_report(&store, "failed to write the note store", err))?;
         file.flush()
-            .map_err(|err| file_io_report(&store, "failed to flush the note store", err))
+            .map_err(|err| file_io_report(&store, "failed to flush the note store", err))?;
+        let after = format!("{contents}{markdown}");
+        Ok(NoteReplaced::read(&contents, &after, record.writer()))
     })();
     if outcome.is_err() {
         journal.restore()?;
@@ -248,7 +301,7 @@ fn note_command(input: &Path, rhei_scope: &[String], options: &NoteOptions) -> M
             None,
         ),
     };
-    append_note_record(&project_root, &record, duplicate_check.as_deref())?;
-    report_note_written(&record);
+    let replaced = append_note_record(&project_root, &record, duplicate_check.as_deref())?;
+    report_note_written(&record, replaced.as_ref());
     Ok(())
 }

@@ -18,8 +18,6 @@ const FOLD_RULE: &str = "a task's last record there is its live one";
 /// §FS-rhei-note.5.1: a first record prints today's line; a second one by the
 /// same task names what it replaced, though the store keeps both records.
 #[test]
-#[ignore = "red until #751: a second record by one task prints the replacing clause; \
-            implement removes this"]
 fn a_second_record_by_one_task_says_it_replaced_the_first() {
     let (_dir, root) = note_fixture("note-replace-fact", None);
 
@@ -42,8 +40,6 @@ fn a_second_record_by_one_task_says_it_replaced_the_first() {
 /// §FS-rhei-note.5.1: a fact recorded after the same task's own strike lifts
 /// the strike, and the struck entry is back in composition (§FS-rhei-memory.4.2).
 #[test]
-#[ignore = "red until #751: a fact after the task's own strike says the struck entry is back; \
-            implement removes this"]
 fn a_record_after_the_tasks_own_strike_says_the_struck_entry_is_back() {
     let (_dir, root) = note_fixture("note-replace-strike", None);
     assert_success(&run_note(&root, &root, Some("auth.2"), &[TRAP]));
@@ -61,8 +57,6 @@ fn a_record_after_the_tasks_own_strike_says_the_struck_entry_is_back() {
 /// §FS-rhei-note.5.1: the clause is appended to a strike's line too, and a
 /// strike lifted while another still holds the entry says nothing came back.
 #[test]
-#[ignore = "red until #751: a strike or restate replacing the slot names what it replaced; \
-            implement removes this"]
 fn a_restate_or_strike_that_replaces_the_slot_says_what_it_replaced() {
     let (_dir, root) = note_fixture("note-replace-forms", None);
     assert_success(&run_note(&root, &root, Some("auth.2"), &[TRAP]));
@@ -135,8 +129,6 @@ fn superseded_notes_project() -> (TestDir, PathBuf) {
 /// the map line still name the store, and now state the fold rule beside it, as
 /// does the trail bullet — the file keeps the superseded record unmarked.
 #[test]
-#[ignore = "red until #751: the overflow, map and trail lines carry the fold rule; \
-            implement removes this"]
 fn every_pointer_to_the_raw_store_states_the_fold_rule() {
     let (_dir, root) = superseded_notes_project();
 
@@ -160,7 +152,6 @@ fn every_pointer_to_the_raw_store_states_the_fold_rule() {
 /// §FS-rhei-note.1: `rhei note --help` says that the file keeps every record,
 /// so a caller who reads both there does not take the replacement for a failure.
 #[test]
-#[ignore = "red until #751: rhei note --help states the fold rule; implement removes this"]
 fn note_help_says_the_store_keeps_every_record() {
     let (_dir, root) = note_fixture("note-replace-help", None);
 

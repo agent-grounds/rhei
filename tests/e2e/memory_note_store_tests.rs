@@ -243,7 +243,10 @@ fn assert_only_the_agreed_additions(root: &Path, task: &str, prompt: &str) {
     );
     assert_eq!(
         map_line.as_deref(),
-        Some("- Notes left for later tickets: `{ROOT}/runtime/notes.md`\n"),
+        Some(
+            "- Notes left for later tickets: `{ROOT}/runtime/notes.md` \u{2014} append-only; a \
+             task's last record there is its live one\n",
+        ),
         "{task} must be told where the store is"
     );
     let trail = trail_line.unwrap_or_default();

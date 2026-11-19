@@ -338,7 +338,11 @@ enum Commands {
         json: bool,
     },
     /// Leave one fact for whoever works next, anywhere in this project
-    // §FS-rhei-note.1: the only writer of the project note store.
+    ///
+    /// A second call replaces this task's entry in every later prompt, but
+    /// runtime/notes.md keeps every record: a task's last record there is its
+    /// live one.
+    // §FS-rhei-note.1: the only writer of the project note store, and its help says what the store keeps.
     Note {
         #[command(flatten)]
         options: NoteOptions,

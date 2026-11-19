@@ -109,7 +109,8 @@
             store.push_str(&format!("- [plan.{n}] fact number {n}\n"));
         }
         let block = render_project_notes(&fold_note_store(&store), "runtime/notes.md");
-        let overflow = "\u{2026} 6 earlier notes not shown \u{2014} read runtime/notes.md\n";
+        let overflow = "\u{2026} 6 earlier notes not shown \u{2014} read runtime/notes.md; \
+                        a task's last record there is its live one\n";
         assert!(block.contains(overflow), "got:\n{block}");
         let entries: Vec<&str> =
             block.lines().filter(|line| line.starts_with("- [plan.")).collect();

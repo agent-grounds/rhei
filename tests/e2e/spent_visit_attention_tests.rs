@@ -31,10 +31,19 @@ fn assert_spent(fixture: &Fixture, out: &CliRun, spent: u64) {
             "delivery".to_string(),
             fixture
                 .member
-                .join(format!("runtime/exports/{TASK}/delivery.md"))
+                .join("runtime")
+                .join("exports")
+                .join(TASK)
+                .join("delivery.md")
                 .display()
                 .to_string(),
-            fixture.member.join(format!("runtime/results/{TASK}.md")).display().to_string(),
+            fixture
+                .member
+                .join("runtime")
+                .join("results")
+                .join(format!("{TASK}.md"))
+                .display()
+                .to_string(),
         ] {
             if !line.contains(&expected) {
                 failures.push(format!("{surface} lacks {expected:?}: {line}"));

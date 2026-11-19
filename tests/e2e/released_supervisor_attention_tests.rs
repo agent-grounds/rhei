@@ -251,8 +251,8 @@ fn a_released_supervisor_over_a_child_that_wrote_nothing_waits_on_its_subtree() 
     // §FS-rhei-run-report.3.1
     for expected in [
         "2 attempts spent on this visit".to_string(),
-        format!("work ({})", dir.join("runtime/plan.1.2.work.md").display()),
-        format!("result ({})", dir.join("runtime/results/plan.1.2.md").display()),
+        format!("work ({})", dir.join("runtime").join("plan.1.2.work.md").display()),
+        format!("result ({})", dir.join("runtime").join("results").join("plan.1.2.md").display()),
         "`rhei retry plan.1.2`, then rerun".to_string(),
     ] {
         assert!(child.contains(&expected), "child lacks {expected:?}: {child}");

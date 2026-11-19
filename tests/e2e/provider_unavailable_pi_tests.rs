@@ -165,9 +165,12 @@ fn the_seventh_unavailable_ending_is_charged_and_halts_a_spent_visit() {
     for expected in [
         format!(
             "finding ({})",
-            fixture.root.join(format!("runtime/exports/{TASK}/finding.md")).display()
+            fixture.root.join("runtime").join("exports").join(TASK).join("finding.md").display()
         ),
-        format!("result ({})", fixture.root.join(format!("runtime/results/{TASK}.md")).display()),
+        format!(
+            "result ({})",
+            fixture.root.join("runtime").join("results").join(format!("{TASK}.md")).display()
+        ),
         format!("| `rhei retry {TASK}`, then rerun |"),
     ] {
         assert!(row.contains(&expected), "Attention lacks {expected:?}: {row}");

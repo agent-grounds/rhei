@@ -392,8 +392,8 @@ the summary prints five stacked groups:
    ([§FS-rhei-run.5.1.1](rhei-run.spec.md#511-a-blocker-no-clock-releases)); a worker interrupted mid-flight by an
    *operator's* shutdown ([§FS-rhei-run.3.2](rhei-run.spec.md#32-interruption-and-process-ownership)) — a run that tore its own workers down while
    failing describes their tickets by the failure instead, never by "re-run to
-   continue"; a manual-only initial state for a ticket this run neither worked
-   nor interrupted; a worker that ran and
+   continue"; a spent current visit with unmet completion; a manual-only initial state
+   for a ticket this run neither worked nor interrupted; a worker that ran and
    left a required artifact unwritten — agent or program alike, since both are
    workers and both stall the same way; a required `inputs:` artifact of the
    ticket's current state that is not on disk ([§FS-rhei-states.3](rhei-states.spec.md#3-artifact-contracts)), named with
@@ -429,6 +429,22 @@ the summary prints five stacked groups:
    rhei that is a member of a Panta project resolves its inputs against its own
    execution root ([§AR-rhei-panta.5](../architecture/rhei-panta.spec.md#5-execution-root-and-per-rhei-runtime)), not the project's, so *which root* is the
    whole question a relative path leaves open.
+
+   A **spent current visit** belongs in Attention, never Waiting
+   ([§FS-rhei-run.5.1.1](rhei-run.spec.md#511-a-blocker-no-clock-releases)). Its blocker names the attempts spent on this visit
+   and unmet completion artifacts, including an absent required result. Paths identify the
+   checked execution root, including the member rhei's root in a Panta project.
+   Its next action is `rhei retry <id>`, then rerun ([§FS-rhei-retry.3](rhei-retry.spec.md#3-output-and-halt-advice));
+   never rerunning alone, claiming with `rhei next`, writing outputs by hand or cancelling.
+   This applies to the run consuming the last attempt and later runs that cannot spawn,
+   whether the worker exited nonzero or exited zero without completing its artifacts.
+   The spent-visit cause supersedes unwritten-output, stall and never-scheduled readings
+   in Attention, Transition Ledger, Task Final States and, where emitted, the stderr halt
+   explanation. Independently proven higher-priority blockers and operator interruption
+   retain precedence. Exhaustion reads the active invocation of the current state and
+   visit, including retry grants in its effective allowance; historical visits, dormant
+   records and an unspent granted allowance do not prove it. Ordinary failures with
+   attempts left retain their existing cause and recovery advice.
 
    The classification is one answer per run, not one per surface: it is made
    under the artifact roots that run's own ready-set scan resolved against —

@@ -254,12 +254,24 @@ pub fn artifact_snapshot(root: &Path, plan: &Path) -> Vec<(PathBuf, Option<Vec<u
 
 pub fn assert_artifacts_unchanged(before: &[(PathBuf, Option<Vec<u8>>)]) {
     for (path, expected) in before {
-        let actual = match fs::read(path) {
+        let actual = match read_artifact(path) {
             Ok(bytes) => Some(bytes),
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => None,
             Err(err) => panic!("read {}: {err}", path.display()),
         };
         assert_eq!(&actual, expected, "refusal changed {}", path.display());
+    }
+}
+
+// Use the existing mapped reader for Windows byte-range locks: ordinary reads
+// fail while the run is live. Retain byte-for-byte owner comparisons.
+include!("../../crates/rhei-cli/src/cli/run_lock_owner_read.rs");
+
+pub fn read_artifact(path: &Path) -> std::io::Result<Vec<u8>> {
+    if path.ends_with(".rhei/run.lock") {
+        read_run_lock_owner(path).map(String::into_bytes)
+    } else {
+        fs::read(path)
     }
 }
 

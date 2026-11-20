@@ -62,6 +62,18 @@ impl OperatorRunFixture {
         cmd
     }
 
+    pub fn invocation_dir(&self) -> PathBuf {
+        // Ask a child started in the same directory. Windows preserves short
+        // names in its cwd even when canonicalization expands them.
+        let out = Command::new(python_command())
+            .args(["-I", "-c", "import os; print(os.getcwd())"])
+            .current_dir(&*self.force.dir)
+            .output()
+            .unwrap();
+        assert!(out.status.success(), "{}", stderr(&out));
+        PathBuf::from(String::from_utf8(out.stdout).unwrap().trim())
+    }
+
     pub fn start(&self, scope: &[&str]) -> RunningChild {
         fs::remove_file(self.force.dir.join("started")).ok();
         let mut cmd = self.command();
@@ -124,7 +136,11 @@ impl OperatorRunFixture {
         paths
             .into_iter()
             .map(|path| {
-                let bytes = fs::read(&path).ok();
+                let bytes = match read_artifact(&path) {
+                    Ok(bytes) => Some(bytes),
+                    Err(err) if err.kind() == std::io::ErrorKind::NotFound => None,
+                    Err(err) => panic!("read {}: {err}", path.display()),
+                };
                 (path, bytes)
             })
             .collect()
@@ -162,9 +178,7 @@ pub(super) fn assert_run_help(text: &str, fixture: &OperatorRunFixture, id: &str
         "retry must quote the supplied reason:\n{text}"
     );
     assert!(
-        text.contains(
-            &rhei_core::platform::canonical_path(&fixture.force.dir).unwrap().display().to_string()
-        ),
+        text.contains(&fixture.invocation_dir().display().to_string()),
         "retry must preserve invocation directory:\n{text}"
     );
 }

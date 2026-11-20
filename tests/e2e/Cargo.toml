@@ -67,7 +67,7 @@ socket2 = "=0.6.4"
 
 [target.'cfg(windows)'.dev-dependencies]
 # Exclusive fixture ownership even against a reuse-enabled listener. §FS-rhei-agents.6.2.1
-windows-sys = { version = "0.61.2", features = ["Win32_Networking_WinSock"] }
+windows-sys = { version = "0.61.2", features = ["Win32_Networking_WinSock", "Win32_System_Memory", "Win32_Security"] }
 
 # Only the pty-based interruption e2e needs this, and only on Unix — Windows is
 # in the CI matrix and `nix` does not build there. §FS-rhei-run-tui.1.5.7

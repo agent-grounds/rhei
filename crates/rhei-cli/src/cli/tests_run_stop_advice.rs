@@ -49,8 +49,8 @@ fn issue_757_stop_advice_observes_registry_first_resolution_without_mutation() {
             assert!(advice.contains("original launcher") && advice.contains("Ctrl-C"), "{advice}");
         } else {
             let resolved = resolution.unwrap();
-            assert_eq!((resolved.id, resolved.pid, resolved.workspace),
-                (run.id.clone(), run.pid, target.path.clone()));
+            assert_eq!((resolved.id, resolved.pid), (run.id.clone(), run.pid));
+            assert_eq!(run_root_key(&resolved.workspace), run_root_key(&target.path));
             if cfg!(unix) {
                 assert!(advice.contains(&format!("rhei stop {} --wait", shell_word(&target.path))), "{advice}");
             } else {

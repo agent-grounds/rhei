@@ -45,6 +45,10 @@ fn shared_output_case(sibling_writer: bool, parallel: &str) {
     assert!(first_visit_notes(&initial).is_empty(), "the writer really spawns");
     let writer = if sibling_writer { "design.writer" } else { "design.design" };
     assert_eq!(fixture.spawns(), [format!("{writer} verdict")]);
+    if sibling_writer {
+        // Give reset a distinct authored state to return to. §FS-rhei-reset.2.2
+        fixture.transition("design.design", "prepare", "approve-design");
+    }
     fixture.transition("design.design", "approve-design", "revise");
     fixture.transition("design.other", "hold", "work");
 
@@ -77,7 +81,6 @@ fn shared_output_case(sibling_writer: bool, parallel: &str) {
 }
 
 #[test]
-#[ignore = "red until #755: same-ticket shared outputs are reused silently; implement removes this"]
 fn first_visit_reuse_from_the_same_ticket_is_announced_in_a_mixed_run() {
     for parallel in ["3", "1"] {
         shared_output_case(false, parallel);
@@ -85,7 +88,6 @@ fn first_visit_reuse_from_the_same_ticket_is_announced_in_a_mixed_run() {
 }
 
 #[test]
-#[ignore = "red until #755: sibling-ticket shared outputs are reused silently; implement removes this"]
 fn first_visit_reuse_from_a_sibling_ticket_is_announced_in_a_mixed_run() {
     for parallel in ["3", "1"] {
         shared_output_case(true, parallel);
@@ -93,7 +95,6 @@ fn first_visit_reuse_from_a_sibling_ticket_is_announced_in_a_mixed_run() {
 }
 
 #[test]
-#[ignore = "red until #755: deliberate first-entry preseed reuse is silent; implement removes this"]
 fn first_visit_reuse_of_a_seed_written_before_arrival_is_announced() {
     let machine_text = BASIC_MACHINE
         .replace(

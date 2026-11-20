@@ -205,6 +205,52 @@ impl InvocationCompletion<'_> {
             .is_some_and(|(invocation, _)| own_names.first() == Some(invocation))
     }
 
+    /// Explain an actual skip backed only by first-visit files, with the same
+    /// invocation identity and owning root used to check those files.
+    /// §FS-rhei-agent-visit-pairing.6 §FS-rhei-reset.5.1
+    fn announce_first_visit_reuse(
+        &self,
+        sink: &Arc<dyn rhei_tui::EventSink>,
+        resolved: &ResolvedAgent,
+        reset: &ResetOffer,
+    ) {
+        if self.work_eligibility(resolved) != Some(VisitWork::FirstVisit) {
+            return;
+        }
+        let task_id = self.task.id.to_string();
+        let state = self.state_name;
+        let (target, model, provider, model_name, agent, mode) = invocation_context(resolved);
+        let paths = self
+            .state_def
+            .outputs
+            .iter()
+            .map(|artifact| {
+                let (_, path) = resolve_artifact_path(
+                    self.artifact_root,
+                    artifact,
+                    &task_id,
+                    state,
+                    Some(self.visit_count),
+                    target,
+                    model,
+                    provider,
+                    model_name,
+                    agent,
+                    mode,
+                );
+                path.display().to_string()
+            })
+            .collect::<Vec<_>>();
+        let text = format!(
+            "note: task {task_id} state '{state}': reusing first-visit outputs ({}) for {}; \
+             no agent spawned; to redo it, run {}",
+            paths.join(", "),
+            invocation_target_label(resolved),
+            reset.for_ticket(&task_id)
+        );
+        self.announce_once(sink, rhei_tui::MessageLevel::Info, text);
+    }
+
     /// Say what the pairing decided, at the moment the pass decides to skip or
     /// spawn: one note for an invocation an orphan answers for and that is not
     /// spawned after all, one warning for an ambiguous edit. Each is said once
@@ -266,6 +312,8 @@ impl InvocationCompletion<'_> {
         }
     }
 
+    /// Deduplicate visit explanations across actual decisions within this run.
+    /// §FS-rhei-agent-visit-pairing.4 §FS-rhei-agent-visit-pairing.5 §FS-rhei-agent-visit-pairing.6
     fn announce_once(
         &self,
         sink: &Arc<dyn rhei_tui::EventSink>,

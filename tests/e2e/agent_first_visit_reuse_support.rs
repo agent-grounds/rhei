@@ -24,7 +24,7 @@ impl Revision {
         fs::create_dir_all(owner.join("tasks")).expect("owner workspace");
         fs::write(project.join("index.panta.md"), "# Panta: Revision\n").unwrap();
         fs::write(owner.join("index.rhei.md"), "# Rhei: Design\n").unwrap();
-        let state = if sibling_writer { "approve-design" } else { "verdict" };
+        let state = if sibling_writer { "prepare" } else { "verdict" };
         fs::write(
             owner.join("tasks/design.md"),
             format!("### Task design: Revise the design\n**State:** {state}\n"),
@@ -88,6 +88,7 @@ result('done in ' + state + '\n')
 const MACHINE: &str = r#"name: first-visit-reuse
 version: 1
 states:
+  prepare: { gating: true, description: Prepare for owner review }
   verdict:
     initial: true
     description: Write v1
@@ -109,6 +110,7 @@ states:
   completed: { final: true, description: Done }
   cancelled: { final: true, description: Dropped }
 transitions:
+  - { from: prepare, to: approve-design }
   - { from: verdict, to: approve-design }
   - { from: approve-design, to: completed }
   - { from: approve-design, to: revise }

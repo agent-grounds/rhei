@@ -28,6 +28,8 @@ struct HelpTarget {
     /// The ticket the command was given, which may pick its rhei among loose
     /// plans exactly as the command's own resolution does. §FS-rhei-panta.6.7
     ticket: Option<TicketPick>,
+    /// Operator retries retain the command's legal selector form. §FS-rhei-errors.1.2
+    operator: Option<OperatorInvocation>,
     /// What an omitted target discovers. Looked for once, and only by a help that
     /// prints it, so a command that succeeds never walks the tree for it.
     discovered: std::sync::OnceLock<Option<PathBuf>>,
@@ -41,6 +43,7 @@ impl HelpTarget {
             machine,
             detached: is_headless_child(),
             ticket: None,
+            operator: None,
             discovered: std::sync::OnceLock::new(),
         }
     }
@@ -109,7 +112,8 @@ impl HelpTarget {
             | Commands::Completions { .. } => (None, None, false),
         };
         let machine = machine.cloned().or_else(|| before_subcommand.map(Path::to_path_buf));
-        Self { ticket: ticket_pick_of(command), ..Self::new(typed, takes_target, machine) }
+        Self { ticket: ticket_pick_of(command), operator: OperatorInvocation::of(command),
+            ..Self::new(typed, takes_target, machine) }
     }
 
     /// The target as typed; otherwise what the command discovers, or for one with

@@ -1,5 +1,27 @@
 # CLI examples
 
+An attended operator can correct a missing edge. A live run blocks this even
+when it schedules another rhei: the lock excludes the whole project. Existing
+contention refuses before typing; a run starting during typing can still refuse
+after confirmation. Follow the refusal's verified stop instruction (on Unix),
+or wait for the run to finish, then retry in the printed invocation directory
+([§FS-rhei-transition-cmd.6](functional-spec/rhei-transition-cmd.spec.md#6-operator-forced-missing-edge-recovery)):
+
+```bash
+rhei stop fd5f02 --wait
+rhei transition profile.deliver --from start-gates --to polish --force --reason "gates started by hand"
+```
+
+When asked, type exactly:
+
+```text
+force profile.deliver start-gates -> polish
+```
+
+Use the run identity and hop from your own refusal. On platforms without
+`rhei stop` support, follow its original-launcher/process-control guidance.
+Agents pass the handoff to a human; they must not perform this ceremony.
+
 When a visit has exhausted its attempts, grant it another configured budget
 without moving it. A supervisor keeps its held subtree and unread checkpoints
 ([§FS-rhei-retry.2](functional-spec/rhei-retry.spec.md#2-grant-and-refusals)); the grant takes effect on the next run:

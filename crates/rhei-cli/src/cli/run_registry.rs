@@ -190,7 +190,7 @@ impl RegistrySweep {
 /// process it describes.
 // §FS-rhei-run-headless.3 §FS-rhei-run-headless.6
 pub(crate) fn sweep_run_registry() -> RegistrySweep {
-    classify_run_registry(Pruning::Prune)
+    classify_run_registry(Pruning::Prune, RunReadAccess::Guarded)
 }
 
 /// The same classification with nothing removed.
@@ -201,7 +201,7 @@ pub(crate) fn sweep_run_registry() -> RegistrySweep {
 /// moment later anyway.
 // §FS-rhei-run-headless.3
 pub(crate) fn read_run_registry() -> RegistrySweep {
-    classify_run_registry(Pruning::Keep)
+    classify_run_registry(Pruning::Keep, RunReadAccess::Guarded)
 }
 
 /// Whether a classification pass is allowed to remove what it finds.
@@ -212,7 +212,7 @@ enum Pruning {
 }
 
 /// Discover registry identities before reading any execution-root data. §FS-rhei-panta.6.6
-fn classify_run_registry(pruning: Pruning) -> RegistrySweep {
+fn classify_run_registry(pruning: Pruning, mode: RunReadAccess) -> RegistrySweep {
     let mut sweep = RegistrySweep::default();
     let Some(dir) = run_registry_dir() else {
         return sweep;
@@ -244,7 +244,7 @@ fn classify_run_registry(pruning: Pruning) -> RegistrySweep {
         };
         descriptors.push((path, descriptor));
     }
-    classify_registry_roots(descriptors, sweep, pruning)
+    classify_registry_roots(descriptors, sweep, pruning, mode)
 }
 
 /// Multi-root registry reads retain one sorted guard set, including during pruning. §FS-rhei-recover.4
@@ -252,8 +252,9 @@ fn classify_registry_roots(
     descriptors: Vec<(PathBuf, RunDescriptor)>,
     mut sweep: RegistrySweep,
     pruning: Pruning,
+    mode: RunReadAccess,
 ) -> RegistrySweep {
-    let access = match registry_root_access(&descriptors, &mut sweep.root_guards) {
+    let access = match registry_root_access(&descriptors, &mut sweep.root_guards, mode) {
         Ok(access) => access,
         Err(error) => {
             sweep.undecided.clear();
@@ -332,11 +333,18 @@ fn cap_ended_entries(ended: &mut Vec<RunDescriptor>, pruning: Pruning) {
 /// the operator has forgotten.
 // §FS-rhei-run-headless.3
 pub(crate) fn resolve_run(reference: Option<&str>) -> MietteResult<RunDescriptor> {
+    resolve_run_with_access(reference, RunReadAccess::Guarded)
+}
+
+/// Keep registry-first access, id/path precedence and descriptor routing identical
+/// for stop and its non-mutating advice. §FS-rhei-errors.1.2 §FS-rhei-transition-cmd.3.4
+fn resolve_run_with_access(reference: Option<&str>, mode: RunReadAccess) -> MietteResult<RunDescriptor> {
     let Some(reference) = reference else {
-        return descriptor_for_path(Path::new("."));
+        return descriptor_for_path_with_access(Path::new("."), mode);
     };
 
-    let sweep = sweep_run_registry();
+    let pruning = if mode == RunReadAccess::Guarded { Pruning::Prune } else { Pruning::Keep };
+    let sweep = classify_run_registry(pruning, mode);
     sweep.ensure_access()?;
     let current = sweep.not_known_to_have_ended();
     if let Some(exact) = current.iter().find(|run| run.id == reference) {
@@ -347,7 +355,7 @@ pub(crate) fn resolve_run(reference: Option<&str>) -> MietteResult<RunDescriptor
     // id-shaped plan stem — resolves to the thing the operator can see.
     let as_path = Path::new(reference);
     if as_path.exists() {
-        return descriptor_for_path(as_path);
+        return descriptor_for_path_with_access(as_path, mode);
     }
 
     match prefix_matches(&current, reference).as_slice() {
@@ -408,14 +416,12 @@ fn ambiguous_reference(
 
 /// The descriptor a plan path or workspace directory points at. A Panta member
 /// names its project's run, just as it does when starting one. §FS-rhei-run-headless.3
-fn descriptor_for_path(path: &Path) -> MietteResult<RunDescriptor> {
-    let workspace = workspace::panta_member(path)
-        .map(|(project, _)| project)
-        .unwrap_or_else(|| execution_workspace_root(&normalize_workspace_input(path)));
+fn descriptor_for_path_with_access(path: &Path, mode: RunReadAccess) -> MietteResult<RunDescriptor> {
+    let workspace = run_workspace_for_path(path);
     // Retain exclusion while resolving the authoritative descriptor. §FS-rhei-recover.4
 
     // §FS-rhei-errors.6
-    let _root_guards = rhei_core::root_access::for_input(&workspace).map_err(|err| root_access_report(&workspace, err))?;
+    let _root_guards = mode.for_input(&workspace).map_err(|err| root_access_report(&workspace, err))?;
     let descriptor_path = run_descriptor_path(&workspace);
     read_descriptor(&descriptor_path).ok_or_else(|| {
         miette!(
@@ -428,4 +434,12 @@ fn descriptor_for_path(path: &Path) -> MietteResult<RunDescriptor> {
             descriptor_path.display()
         )
     })
+}
+
+/// The workspace a stop/attach path resolves to, also used by read-only stop advice.
+/// §FS-rhei-run-headless.3 §FS-rhei-transition-cmd.3.4
+fn run_workspace_for_path(path: &Path) -> PathBuf {
+    workspace::panta_member(path)
+        .map(|(project, _)| project)
+        .unwrap_or_else(|| execution_workspace_root(&normalize_workspace_input(path)))
 }

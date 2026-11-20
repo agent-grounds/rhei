@@ -371,6 +371,9 @@ enum Commands {
         #[arg(long)]
         release_subtree: bool,
         /// Operator-only missing-edge recovery; requires an interactive terminal and typed hop.
+        /// Existing run locks refuse before typing, including runs scoped to other rheis:
+        /// the lock excludes the whole project. No lock is held while you type; a run
+        /// starting then can still refuse after confirmation. Retry with fresh confirmation.
         /// This ceremony attributes an OS account; a same-account PTY cannot prove human identity.
         // §FS-rhei-transition-cmd.6
         #[arg(long)]

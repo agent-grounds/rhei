@@ -40,6 +40,7 @@ fn operator_registry_established_markers_always_refuse() {
                 vec![(entry.clone(), run.clone())],
                 RegistrySweep::default(),
                 pruning,
+                RunReadAccess::Guarded,
             );
             assert!(sweep
                 .ensure_access()
@@ -57,6 +58,7 @@ fn operator_registry_established_markers_always_refuse() {
                 vec![(entry, run)],
                 RegistrySweep::default(),
                 Pruning::Prune,
+                RunReadAccess::Guarded,
             );
             fs::set_permissions(&marker, fs::Permissions::from_mode(0o644)).unwrap();
             let error = sweep.ensure_access().unwrap_err().to_string();
@@ -86,6 +88,7 @@ fn operator_registry_unknown_root_never_reads_missing_runtime_descriptor() {
             vec![(entry.clone(), run.clone())],
             RegistrySweep::default(),
             pruning,
+            RunReadAccess::Guarded,
         );
         fs::set_permissions(dir.path().join(".rhei"), fs::Permissions::from_mode(0o755)).unwrap();
         sweep.ensure_access().unwrap();

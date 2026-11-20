@@ -104,7 +104,7 @@ fn operator_marker_blocks_run_discovery_and_intervention() {
     interrupt_force_at("marker-after");
     assert!(commit_confirmed_force(&request, prepare_forced_transition(&request).unwrap(), "test").is_err());
     clear_force_interrupt();
-    let error = descriptor_for_path(&plan).unwrap_err().to_string();
+    let error = descriptor_for_path_with_access(&plan, RunReadAccess::Guarded).unwrap_err().to_string();
     assert!(error.contains("plan.1 gate -> work"), "{error}");
     let error = intervene_command(&plan, "1", None, "resume").unwrap_err().to_string();
     assert!(error.contains("plan.1 gate -> work"), "{error}");
@@ -119,7 +119,7 @@ fn operator_marker_blocks_run_discovery_and_intervention() {
     fs::write(&entry, serde_json::to_vec(&descriptor).unwrap()).unwrap();
     let before = fs::read(&entry).unwrap();
     for pruning in [Pruning::Keep, Pruning::Prune] {
-        let sweep = classify_registry_roots(vec![(entry.clone(), descriptor.clone())], RegistrySweep::default(), pruning);
+        let sweep = classify_registry_roots(vec![(entry.clone(), descriptor.clone())], RegistrySweep::default(), pruning, RunReadAccess::Guarded);
         let error = sweep.ensure_access().unwrap_err().to_string();
         assert!(error.contains("plan.1 gate -> work"), "{error}");
         assert!(sweep.live.is_empty() && sweep.ended.is_empty() && sweep.undecided.is_empty());

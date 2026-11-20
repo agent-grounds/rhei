@@ -10,7 +10,6 @@ use super::*;
 /// Project and member entry points must observe the same project lock.
 /// §FS-rhei-transition-cmd.6 §FS-rhei-run.2.6
 #[test]
-#[ignore = "red until #757: live contention must refuse before typing; implement removes this"]
 fn issue_757_force_live_run_refuses_before_prompt() {
     for member_cwd in [false, true] {
         let fixture = OperatorRunFixture::new();
@@ -36,7 +35,6 @@ fn issue_757_force_live_run_refuses_before_prompt() {
 /// Separate from ordering: captures today's refusal without needing a terminal.
 /// §FS-rhei-errors.1.2 §FS-rhei-run.2.6
 #[test]
-#[ignore = "red until #757: contention help must name verified scope and remedy; implement removes this"]
 fn issue_757_force_live_run_help() {
     let fixture = OperatorRunFixture::new();
     let mut run = fixture.start(&["constants"]);
@@ -52,7 +50,6 @@ fn issue_757_force_live_run_help() {
 /// Keep the terminal-required headline and hand over the exact qualified hop.
 /// §FS-rhei-errors.1.2 §FS-rhei-transition-cmd.6
 #[test]
-#[ignore = "red until #757: non-terminal handoff must include the canonical hop; implement removes this"]
 fn issue_757_force_nonterminal_handoff() {
     let fixture = OperatorRunFixture::new();
     let mut run = fixture.start(&["constants"]);
@@ -74,7 +71,6 @@ fn issue_757_force_nonterminal_handoff() {
 /// while input is pending, then refuse safely and require a fresh confirmation.
 /// §FS-rhei-transition-cmd.6 §FS-rhei-run.2.6
 #[test]
-#[ignore = "red until #757: post-confirmation contention must supply complete run help; implement removes this"]
 fn issue_757_run_can_start_during_confirmation_then_fresh_retry_succeeds() {
     let fixture = OperatorRunFixture::new();
     let mut before = None;
@@ -122,7 +118,6 @@ fn issue_757_run_can_start_during_confirmation_then_fresh_retry_succeeds() {
 /// Recovery observes marker owners and does not require an ordinary plan load.
 /// §FS-rhei-recover.3
 #[test]
-#[ignore = "red until #757: recovery must refuse a held owner before prompting; implement removes this"]
 fn issue_757_recovery_refuses_before_prompt() {
     let fixture = recovery_fixture("issue-757-recovery-order");
     let _held = hold_operator(&fixture.force.dir);
@@ -143,7 +138,6 @@ fn issue_757_recovery_refuses_before_prompt() {
 /// Recovery's handoff includes its id, qualified hop and evidence-derived decision.
 /// §FS-rhei-recover.3 §FS-rhei-errors.1.2
 #[test]
-#[ignore = "red until #757: recovery handoff must include its full confirmation; implement removes this"]
 fn issue_757_recovery_nonterminal_handoff() {
     let fixture = recovery_fixture("issue-757-recovery-handoff");
     let _held = hold_operator(&fixture.force.dir);
@@ -168,7 +162,6 @@ fn issue_757_recovery_nonterminal_handoff() {
 /// special characters, explicit machine, result and invocation directory.
 /// §FS-rhei-errors.1.2
 #[test]
-#[ignore = "red until #757: handoff must render the complete quoted retry context; implement removes this"]
 fn issue_757_force_retry_preserves_invocation_context() {
     for supplied in [false, true] {
         let fixture = OperatorRunFixture::new();
@@ -201,10 +194,10 @@ fn issue_757_force_retry_preserves_invocation_context() {
         let text = &output.stderr;
         for part in [
             "rhei ",
-            "--state-machine profile/states.yaml",
-            "--task profile.deliver",
-            "--from human-gate",
-            "--to implement",
+            "--state-machine=profile/states.yaml",
+            "--task=profile.deliver",
+            "--from=human-gate",
+            "--to=implement",
             "--force",
             "--reason",
             "--result",

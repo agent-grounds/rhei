@@ -117,6 +117,14 @@ Type the exact qualified hop printed by the command. Final entry also needs a
 fresh `--result`. Claims, active runs and transition safeguards still apply;
 no callbacks run. Agents must not invoke operator recovery.
 
+An existing held run lock refuses before asking you to type. The lock excludes
+the whole project even if the run schedules other rheis. The refusal names any
+verified run and scheduling scope, gives a safe way to wait or stop it, and
+prints the full retry and exact typing instruction. No lock is retained while
+you type: a run starting meanwhile can still refuse the move after confirmation,
+so retry only after it ends, with fresh confirmation
+([§FS-rhei-transition-cmd.6](docs/functional-spec/rhei-transition-cmd.spec.md#6-operator-forced-missing-edge-recovery)).
+
 If interrupted, commands refuse the root and print `rhei recover <execution-root>`.
 That command requires fresh confirmation and restores the complete recorded
 outcome without duplicate results or audit pairs. Older binaries cannot enforce

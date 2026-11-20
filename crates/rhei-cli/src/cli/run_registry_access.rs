@@ -1,5 +1,26 @@
 // External registry evidence remains usable when a root is uncheckable. §FS-rhei-run-headless.3
 
+/// Advice observes the resolver's access rules without creating guards or pruning.
+/// Commands retain their existing guarded reads. §FS-rhei-errors.1.2 §FS-rhei-transition-cmd.3.4
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RunReadAccess {
+    Guarded,
+    Observe,
+}
+
+impl RunReadAccess {
+    fn for_input(self, path: &Path) -> std::io::Result<Vec<rhei_core::root_access::RootAccessGuard>> {
+        use rhei_core::root_access::{check_pending, for_input, input_roots};
+        if self == Self::Guarded {
+            return for_input(path);
+        }
+        for root in input_roots(path)? {
+            check_pending(&root)?;
+        }
+        Ok(Vec::new())
+    }
+}
+
 /// Only inspection failures become unknown; pending markers and other guard errors refuse.
 /// Established markers use ErrorKind::Other even when their contents cannot be read. §FS-rhei-recover.4
 fn registry_inspection<T>(result: std::io::Result<T>) -> std::io::Result<Result<T, String>> {
@@ -22,6 +43,7 @@ fn registry_inspection<T>(result: std::io::Result<T>) -> std::io::Result<Result<
 fn registry_root_access(
     descriptors: &[(PathBuf, RunDescriptor)],
     guards: &mut Vec<rhei_core::root_access::RootAccessGuard>,
+    mode: RunReadAccess,
 ) -> Result<Vec<Result<(), String>>, Box<miette::MietteDiagnostic>> {
     use rhei_core::root_access::{check_pending, input_roots, RootAccessGuard};
     let mut groups = Vec::new();
@@ -48,7 +70,7 @@ fn registry_root_access(
             .map_err(|err| root_access_diagnostic(root, err))?;
     }
     for (root, access) in &mut roots {
-        if access.is_ok() {
+        if access.is_ok() && mode == RunReadAccess::Guarded {
             match registry_inspection(RootAccessGuard::shared(root))
                 .map_err(|err| root_access_diagnostic(root, err))? {
                 Ok(guard) => guards.push(guard),

@@ -71,9 +71,10 @@ fn recover_command(root: &Path) -> MietteResult<()> {
     };
     let marker = ForcedMarker::parse(&root, &preview).map_err(|err| forced_recovery_error(&root, err))?;
     let decision = forced_decision(&root, &marker).map_err(|err| forced_recovery_error(&root, err))?;
-    let expected = format!("recover {} {} {} -> {} {}", marker.recovery_id, marker.hop.task_id,
-        marker.hop.from, marker.hop.to, decision.word());
-    let account = confirm_operator_hop(&expected, "recover")?;
+    // Observe marker-derived owners without loading the in-doubt plan. §FS-rhei-recover.3
+    let handoff = OperatorHandoff::recovery(&root, &marker, decision);
+    operator_preflight(&forced_owner_roots(&root, &marker.files)?, &handoff)?;
+    let account = confirm_operator_hop(&handoff)?;
     forced_replay(&root, &marker, decision, &account)?;
     println!("{} {} {} -> {} rolled {}", marker.recovery_id, marker.hop.task_id,
         marker.hop.from, marker.hop.to, if decision == ForcedDecision::Forward { "forward" } else { "back" });
@@ -85,7 +86,8 @@ fn forced_replay(root: &Path, marker: &ForcedMarker, decision: ForcedDecision, a
     let preview = marker.bytes()?;
     let roots = forced_owner_roots(root, &marker.files)?;
     forced_boundary("recovery-confirmed-before-locks")?;
-    let _run_locks = operator_run_locks(&roots, account)?;
+    let handoff = OperatorHandoff::recovery(root, marker, decision);
+    let _run_locks = operator_run_locks_with_handoff(&roots, account, Some(&handoff))?;
     let _guards = forced_root_guards(&roots)?;
     forced_marker_location(root)?;
     let _file_locks = forced_lock_images(root, &marker.files)?;

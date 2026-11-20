@@ -38,6 +38,9 @@ const UNLINK_ONE_LEAD_IN: &str = "remove the link (";
 /// Several links a rebind would write through. §FS-rhei-library.2.2
 const UNLINK_MANY_LEAD_IN: &str = "remove the links (";
 
+/// A fresh attended invocation, kept complete with its reason/result. §FS-rhei-errors.1.2
+const OPERATOR_RETRY_LEAD_IN: &str = "After any blocker ends, retry with fresh confirmation: ";
+
 /// Every lead-in above, which is the whole of what the renderer looks for.
 const OFFERED_COMMAND_LEAD_INS: &[&str] = &[
     CHECK_SPELLING_LEAD_IN,
@@ -48,6 +51,7 @@ const OFFERED_COMMAND_LEAD_INS: &[&str] = &[
     REMOVE_THAT_ONE_LEAD_IN,
     UNLINK_ONE_LEAD_IN,
     UNLINK_MANY_LEAD_IN,
+    OPERATOR_RETRY_LEAD_IN,
     SET_ASIDE_LEAD_IN,
     SET_ASIDE_INSTEAD_LEAD_IN,
     TRIM_LEAD_IN,

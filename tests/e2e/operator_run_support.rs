@@ -154,9 +154,7 @@ pub(super) fn assert_run_help(text: &str, fixture: &OperatorRunFixture, id: &str
     }
     assert_safe_remedy(text, &fixture.force.dir, id);
     assert!(
-        text.contains(
-            "rhei transition profile.deliver --from human-gate --to implement --force --reason"
-        ),
+        text.contains("rhei transition --from=human-gate --to=implement --force --reason="),
         "missing complete retry:\n{text}"
     );
     assert!(

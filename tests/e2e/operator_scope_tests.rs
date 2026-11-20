@@ -10,7 +10,6 @@ use super::*;
 /// Every row executes even on the old binary, so the red report lists the matrix.
 /// §FS-rhei-transition-cmd.6 §FS-rhei-transition-cmd.3.4
 #[test]
-#[ignore = "red until #757: operator handoff must use verified journal scope; implement removes this"]
 fn issue_757_scope_and_readonly_registry_matrix() {
     let mut missing = Vec::new();
     for mode in ["whole", "narrow", "repeated", "missing", "torn", "stale"] {
@@ -82,7 +81,6 @@ fn issue_757_scope_and_readonly_registry_matrix() {
 /// Without a resolvable descriptor, an owner id alone cannot become a stop target.
 /// §FS-rhei-errors.1.2 §FS-rhei-transition-cmd.6
 #[test]
-#[ignore = "red until #757: descriptor uncertainty needs safe launcher guidance; implement removes this"]
 fn issue_757_missing_descriptor_uses_launcher_remedy() {
     let fixture = OperatorRunFixture::new();
     let mut run = fixture.start(&["constants"]);
@@ -110,7 +108,6 @@ fn issue_757_missing_descriptor_uses_launcher_remedy() {
 /// A shared execution root still blocks a different plan under it.
 /// §FS-rhei-transition-cmd.6 §FS-rhei-run.2.6
 #[test]
-#[ignore = "red until #757: shared-root blocker must be handed off with the hop; implement removes this"]
 fn issue_757_shared_root_operator_handoff() {
     let fixture = force_fixture("issue-757-shared-root", GATE_PLAN, FORCE_MACHINE);
     write_fixture_file(&fixture.dir, "sibling.rhei.md", GATE_PLAN);

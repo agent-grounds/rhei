@@ -1,3 +1,5 @@
+include!("operator_handoff.rs");
+
 /// Reject contradictory flags before any recovery preflight. §FS-rhei-transition-cmd.6
 fn validate_force_options(reason: Option<&str>, supervisor: Option<&str>, no_callbacks: bool) -> MietteResult<()> {
     // §FS-rhei-errors.6
@@ -11,13 +13,14 @@ fn validate_force_options(reason: Option<&str>, supervisor: Option<&str>, no_cal
     Ok(())
 }
 
-/// No environment/configuration grant or test bypass participates in authority. §FS-rhei-recover.1
-fn confirm_operator_hop(expected: &str, operation: &str) -> MietteResult<String> {
+/// No environment/configuration grant or test bypass participates in authority.
+/// §FS-rhei-recover.1 §FS-rhei-errors.1.2
+fn confirm_operator_hop(handoff: &OperatorHandoff) -> MietteResult<String> {
     use std::io::IsTerminal;
     if !std::io::stdin().is_terminal() {
-        // §FS-rhei-errors.1.2
-        return Err(miette!(help = "hand this to a human operator at an interactive terminal for fresh typed confirmation. An agent may not run the operator ceremony.", "{operation} requires an interactive terminal and fresh typed confirmation"));
+        return Err(handoff.refusal(None, false));
     }
+    let expected = &handoff.expected;
     // Query the operating system's account utility, never an author-supplied environment name.
     // §FS-rhei-transition-cmd.6.1
     let account = std::process::Command::new("whoami").output()
@@ -37,23 +40,34 @@ fn confirm_operator_hop(expected: &str, operation: &str) -> MietteResult<String>
     let read = std::io::stdin().read_line(&mut response)
         // §FS-rhei-errors.6
         .map_err(|err| miette!(help = "restore readable standard input on the operator terminal before requesting fresh confirmation.", "cannot read operator confirmation: {err}"))?;
-    if read == 0 || response.trim_end_matches(['\r', '\n']) != expected {
+    if read == 0 || response.trim_end_matches(['\r', '\n']) != expected.as_str() {
         // §FS-rhei-errors.6
         return Err(miette!(help = "if this correction is intended, the human operator must run it again at an interactive terminal and type the displayed hop exactly.", "operator confirmation did not match the exact hop; no changes made"));
     }
     Ok(account_name.trim().to_string())
 }
 
-/// Run locks precede root guards; contention reports the current recorded owner. §FS-rhei-recover.3
+/// Isolated callers share production acquisition and safe contention reporting. §FS-rhei-recover.3
+#[cfg(test)]
 fn operator_run_locks(roots: &[PathBuf], owner: &str) -> MietteResult<Vec<HeldRunLock>> {
+    operator_run_locks_with_handoff(roots, owner, None)
+}
+
+/// Run locks precede root guards; the typing race uses the same complete handoff.
+/// §FS-rhei-recover.3 §FS-rhei-transition-cmd.6
+fn operator_run_locks_with_handoff(roots: &[PathBuf], owner: &str,
+    handoff: Option<&OperatorHandoff>) -> MietteResult<Vec<HeldRunLock>> {
     let mut held = Vec::new();
     for root in roots {
         let Some(mut lock) = try_acquire_run_lock(root)? else {
-            let path = root.join(".rhei/run.lock");
-            let recorded = read_run_lock_owner(&path)
-                .unwrap_or_else(|err| format!("owner record unreadable: {err}"));
             // §FS-rhei-errors.6
-            return Err(miette!(help = "wait for the recorded run to finish, or inspect it with: rhei runs", "execution root {} has a held run lock; recorded owner: {}", root.display(), recorded.trim()));
+            return Err(match handoff {
+                Some(handoff) => handoff.refusal(Some(root), true),
+                None => {
+                    let blocker = operator_blocker(root, None);
+                    miette!(help = blocker.guidance, "{}", blocker.summary)
+                }
+            });
         };
         let body = serde_json::json!({"operator": owner, "pid": std::process::id(), "operation": "forced-recovery"});
         lock.file.rewind().and_then(|()| lock.file.set_len(0))

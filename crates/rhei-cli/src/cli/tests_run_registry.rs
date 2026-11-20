@@ -8,6 +8,8 @@ mod run_registry_tests {
     };
     use super::super::*;
 
+    include!("tests_run_stop_advice.rs");
+
     fn ids(runs: &[RunDescriptor]) -> Vec<&str> {
         runs.iter().map(|run| run.id.as_str()).collect()
     }

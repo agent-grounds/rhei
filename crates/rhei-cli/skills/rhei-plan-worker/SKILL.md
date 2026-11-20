@@ -102,6 +102,8 @@ Either way the message is required. No task enters a `final: true` state without
 
 To redo finished work whose input changed, and only when the ticket or its brief asks for that rerun, run `rhei reset <plan> --task <id> --yes`: it returns that ticket, its descendants and its `**Prior:**` dependents to their authored states with their results and visit counts cleared, and keeps every other ticket; it is not `rhei transition --force`, which stays an operator's ([§FS-rhei-reset.3](../../../../docs/functional-spec/rhei-reset.spec.md#3-safety)).
 
+For operator-only force or recovery, pass the refusal's complete handoff to the human **verbatim**, including the blocker, remedy, invocation directory, retry command and exact confirmation. Agents must not run the ceremony ([§FS-rhei-errors.1.2](../../../../docs/functional-spec/rhei-errors.spec.md#12-help)).
+
 ### Typical transitions for the default `rhei` machine
 
 - `pending` → `completed` — the task is done.

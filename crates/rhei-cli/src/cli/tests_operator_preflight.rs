@@ -79,7 +79,6 @@ fn issue_757_existing_scope_reader_requires_verified_complete_prefix() {
 /// Refuse unverified owner records without promoting their id or pid to advice.
 /// §FS-rhei-errors.1.2 §FS-rhei-recover.3
 #[test]
-#[ignore = "red until #757: unverified holders must not become actionable run identities; implement removes this"]
 fn issue_757_unverified_owner_diagnostics_are_safe() {
     let mut violations = Vec::new();
     for mode in ["malformed", "unsupported", "stale", "mismatched", "descriptor-mismatch", "missing", "operator"] {
@@ -149,7 +148,6 @@ fn issue_757_snapshot(root: &Path) -> BTreeMap<PathBuf, Vec<u8>> {
 /// The existing marker preview derives owners without parsing the plan.
 /// §FS-rhei-transition-cmd.6 §FS-rhei-recover.3
 #[test]
-#[ignore = "red until #757: basin owner contention must be in the non-terminal handoff; implement removes this"]
 fn issue_757_basin_parent_and_member_preflight_handoff() {
     let mut missing = Vec::new();
     for replay in [false, true] {
@@ -170,7 +168,12 @@ fn issue_757_basin_parent_and_member_preflight_handoff() {
                     "work", "done", "repair basin route", Some("fresh basin result")).unwrap_err()
             };
             assert_eq!(issue_757_snapshot(&project), before);
-            let text = format!("{error:?}");
+            let text = error.help().expect("complete operator handoff").to_string();
+            let expected = if replay {
+                let marker = recorded_marker(&root);
+                format!("recover {} basin.1.1 work -> done rollback", marker.recovery_id)
+            } else { "force basin.1.1 work -> done".to_owned() };
+            assert!(text.contains(&format!("Type exactly: {expected}")), "{text}");
             if !text.contains("other-operator") || !text.contains(&owner.display().to_string()) {
                 missing.push(format!("replay={replay} parent={parent}: held basin owner must be handed off before confirmation: {text}"));
             }
@@ -179,3 +182,5 @@ fn issue_757_basin_parent_and_member_preflight_handoff() {
     }
     assert!(missing.is_empty(), "{}", missing.join("\n"));
 }
+
+include!("tests_operator_retry.rs");

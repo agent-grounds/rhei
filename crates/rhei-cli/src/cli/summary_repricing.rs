@@ -220,6 +220,12 @@ fn activity_from_liveness(liveness: Liveness) -> SelectedRunActivity {
 /// Contention is checked separately; text on a free lock is not active evidence.
 /// §FS-rhei-summary.1 §FS-rhei-summary.5
 fn run_lock_owner_id(root: &Path) -> Result<Option<String>, String> {
+    run_lock_owner(root).map(|owner| owner.map(|owner| owner.id))
+}
+
+/// Shared supported ownership validation; identity still requires a live descriptor.
+/// §FS-rhei-summary.5 §FS-rhei-transition-cmd.3.4
+fn run_lock_owner(root: &Path) -> Result<Option<RunLockOwner>, String> {
     let path = root.join(".rhei/run.lock");
     let body = read_run_lock_owner(&path)
         .map_err(|err| format!("{} is held but could not be read: {err}", path.display()))?;
@@ -256,7 +262,7 @@ fn run_lock_owner_id(root: &Path) -> Result<Option<String>, String> {
             path.display(), owner.workspace.display()
         ));
     }
-    Ok(Some(owner.id))
+    Ok(Some(owner))
 }
 
 /// Find timestamped history reports that explicitly claim the exact run id.

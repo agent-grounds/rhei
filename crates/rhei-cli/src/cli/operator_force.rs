@@ -34,13 +34,15 @@ fn forced_lock_images(root: &Path, files: &[ForcedFile]) -> MietteResult<Vec<fs:
     Ok(locks)
 }
 
-/// Confirmation precedes run/root/file locks; all mutable guards are then repeated. §FS-rhei-transition-cmd.6
+/// Observe existing locks before confirmation; acquire and revalidate afterwards. §FS-rhei-transition-cmd.6
 #[allow(clippy::too_many_arguments)]
 fn force_transition_command(input: &Path, scope: &[String], machine_path: Option<&Path>,
     task: &str, from: &str, to: &str, reason: &str, result: Option<&str>) -> MietteResult<()> {
     let request = ForcedRequest { input, scope, machine_path, task, from, to, reason, result };
     let preview = prepare_forced_transition(&request)?;
-    let account = confirm_operator_hop(&format!("force {} {from} -> {to}", preview.task_id), "--force")?;
+    let handoff = OperatorHandoff::force(&request, &preview.task_id);
+    operator_preflight(&preview.roots, &handoff)?;
+    let account = confirm_operator_hop(&handoff)?;
     commit_confirmed_force(&request, preview, &account)
 }
 
@@ -48,7 +50,8 @@ fn force_transition_command(input: &Path, scope: &[String], machine_path: Option
 fn commit_confirmed_force(request: &ForcedRequest<'_>, preview: PreparedForce, account: &str) -> MietteResult<()> {
     let ForcedRequest { from, to, reason, result, .. } = *request;
     forced_boundary("confirmed-before-locks")?;
-    let _run_locks = operator_run_locks(&preview.roots, account)?;
+    let handoff = OperatorHandoff::force(request, &preview.task_id);
+    let _run_locks = operator_run_locks_with_handoff(&preview.roots, account, Some(&handoff))?;
     let _guards = forced_root_guards(&preview.roots)?;
     // §FS-rhei-errors.6
     for root in &preview.roots { rhei_core::root_access::check_pending(root).map_err(|err| root_access_report(root, err))?; }

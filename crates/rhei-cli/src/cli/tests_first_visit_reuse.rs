@@ -17,7 +17,6 @@ mod first_visit_reuse {
     }
 
     #[test]
-    #[ignore = "red until #755: actual first-visit skips emit no decision note; implement removes this"]
     fn first_visit_reuse_announces_only_actual_skips_once_per_visit() {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path();

@@ -11,6 +11,15 @@
 
 // §AR-source-file-size.3 §FS-rhei-agents.3.2 §FS-rhei-run.3
 
+/// Why existing work is eligible, shared by completion and its skip explanation.
+/// §FS-rhei-agents.3.2 §FS-rhei-agent-visit-pairing.6
+#[derive(PartialEq, Eq)]
+enum VisitWork {
+    OwnRecord,
+    PairedRecord,
+    FirstVisit,
+}
+
 /// One state visit, ready to be asked the completion condition about each of
 /// its invocations.
 ///
@@ -45,7 +54,7 @@ struct InvocationCompletion<'a> {
 }
 
 impl InvocationCompletion<'_> {
-    /// Whether an existing artifact belongs to work eligible for this visit.
+    /// Why an existing artifact belongs to work eligible for this visit, if it does.
     ///
     /// The invocation's own current-visit record answers first, whatever its
     /// ending. With none, the visit's one orphaned record may answer for it,
@@ -55,28 +64,27 @@ impl InvocationCompletion<'_> {
     /// through other states do not establish re-entry.
     // §FS-rhei-agents.3.2 §FS-rhei-transitions.4.3
     // §FS-rhei-agent-visit-pairing.2 §FS-rhei-agent-visit-pairing.3 §FS-rhei-agent-visit-pairing.6
-    fn work_is_eligible_for_visit(&self, resolved: &ResolvedAgent) -> bool {
+    fn work_eligibility(&self, resolved: &ResolvedAgent) -> Option<VisitWork> {
         let task_id = self.task.id.to_string();
         // An unreadable ledger is not eligible: the spawn it leads to refuses
         // on it by name. §FS-rhei-agents.8.1
-        let Some(own_names) = self.own_names(resolved) else {
-            return false;
-        };
+        let own_names = self.own_names(resolved)?;
         let own = own_spawn_record(&own_names, &task_id, self.state_name, self.moves);
         if own
             .as_ref()
             .is_some_and(|record| record.proves_successful_work(&task_id, self.state_name, self.moves))
         {
-            return true;
+            return Some(VisitWork::OwnRecord);
         }
         // Its own failed or still-running record of this visit decides; no orphan answers for it.
         if self.ran_under(&own_names) {
-            return false;
+            return None;
         }
         if self.paired_with(&own_names) {
-            return true;
+            return Some(VisitWork::PairedRecord);
         }
-        own.is_none() && !self.visit_pairing().ran_this_visit && !self.has_prior_state_visit()
+        (own.is_none() && !self.visit_pairing().ran_this_visit && !self.has_prior_state_visit())
+            .then_some(VisitWork::FirstVisit)
     }
 
     /// A departure proves a prior visit, including a visit that began before
@@ -118,7 +126,7 @@ impl InvocationCompletion<'_> {
     /// rather than spawned again, at both moments this condition is asked.
     // §FS-rhei-agents.3.2 §FS-rhei-states.3.3
     fn invocation_is_pending(&self, resolved: &ResolvedAgent) -> bool {
-        if !self.state_def.outputs.is_empty() && !self.work_is_eligible_for_visit(resolved) {
+        if !self.state_def.outputs.is_empty() && self.work_eligibility(resolved).is_none() {
             return true;
         }
         if !state_outputs_exist_for_resolved_invocation(
@@ -223,8 +231,9 @@ fn task_has_pending_agent_invocations(
 ///
 /// A target edited in place keeps the visit's finished work: the note naming
 /// the record that answers for it, or the warning for an edit too ambiguous to
-/// pair, is printed on the sink `pairing_notes` names. A reader that only asks
-/// passes `None`: the ready filter asks on every slice of a provider wait, and
+/// pair, is printed on the sink `pairing_notes` names. First-visit output reuse
+/// is explained there too. §FS-rhei-agent-visit-pairing.6
+/// A reader that only asks passes `None`: the ready filter asks on every slice of a provider wait, and
 /// would otherwise repeat the note each time. §FS-rhei-run.5.1
 ///
 /// `artifact_root` is the ticket's own root, where its outputs and results sit:
@@ -270,11 +279,15 @@ fn agent_invocations_to_spawn(
         invocations: &invocations,
         pairing: std::cell::OnceCell::new(),
     };
-    let pending = invocations
-        .iter()
-        .filter(|resolved| completion.invocation_is_pending(resolved))
-        .cloned()
-        .collect::<Vec<_>>();
+    let mut pending = Vec::new();
+    for resolved in &invocations {
+        if completion.invocation_is_pending(resolved) {
+            pending.push(resolved.clone());
+        } else if let Some((sink, reset)) = pairing_notes {
+            // Only actual skips speak; readiness probes pass no sink. §FS-rhei-agent-visit-pairing.6
+            completion.announce_first_visit_reuse(sink, resolved, reset);
+        }
+    }
     // Said here, where the pass decides, not in the predicate, which is asked
     // again after every exit. §FS-rhei-agent-visit-pairing.4
     if let Some((sink, reset)) = pairing_notes {

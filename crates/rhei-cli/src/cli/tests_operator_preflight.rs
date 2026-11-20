@@ -23,10 +23,18 @@ fn issue_757_existing_probe_is_read_only_and_noncreating() {
     drop(file);
     fs::remove_file(&path).unwrap();
     fs::remove_dir(root.join(".rhei")).unwrap();
-    // A non-directory parent makes opening the lock uncertain on every platform.
-    fs::write(root.join(".rhei"), "not a directory").unwrap();
-    assert!(matches!(probe_run_lock(root), RunLockProbe::Unknown(_)));
-    assert_eq!(fs::read(root.join(".rhei")).unwrap(), b"not a directory");
+    if cfg!(windows) {
+        // Windows reports a non-directory parent as NotFound. Opening a
+        // directory as a regular file instead supplies uncertain evidence.
+        fs::create_dir_all(&path).unwrap();
+        assert!(matches!(probe_run_lock(root), RunLockProbe::Unknown(_)));
+        assert!(path.is_dir());
+        assert_eq!(fs::read_dir(&path).unwrap().count(), 0);
+    } else {
+        fs::write(root.join(".rhei"), "not a directory").unwrap();
+        assert!(matches!(probe_run_lock(root), RunLockProbe::Unknown(_)));
+        assert_eq!(fs::read(root.join(".rhei")).unwrap(), b"not a directory");
+    }
 }
 
 fn issue_757_journal(root: &Path, names: Option<&str>) -> String {

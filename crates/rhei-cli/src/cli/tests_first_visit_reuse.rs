@@ -83,7 +83,9 @@ transitions:
         assert_eq!(said.len(), 1, "an actual first-visit skip must be announced exactly once: {said:?}");
         let note = &said[0];
         assert!(note.contains("task plan.1 state 'work': reusing first-visit outputs"), "{note}");
-        assert!(note.contains(&runtime.join("digest-alpha.md").display().to_string()), "{note}");
+        // Authored artifact paths can retain forward slashes on Windows.
+        let expected_path = runtime.join("digest-alpha.md").display().to_string().replace('\\', "/");
+        assert!(note.replace('\\', "/").contains(&expected_path), "{note}");
         assert!(!note.contains("digest-beta.md"), "beta will spawn: {note}");
         assert!(!note.contains("{model}"), "the note names resolved paths: {note}");
         assert!(note.contains("no agent spawned"), "{note}");

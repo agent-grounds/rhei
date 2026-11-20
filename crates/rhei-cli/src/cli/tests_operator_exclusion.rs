@@ -190,3 +190,5 @@ fn operator_force_revalidates_after_concurrent_claim_command() {
 fn operator_force_revalidates_after_concurrent_reset_command() {
     operator_force_revalidates_after_command(true);
 }
+
+include!("tests_operator_preflight.rs");

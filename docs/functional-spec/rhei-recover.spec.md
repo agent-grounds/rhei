@@ -128,8 +128,18 @@ in-doubt plan: the execution root, plus the immediate parent project for a
 version-2 basin manifest image, and filesystem-discovered project members
 needed by dependent project reads. Preparation, file-image resolution and replay
 use this same owner set. Recheck owner identities, image paths and marker
-validity under the complete lock set before replay. Run-lock acquisition is non-blocking and
-names the recorded owner on contention. After locking, recovery re-reads the
+validity under the complete lock set before replay. After stable validation,
+before its full recovery confirmation, recovery observes the existing locks of
+this marker-derived owner set without loading the in-doubt plan. It uses the
+same read-only, non-creating, non-rewriting observation and missing/uncertain
+fallthrough as [§FS-rhei-transition-cmd.6](rhei-transition-cmd.spec.md#6-operator-forced-missing-edge-recovery).
+Observation retains no exclusion while the operator types. Actual acquisition
+remains non-blocking after fresh confirmation. Contention at either point
+names the verified run, its known journal-derived scope and ticket membership,
+explains project-wide exclusion, and gives safe stop or waiting guidance and
+the full contextual retry. Unverified ownership and unknown scope are never
+presented as established identity or scope
+([§FS-rhei-errors.1.2](rhei-errors.spec.md#12-help)). After locking, recovery re-reads the
 marker and ledger and verifies that the previewed marker bytes, id, hop, and
 decision are unchanged. A changed or vanished marker refuses; it is never
 treated as the confirmed operation.

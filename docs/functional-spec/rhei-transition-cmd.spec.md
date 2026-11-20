@@ -487,8 +487,31 @@ parent project whose `index.panta.md` owns qualified visit/checkpoint metadata.
 Derive the same owner set for preparation and replay under [§FS-rhei-recover.2](rhei-recover.spec.md#2-marker-format)
 and [§FS-rhei-recover.3](rhei-recover.spec.md#3-recovery-decision), without moving or omitting that metadata.
 
-After confirmation, the command acquires each affected owner's run
-lock non-blocking and refuses with its recorded owner when held. It then takes
+After stable validation and before asking for confirmation, the command observes
+the existing run locks of that same canonical, sorted owner set, including any
+basin-parent owner. Observation opens only existing files, creates nothing,
+rewrites no ownership, and holds no exclusion while the operator types. Only
+observed contention refuses before the prompt; missing locks or uncertain
+evidence add no eligibility gate. Actual non-blocking acquisition and locked
+revalidation remain after fresh confirmation, so a run starting during typing
+can still refuse the move. Project-wide exclusion applies even when the ticket
+is outside the run's scheduling scope ([§FS-rhei-run.2.6](rhei-run.spec.md#26-run-lock)).
+
+Both contention refusals identify a verified live run, its known scheduling
+scope and the ticket's membership, explain project-wide locking, and give a safe
+remedy followed by the complete quoted retry in its invocation context
+([§FS-rhei-errors.1.2](rhei-errors.spec.md#12-help)). Scope comes only from that
+run's verified complete startup journal prefix: whole project or the resolved
+union of repeated `--rhei` selections, using the same evidence and safe stop
+rules as [§FS-rhei-transition-cmd.3.4](#34-live-gate-release-into-a-visits-budget).
+Incomplete, torn, stale, absent or unreadable scope evidence stays unknown.
+Malformed, unsupported, stale or mismatched ownership supplies no invented run
+identity, scope, pid or stop action. Another operator holder is identified as
+such. Registry observation is read-only and never prunes entries. No owner,
+descriptor, registry, journal or recovery-marker format changes are required.
+
+After confirmation, the command acquires each affected owner's run lock
+non-blocking with the same contention guidance. It then takes
 the exclusive root-access guards of [§FS-rhei-recover.4](rhei-recover.spec.md#4-pending-root-interlock) and the stable metadata,
 task, and ledger locks. It refuses while a claim exists on the task, any
 descendant, or the nearest in-scope supervising ancestor; claim release is a

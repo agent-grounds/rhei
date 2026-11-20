@@ -131,10 +131,18 @@ or immediate detached-child refusal as startup locks. The project lock remains
 held throughout; `--dry-run` remains lock-free and makes no live-admission
 promise.
 
-An operator-forced transition acquires the same involved roots
-non-blocking—after confirmation and before its exclusive root guard—and holds
-them through marker removal ([§FS-rhei-transition-cmd.6](rhei-transition-cmd.spec.md#6-operator-forced-missing-edge-recovery)). It never queues behind
-a live run: the refusal names the recorded owner. Conversely, run startup
+An operator-forced transition first observes the existing locks of the same
+involved roots after stable validation and before confirmation. Observation is
+read-only, creates no files, rewrites no owner and retains no exclusion during
+typing; only observed contention refuses, while missing or uncertain evidence
+falls through. It acquires those roots non-blocking after confirmation and
+before its exclusive root guard, and holds them through marker removal
+([§FS-rhei-transition-cmd.6](rhei-transition-cmd.spec.md#6-operator-forced-missing-edge-recovery)). It never queues behind
+a live run. Both refusals name the verified run, its known journal-derived
+scope and ticket membership, explain whole-project exclusion even outside that
+scope, and say how to end the run safely and retry; unknown evidence stays
+unknown ([§FS-rhei-errors.1.2](rhei-errors.spec.md#12-help)). A run can start
+while the operator types and then prevent acquisition. Conversely, run startup
 checks the pending-recovery interlock before and after acquiring its shared root
 guards and refuses a marked root rather than completing or undoing the
 operator's transaction ([§FS-rhei-recover.4](rhei-recover.spec.md#4-pending-root-interlock)).

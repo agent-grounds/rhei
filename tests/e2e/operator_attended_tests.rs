@@ -16,9 +16,27 @@ const ATTENDED_WAIT: Duration = Duration::from_secs(60);
 /// Input is sent only after the child's prompt is observed, using a channel barrier.
 /// The harness is test-only; production has no environment authorization. §FS-rhei-recover.1
 pub(super) fn attended(fixture: &ForceFixture, arguments: &[&str], answer: &str) -> (bool, String) {
+    attended_command(
+        rhei_command(fixture.dir.join("attended-home")),
+        arguments,
+        Some(answer),
+        || {},
+    )
+}
+
+/// The same native driver can observe exit without answering, or pause at the
+/// prompt while a scenario starts a run. §FS-rhei-transition-cmd.6 §FS-rhei-recover.3
+pub(super) fn attended_command(
+    source: std::process::Command,
+    arguments: &[&str],
+    answer: Option<&str>,
+    before_answer: impl FnOnce(),
+) -> (bool, String) {
     use portable_pty::{native_pty_system, CommandBuilder, PtySize};
-    let source = rhei_command(fixture.dir.join("attended-home"));
     let mut command = CommandBuilder::new(source.get_program());
+    if let Some(cwd) = source.get_current_dir() {
+        command.cwd(cwd);
+    }
     for (key, value) in source.get_envs() {
         if let Some(value) = value {
             command.env(key, value);
@@ -37,7 +55,7 @@ pub(super) fn attended(fixture: &ForceFixture, arguments: &[&str], answer: &str)
     let mut writer = pair.master.take_writer().unwrap();
     let watch = TerminalWatch::start(reader, ": type ");
     let started = Instant::now();
-    if !watch.prompted_within(ATTENDED_WAIT) {
+    if answer.is_some() && !watch.prompted_within(ATTENDED_WAIT) {
         let _ = killer.kill();
         // Closing the pseudo-console lets a ConPTY reader end; the report does not rely on it.
         drop(writer);
@@ -48,8 +66,16 @@ pub(super) fn attended(fixture: &ForceFixture, arguments: &[&str], answer: &str)
             watch.transcript_within(Duration::from_secs(5))
         );
     }
-    writer.write_all(answer.as_bytes()).unwrap();
-    writer.flush().unwrap();
+    if let Some(answer) = answer {
+        if let Err(panic) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(before_answer)) {
+            let _ = killer.kill();
+            drop(writer);
+            drop(pair.master);
+            std::panic::resume_unwind(panic);
+        }
+        writer.write_all(answer.as_bytes()).unwrap();
+        writer.flush().unwrap();
+    }
     let (exit_tx, exit_rx) = mpsc::channel();
     std::thread::spawn(move || {
         let _ = exit_tx.send(child.wait());
@@ -61,10 +87,16 @@ pub(super) fn attended(fixture: &ForceFixture, arguments: &[&str], answer: &str)
             let _ = killer.kill();
             drop(writer);
             drop(pair.master);
+            let transcript = watch.transcript_within(Duration::from_secs(5));
+            // Exit-only scenarios assert on the transcript themselves: an unexpected
+            // prompt is the regression, rather than a missing-prompt harness panic.
+            if answer.is_none() {
+                return (false, format!("{transcript}\n[exit wait expired: {err}]"));
+            }
             panic!(
                 "attended child did not exit ({err}) {:?} after the answer: {}",
                 answered.elapsed(),
-                watch.transcript_within(Duration::from_secs(5))
+                transcript
             );
         }
     };

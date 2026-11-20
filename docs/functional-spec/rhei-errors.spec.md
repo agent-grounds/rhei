@@ -73,7 +73,31 @@ the caller to bypass the boundary.
 
 For operator-forced recovery, a non-terminal caller is directed to a human
 operator at an interactive terminal for fresh typed confirmation; an agent
-must not perform the ceremony. A terminal ancestor refusal identifies the
+must not perform the ceremony. Keep the force headline exactly `--force
+requires an interactive terminal and fresh typed confirmation`. Help includes
+the exact canonical qualified typed hop (or full recovery confirmation), the
+complete shell-quoted retry and its invocation directory. Preserve the
+supplied target spelling or explicitly discovered target, selectors, reason,
+result and explicit state machine. Commands remain unwrapped for copying.
+When contention and non-terminal input coexist, retain that headline and put
+the blocker, safe remedy, retry/context and typed confirmation together in one
+handoff. Stable validation still precedes this handoff.
+
+Forced-transition and recovery contention help identifies a verified live run
+and its known journal-derived scheduling scope, says whether the ticket is in
+that scope, and explains that the lock still excludes the whole project. Scope
+uncertainty is stated as unknown. Waiting is always an option; offer `rhei stop
+<id> --wait` (or an exact workspace target) only when read-only identity,
+liveness and descriptor/registry checks prove that it resolves to this exact
+live run and the platform supports stopping. Otherwise direct the operator to
+wait or interrupt the original launcher using its process controls, without
+inventing a pid or stop target. Identify another operator's forced-recovery
+holder as an operator, not a run. Malformed, unsupported, missing, stale or
+mismatched owner data cannot establish an actionable run identity. The same
+verified scope and safe stop rules serve the live-gate advisory in
+[§FS-rhei-transition-cmd.3.4](rhei-transition-cmd.spec.md#34-live-gate-release-into-a-visits-budget).
+
+A terminal ancestor refusal identifies the
 ancestor to reopen first and gives its operator-only transition command,
 retaining the plan path, task, source and target state. The command goes only
 to a state the forced path would let that ancestor enter: one its profile

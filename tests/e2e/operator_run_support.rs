@@ -162,13 +162,17 @@ pub(super) fn assert_run_help(text: &str, fixture: &OperatorRunFixture, id: &str
         "retry must quote the supplied reason:\n{text}"
     );
     assert!(
-        text.contains(&fixture.force.dir.display().to_string()),
+        text.contains(
+            &rhei_core::platform::canonical_path(&fixture.force.dir).unwrap().display().to_string()
+        ),
         "retry must preserve invocation directory:\n{text}"
     );
 }
 
 pub(super) fn assert_safe_remedy(text: &str, root: &Path, id: &str) {
     if cfg!(unix) {
+        // The CLI resolves aliases such as macOS's /var and /private/var.
+        let root = rhei_core::platform::canonical_path(root).unwrap();
         assert!(
             text.contains(&format!("rhei stop {id} --wait"))
                 || text.contains(&format!(

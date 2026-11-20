@@ -207,14 +207,15 @@ fn issue_757_force_retry_preserves_invocation_context() {
         for value in ["owner's $(literal) route", "outcome with spaces"] {
             assert!(text.contains(&shell_quote(value)), "retry lost quoted {value:?}:\n{text}");
         }
+        let invocation_dir = rhei_core::platform::canonical_path(&fixture.force.dir).unwrap();
         let target = if supplied {
             "./index.panta.md".to_owned()
         } else {
-            fixture.force.dir.display().to_string()
+            invocation_dir.display().to_string()
         };
         assert!(text.contains(&shell_quote(&target)), "retry lost target {target}:\n{text}");
         assert!(
-            text.contains(&fixture.force.dir.display().to_string()),
+            text.contains(&invocation_dir.display().to_string()),
             "missing invocation directory:\n{text}"
         );
         let raw = raw_stderr(&out);

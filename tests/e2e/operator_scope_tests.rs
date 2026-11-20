@@ -1,7 +1,9 @@
 //! Scope evidence and safe fallback diagnostics for the shared ceremony.
 //! §FS-rhei-transition-cmd.6 §FS-rhei-errors.1.2 §FS-rhei-recover.3
 
-use super::operator_attended_tests::{attended, attended_command};
+#[cfg(unix)]
+use super::operator_attended_tests::attended;
+use super::operator_attended_tests::attended_command;
 use super::operator_force_support::*;
 use super::operator_run_support::*;
 use super::*;

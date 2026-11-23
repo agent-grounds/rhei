@@ -3,52 +3,21 @@
 *Each release's section is generated from the pull requests merged since the
 previous release; nothing here is written by hand.*
 
-## 2. [0.6.5] - 2026-11-16
+## 2. [0.6.6] - 2026-11-23
 
-- [Let the failed-own-record test tolerate healthy delayed sibling startup](https://github.com/agent-grounds/rhei/pull/740) (PR #740)
-- [Classify a polling fan-out with a free arm as waiting on its poll](https://github.com/agent-grounds/rhei/pull/738) (PR #738)
-- [Explain a ticket held only by its poll deadline as waiting on its poll, which rhei resumes itself](https://github.com/agent-grounds/rhei/pull/737) (PR #737)
-- [Keep a ticket halted on spent attempts or a refused log name out of the passes a deadline sleep opens](https://github.com/agent-grounds/rhei/pull/734) (PR #734)
-- [Wait for provider-held supervisors with open children](https://github.com/agent-grounds/rhei/pull/732) (PR #732)
-- [Specify that a provider wait holds only a ticket with an arm still to spawn, and only in the continuous run](https://github.com/agent-grounds/rhei/pull/733) (PR #733)
-- [Contribute a wait deadline only for a ticket nothing but a clock holds, so an expired provider record no longer keeps a run rescanning](https://github.com/agent-grounds/rhei/pull/731) (PR #731)
-- [Make a fan-out due when its first arm still to be spawned frees](https://github.com/agent-grounds/rhei/pull/730) (PR #730)
-- [Predict spawn refusals in dry runs](https://github.com/agent-grounds/rhei/pull/716) (PR #716)
-- [Append e2e fixture lines under a lock, so two processes appending to one file at once on Windows both keep their line](https://github.com/agent-grounds/rhei/pull/724) (PR #724)
-- [Name the ready task as the instantiation stop point and record a real write's invocation in the past tense](https://github.com/agent-grounds/rhei/pull/720) (PR #720)
-- [Number a stay by every arrival in its state, including ones the ledger never recorded](https://github.com/agent-grounds/rhei/pull/715) (PR #715)
-- [Reset a ticket scope with `rhei reset --task`](https://github.com/agent-grounds/rhei/pull/704) (PR #704)
-- [Say that rhei run --parallel counts tasks, each with all its fan-out arms](https://github.com/agent-grounds/rhei/pull/714) (PR #714)
-- [Name the missing Tasks section at misplaced task headings](https://github.com/agent-grounds/rhei/pull/693) (PR #693)
-- [Name the base and the path tried when a link's target does not exist](https://github.com/agent-grounds/rhei/pull/713) (PR #713)
-- [Resolve a bare index.panta.md to the current directory as its project](https://github.com/agent-grounds/rhei/pull/721) (PR #721)
-- [Resume the agent visit a run killed outright left behind, once its process group is gone](https://github.com/agent-grounds/rhei/pull/678) (PR #678)
-- [Say that a parent's Prior does not hold its children](https://github.com/agent-grounds/rhei/pull/694) (PR #694)
-- [Give the claim rollback and ledger-writer tests the shared 30 s patience so a slow runner cannot time them out at two seconds](https://github.com/agent-grounds/rhei/pull/712) (PR #712)
-- [Explain invalid COMPLETE values and how to recover](https://github.com/agent-grounds/rhei/pull/711) (PR #711)
-- [Let a qualified ticket id pick its rhei among loose plans](https://github.com/agent-grounds/rhei/pull/710) (PR #710)
-- [Keep live gate fixtures alive when raising the visits budget](https://github.com/agent-grounds/rhei/pull/706) (PR #706)
-- [Deliver the mid-grace shutdown at grace entry in the supervised precedence test so a late-scheduled raiser cannot fail it with TimedOut](https://github.com/agent-grounds/rhei/pull/707) (PR #707)
-- [Remove ticket exports during narrowed reset so completion requires fresh output](https://github.com/agent-grounds/rhei/pull/705) (PR #705)
-- [Refuse task metadata throughout workspace and Panta manifests](https://github.com/agent-grounds/rhei/pull/700) (PR #700)
-- [Let a continuous run sleep through a provider wait instead of opening a pass every half second](https://github.com/agent-grounds/rhei/pull/699) (PR #699)
-- [Record an `--until-idle` idle stop as finished, with exit code 3, in run.json, the run registry and the evidence manifest](https://github.com/agent-grounds/rhei/pull/697) (PR #697)
-- [Wait out a refused read of c's spawn record in the failed-own-record fixtures so a Windows sharing violation cannot fail the test](https://github.com/agent-grounds/rhei/pull/698) (PR #698)
-- [End a codex-family stdin command line `-- -` so a forked session reads its prompt](https://github.com/agent-grounds/rhei/pull/690) (PR #690)
-- [Spawn a private copy of the rhei binary in the test harness so a concurrent relink cannot remove it](https://github.com/agent-grounds/rhei/pull/691) (PR #691)
-- [Settle a fan-out arm at every exit, so a spawn error or worker panic leaves nothing outstanding after the run](https://github.com/agent-grounds/rhei/pull/682) (PR #682)
-- [Explain budget admission refusals in the final run halt](https://github.com/agent-grounds/rhei/pull/686) (PR #686)
-- [Let a `pi:<provider>/<model>` target wait out a provider outage instead of spending the state's attempts](https://github.com/agent-grounds/rhei/pull/683) (PR #683)
-- [Refuse a Directory Workspace link that leaves the workspace root whether or not its target exists](https://github.com/agent-grounds/rhei/pull/687) (PR #687)
-- [Attach Codex MCP servers through supported native configuration](https://github.com/agent-grounds/rhei/pull/675) (PR #675)
-- [Name the template file when instantiate refuses a file it rendered](https://github.com/agent-grounds/rhei/pull/669) (PR #669)
-- [Pipe the built-in pi's prompt on stdin with no trailing separator, so a prompt over 128 KiB starts pi](https://github.com/agent-grounds/rhei/pull/674) (PR #674)
-- [Refuse overlapping exit_code rules from one state when the machine loads](https://github.com/agent-grounds/rhei/pull/665) (PR #665)
-- [Settle each arm of a fanout at its own exit, from its own record](https://github.com/agent-grounds/rhei/pull/660) (PR #660)
-- [Fold consecutive attempts at one visit into one rhei summary step](https://github.com/agent-grounds/rhei/pull/656) (PR #656)
+- [Check run locks before operator confirmation and give complete recovery guidance](https://github.com/agent-grounds/rhei/pull/758) (PR #758)
+- [Announce first-visit output reuse before skipping agents](https://github.com/agent-grounds/rhei/pull/756) (PR #756)
+- [Explain which automatic state machines project validation overrides replace](https://github.com/agent-grounds/rhei/pull/754) (PR #754)
+- [Say what a replacing rhei note replaced and state the fold rule beside the raw note store](https://github.com/agent-grounds/rhei/pull/752) (PR #752)
+- [Report spent visits with retry advice and rooted unmet artifacts](https://github.com/agent-grounds/rhei/pull/750) (PR #750)
+- [Recognize a Claude Code give-up on an unreachable provider as provider_unavailable](https://github.com/agent-grounds/rhei/pull/748) (PR #748)
+- [Resolve stop and attach member references to the Panta project run](https://github.com/agent-grounds/rhei/pull/747) (PR #747)
+- [Honor the state-machine override when creating tickets](https://github.com/agent-grounds/rhei/pull/743) (PR #743)
+- [Describe --state-machine as overriding the automatic states.yaml lookup](https://github.com/agent-grounds/rhei/pull/744) (PR #744)
 
 ## 3. Older releases
 
+- [0.6.5](changelog/0.6.5.md) - 2026-11-16: 41 pull requests.
 - [0.6.4](changelog/0.6.4.md) - 2026-11-09: 69 pull requests.
 - [0.6.3](changelog/0.6.3.md) - 2026-10-26: 6 pull requests.
 - [0.6.2](changelog/0.6.2.md) - 2026-10-19: 5 pull requests.

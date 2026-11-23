@@ -400,3 +400,59 @@ fn issue_205_parallel_admission_refills_without_exceeding_the_slot_limit() {
         assert_follow_on_artifacts(&fixture.project, task, &observed);
     }
 }
+
+/// The live-checkpoint line says what the run did with a member published
+/// mid-run. Unrestricted, `follow` is admitted and the line says so: the
+/// control proves the fixture exercises live admission. Narrowed to `seed`,
+/// `follow` is locked but never scheduled, so the line must not call it
+/// admitted and must say it is outside the scope - pinned by meaning, not bytes.
+// §FS-rhei-panta.6.2.1 §FS-rhei-run.2.5 §FS-rhei-run.2.6
+fn assert_checkpoint_line_follows_scope(parallel: &str) {
+    let control = handoff_fixture(&format!("live-member-760-control-{parallel}"), false);
+    let run = run_project(&control, &["--no-tui", "--parallel", parallel]);
+    assert_success(&run);
+    let output = format!("{}{}", run.stdout, run.stderr);
+    assert!(
+        output.contains("Admitted 1 new rhei member(s): follow"),
+        "--parallel {parallel}: an unrestricted run keeps today's admission line:\n{output}"
+    );
+    assert_follow_on_finished(&control.project, 1);
+
+    let fixture = handoff_fixture(&format!("live-member-760-narrowed-{parallel}"), false);
+    let run = run_project(&fixture, &["--rhei", "seed", "--no-tui", "--parallel", parallel]);
+    assert_success(&run);
+    let output = format!("{}{}", run.stdout, run.stderr);
+    // Scheduling and locking are already right; the line must not move them.
+    assert!(!fixture.project.join("follow/follow-observation.json").exists());
+    assert!(!fixture.project.join("follow/runtime/spawns").exists());
+    let admitted: Vec<&str> =
+        output.lines().filter(|l| l.contains("Admitted") && l.contains("follow")).collect();
+    assert!(
+        admitted.is_empty(),
+        "--parallel {parallel}: a narrowed run must not report `follow` as admitted, \
+         it never schedules it: {admitted:?}\n{output}"
+    );
+    let locked = output.lines().any(|l| {
+        l.contains("follow")
+            && (l.contains("not scheduled") || l.contains("outside the --rhei scope"))
+    });
+    assert!(
+        locked,
+        "--parallel {parallel}: a narrowed run must name `follow` as locked and not \
+         scheduled:\n{output}"
+    );
+}
+
+/// The sequential loop. §FS-rhei-panta.6.2.1
+#[test]
+#[ignore = "red until #760: narrowed run reports out-of-scope member as admitted; implement removes this"]
+fn issue_760_sequential_narrowed_run_reports_an_out_of_scope_member_as_locked_not_admitted() {
+    assert_checkpoint_line_follows_scope("1");
+}
+
+/// The parallel schedule. §FS-rhei-panta.6.2.1 §FS-rhei-run.5
+#[test]
+#[ignore = "red until #760: narrowed run reports out-of-scope member as admitted; implement removes this"]
+fn issue_760_parallel_narrowed_run_reports_an_out_of_scope_member_as_locked_not_admitted() {
+    assert_checkpoint_line_follows_scope("2");
+}

@@ -399,6 +399,35 @@ Before spawning, `rhei run` reports the resolved scope and the rheis it will
 touch ([§FS-rhei-panta.6](rhei-panta.spec.md#6-project-scope-and-command-behavior)). A bare rhei runs as the single rhei of its implicit Panta, so the
 project-wide loop is the only execution path.
 
+#### 6.2.1. What an admission checkpoint reports
+
+A checkpoint that finds members published since startup reports them in the
+run journal, and the line says what the run did with them, which depends on
+its scope. An unrestricted run admits each new member and reports exactly:
+
+```text
+Admitted <N> new rhei member(s): <ids>
+```
+
+A run narrowed with `--rhei` admits nothing: its candidate set stays the one
+resolved at startup ([§FS-rhei-run.2.5](rhei-run.spec.md#25-project-scope---rhei)), so it never schedules a ticket
+of a new member, but it still takes the member's run lock and keeps it in strict
+validation ([§FS-rhei-run.2.6](rhei-run.spec.md#26-run-lock)). Where that point says the lock is taken
+"before admitting the member", a narrowed run takes it and stops there. Such a
+run never reports the member as admitted. It reports it on a line of its own
+that names the member and says the run locked it and will not schedule it
+because it lies outside the `--rhei` scope, for example:
+
+```text
+Locked 1 new rhei member outside the --rhei scope (not scheduled): <ids>
+```
+
+The line exists because an unattended run's journal is how an operator learns
+what that run will do next: calling a member admitted that the run will never
+schedule sends the operator to move work out of the project that was never at
+risk of starting. The checkpoint changes nothing else - scheduling, locking and
+the closing totals stay as the points above state them.
+
 ### 6.3. Completion and rollup
 
 Result artifacts and their in-plan links are keyed by the **project-qualified**

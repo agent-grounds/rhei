@@ -1774,6 +1774,26 @@ The [`concurrent`](rhei-states.spec.md#12-per-state-fields) flag on a `StateDef`
 
 The flag does not change state entry/exit semantics or transitions, and it does not affect within-task fanout (`all_targets` / `all_models`): every resolved invocation for a single scheduled task is still spawned together. Those invocations take no `--parallel` slot of their own ([§FS-rhei-run.5.3](rhei-run.spec.md#53-what---parallel-counts)).
 
+#### 5.2.1. Which Tickets Share a Non-Concurrent State
+
+"This state" is the state of the ticket's own machine, the same one its
+`concurrent` flag is read from ([§FS-rhei-states.1.2](rhei-states.spec.md#12-per-state-fields)). In a project run each rhei
+runs under its own machine ([§FS-rhei-panta.6](rhei-panta.spec.md#6-project-scope-and-command-behavior)), and a machine is
+identified by its resolved source: the `states.yaml` that governs the rhei, the
+project root's file, the `--state-machine` override, or the built-in default.
+The limit is held per (machine source, state name), at every point the run
+admits work — the first fill of a pass, the work already in flight, and the
+refill of a freed slot:
+
+- Two rheis whose machines come from different sources hold different states,
+  even when the states share a name. A ticket in one never waits for a ticket
+  in the other, and their `concurrent` flags may differ.
+- Two rheis governed by one source — both inheriting the project root's file,
+  both under one `--state-machine` override, or both under the built-in
+  default — share each of its states, and its non-concurrent limit counts
+  their tickets together. Two paths that spell the same file are one source;
+  two files with identical contents are two.
+
 ### 5.3. What `--parallel` Counts
 
 `--parallel N` bounds the number of **tasks** in flight, not the number of

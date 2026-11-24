@@ -101,12 +101,26 @@ fn find_next_transition(
 /// against the plan as re-read after it ran: the re-read graph supplies the
 /// operands, and the state the invocation ran in supplies the edge, even where
 /// the invocation moved its own ticket onward in between.
-// §FS-rhei-agents.3.2
+// §FS-rhei-agents.3.2 §FS-rhei-errors.1.5.1
 fn find_next_transition_from(
     task: &rhei_core::ast::Task,
     rhei: &rhei_core::ast::Rhei,
     machine: &rhei_validator::StateMachine,
     from_state_raw: &str,
+) -> MietteResult<Option<String>> {
+    find_next_transition_with_budget(
+        task, rhei.metadata.as_ref(), machine, from_state_raw, EntryBudgetCheck::Enforce,
+    )
+}
+
+/// Diagnostic selection shares source precedence, profiles and guards with real
+/// selection, relaxing only counted destination entry. §FS-rhei-errors.1.5.1
+fn find_next_transition_with_budget(
+    task: &rhei_core::ast::Task,
+    metadata: Option<&Metadata>,
+    machine: &rhei_validator::StateMachine,
+    from_state_raw: &str,
+    budget_check: EntryBudgetCheck,
 ) -> MietteResult<Option<String>> {
     let current_state = normalized_state_name(from_state_raw, machine);
 
@@ -119,14 +133,15 @@ fn find_next_transition_from(
                 task.profile_level(),
                 &rule.to.0,
             )
-            && transition_rule_is_applicable(
+            && transition_rule_is_applicable_with_budget(
                 rule,
                 machine,
-                rhei.metadata.as_ref(),
+                metadata,
                 &task.id,
                 Some(task),
                 &current_state,
                 from_state_raw,
+                budget_check,
             )?
         {
             return Ok(Some(rule.to.0.clone()));
@@ -145,14 +160,15 @@ fn find_next_transition_from(
                     task.profile_level(),
                     &rule.to.0,
                 )
-                && transition_rule_is_applicable(
+                && transition_rule_is_applicable_with_budget(
                     rule,
                     machine,
-                    rhei.metadata.as_ref(),
+                    metadata,
                     &task.id,
                     Some(task),
                     &current_state,
                     from_state_raw,
+                    budget_check,
                 )?
             {
                 return Ok(Some(rule.to.0.clone()));

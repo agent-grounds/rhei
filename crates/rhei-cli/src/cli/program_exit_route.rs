@@ -24,14 +24,16 @@ fn transition_is_nonzero_exit_code(rule: &rhei_core::ast::TransitionRule) -> boo
     matches!(rule.exit_code, Some(YamlValue::String(ref value)) if value == "nonzero")
 }
 
+// §FS-rhei-errors.1.5.1: diagnostic and live routes evaluate the same guards.
 fn program_transition_is_applicable(
     rule: &rhei_core::ast::TransitionRule,
     machine: &rhei_validator::StateMachine,
     metadata: Option<&Metadata>,
     task: &rhei_core::ast::Task,
     current_state: &str,
+    budget_check: EntryBudgetCheck,
 ) -> bool {
-    transition_rule_is_applicable(
+    transition_rule_is_applicable_with_budget(
         rule,
         machine,
         metadata,
@@ -39,6 +41,7 @@ fn program_transition_is_applicable(
         Some(task),
         current_state,
         task.state.as_str(),
+        budget_check,
     )
     .unwrap_or(false)
 }
@@ -134,12 +137,28 @@ struct ProgramExitRoute {
     selected_rule: usize,
 }
 
+/// Real program selection retains all budget checks. §FS-rhei-errors.1.5.1
 fn find_program_exit_transition(
     machine: &rhei_validator::StateMachine,
     metadata: Option<&Metadata>,
     task: &rhei_core::ast::Task,
     current_state: &str,
     exit_code: i32,
+) -> MietteResult<Option<ProgramExitRoute>> {
+    find_program_exit_transition_with_budget(
+        machine, metadata, task, current_state, exit_code, EntryBudgetCheck::Enforce,
+    )
+}
+
+/// Keep exit matching and poll precedence identical when diagnosing an entry
+/// refused solely by visits. §FS-rhei-errors.1.5.1
+fn find_program_exit_transition_with_budget(
+    machine: &rhei_validator::StateMachine,
+    metadata: Option<&Metadata>,
+    task: &rhei_core::ast::Task,
+    current_state: &str,
+    exit_code: i32,
+    budget_check: EntryBudgetCheck,
 ) -> MietteResult<Option<ProgramExitRoute>> {
     let applicable_exact_match_exists = exit_code != 0
         && machine
@@ -149,7 +168,9 @@ fn find_program_exit_transition(
             .filter(|rule| transition_has_exact_exit_code(rule))
             .filter(|rule| transition_matches_exit_code(rule, exit_code))
             .any(|rule| {
-                program_transition_is_applicable(rule, machine, metadata, task, current_state)
+                program_transition_is_applicable(
+                    rule, machine, metadata, task, current_state, budget_check,
+                )
             });
 
     let spent_budget = (exit_code != 0)
@@ -179,7 +200,9 @@ fn find_program_exit_transition(
             !(applicable_exact_match_exists && transition_is_nonzero_exit_code(rule))
         })
         .filter(|(_, rule)| {
-            program_transition_is_applicable(rule, machine, metadata, task, current_state)
+            program_transition_is_applicable(
+                rule, machine, metadata, task, current_state, budget_check,
+            )
         });
     let Some((first_index, first_rule)) = applicable.next() else {
         return Ok(None);

@@ -250,13 +250,19 @@ fn handle_parallel_program_completion(
                 );
                 advanced = true;
             } else if program_outcome.status.success() {
-                emit_run_message(
+                // The same selector and artifact checks explain every worker.
+                // §FS-rhei-errors.1.5.1
+                emit_no_advance_warning(
+                    "program", &task_id_str, &state_name,
+                    Some(NoAdvanceContext {
+                        workspace_root,
+                        artifact_root: &reloaded.task_root(&task_id_str, workspace_root),
+                        machine,
+                        metadata: reloaded.rhei.metadata.as_ref(),
+                        task,
+                        state: &state_name,
+                    }),
                     sink,
-                    rhei_tui::MessageLevel::Warn,
-                    format!(
-                        "  warning: program exited 0 but task {} did not advance from '{}'",
-                        task_id_str, state_name
-                    ),
                 );
             } else {
                 emit_run_message(

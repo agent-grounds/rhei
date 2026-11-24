@@ -456,6 +456,8 @@ fn describe_refused_alternatives(
     format!("{governs}{reachable}")
 }
 
+/// Live applicability always enforces entry budgets; the diagnostic probe uses
+/// the same guards with only visits relaxed. §FS-rhei-errors.1.5.1
 #[allow(clippy::too_many_arguments)]
 fn transition_rule_is_applicable(
     rule: &rhei_core::ast::TransitionRule,
@@ -466,11 +468,36 @@ fn transition_rule_is_applicable(
     current_state: &str,
     current_state_raw: &str,
 ) -> MietteResult<bool> {
+    transition_rule_is_applicable_with_budget(
+        rule,
+        machine,
+        metadata,
+        task_id,
+        task,
+        current_state,
+        current_state_raw,
+        EntryBudgetCheck::Enforce,
+    )
+}
+
+/// Share every guard with diagnostic selection, which relaxes only destination
+/// visits and never the poll allowance. §FS-rhei-errors.1.5.1
+#[allow(clippy::too_many_arguments)]
+fn transition_rule_is_applicable_with_budget(
+    rule: &rhei_core::ast::TransitionRule,
+    machine: &rhei_validator::StateMachine,
+    metadata: Option<&Metadata>,
+    task_id: &TaskId,
+    task: Option<&rhei_core::ast::Task>,
+    current_state: &str,
+    current_state_raw: &str,
+    budget_check: EntryBudgetCheck,
+) -> MietteResult<bool> {
     // Source sets retain wildcard semantics. §FS-rhei-transitions.4.6
     if !machine.transition_matches_source(rule, current_state) {
         return Ok(false);
     }
-    if !loop_reentry_allowed(
+    if !budget_check.allows(
         machine,
         metadata,
         task_id,

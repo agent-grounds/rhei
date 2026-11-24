@@ -6,7 +6,7 @@
 /// mutually exclusive and are raised by different keys, so the refusal says
 /// which one it measured rather than leaving the reader to guess the field.
 /// §FS-rhei-errors.1.5
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum LoopBudgetKind {
     /// A state's `visits:` budget, counted in visits.
     Visits,
@@ -36,7 +36,7 @@ impl LoopBudgetKind {
 /// was, and how far it is spent. Carried out of the check that measured it so
 /// the refusal cannot re-derive the subject and arrive at a different state.
 /// §FS-rhei-errors.1.5
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct SpentLoopBudget {
     state: String,
     kind: LoopBudgetKind,
@@ -136,3 +136,5 @@ fn loop_reentry_allowed(
     spent_loop_budget(machine, metadata, task_id, current_state, current_state_raw, to_state)
         .is_none()
 }
+
+include!("run_spent_destination.rs");

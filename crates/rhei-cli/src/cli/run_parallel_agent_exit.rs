@@ -550,10 +550,9 @@ fn handle_parallel_agent_exit(
                             );
                         }
                     } else {
-                        run_warn!(
-                            "  warning: agent exited 0 but task {} did not advance from '{}'",
-                            task_id_str, state_name
-                        );
+                        // No remaining task can establish a budget refusal.
+                        // §FS-rhei-errors.1.5.1
+                        emit_no_advance_warning("agent", &task_id_str, &state_name, None, sink);
                     }
                 }
                 Err(err) => {

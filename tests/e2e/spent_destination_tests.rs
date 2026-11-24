@@ -69,25 +69,21 @@ fn completion_names_spent_destination(worker: Worker, parallel: usize) {
 }
 
 #[test]
-#[ignore = "red until #764: sequential agent warnings and Attention name spent destination visits; implement removes this"]
 fn issue_764_agent_sequential_names_spent_destination() {
     completion_names_spent_destination(Worker::Agent, 1);
 }
 
 #[test]
-#[ignore = "red until #764: parallel agent warnings and Attention name spent destination visits; implement removes this"]
 fn issue_764_agent_parallel_names_spent_destination() {
     completion_names_spent_destination(Worker::Agent, 2);
 }
 
 #[test]
-#[ignore = "red until #764: sequential program warnings and Attention name spent destination visits; implement removes this"]
 fn issue_764_program_sequential_names_spent_destination() {
     completion_names_spent_destination(Worker::Program, 1);
 }
 
 #[test]
-#[ignore = "red until #764: parallel program warnings and Attention name spent destination visits; implement removes this"]
 fn issue_764_program_parallel_names_spent_destination() {
     completion_names_spent_destination(Worker::Program, 2);
 }

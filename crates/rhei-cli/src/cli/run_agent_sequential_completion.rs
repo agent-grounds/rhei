@@ -496,8 +496,10 @@ fn handle_sequential_agent_completion(
                                     workspace_root,
                                     &task_workspace_root,
                                     machine,
-                                    loaded.rhei.metadata.as_ref(),
-                                    task,
+                                    // Diagnose the post-exit guards and counters.
+                                    // §FS-rhei-errors.1.5.1
+                                    reloaded.rhei.metadata.as_ref(),
+                                    task_after.unwrap_or(task),
                                     task_id_str,
                                     state_before,
                                     // The same post-exit edge the completion

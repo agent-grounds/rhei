@@ -277,7 +277,7 @@ The rule binds every path that writes the link: `rhei complete`, `rhei transitio
    and would not be refused for leaving a plan validation refuses
    ([§FS-rhei-reset.2.3](rhei-reset.spec.md#23-a-reset-validation-would-refuse)); otherwise the help says a reset would not reopen it, or
    would be refused and why, and prints no reset command.
-5. Reject if the task's current state is a [gating state](rhei-states.spec.md#12-per-state-fields) (`gating: true`) — those can only be exited by an explicit human-initiated `rhei transition`.
+5. Reject if the task's current state is a [gating state](rhei-states.spec.md#12-per-state-fields) (`gating: true`) — those can only be exited by an explicit human-initiated `rhei transition`, and the help names it. At a gate whose brief asks an authored required question, which `rhei transition` refuses too ([§FS-rhei-gate-brief.8](rhei-gate-brief.spec.md#8-leaving-a-gate-by-rhei-transition)), the help names `rhei gate show` and `rhei gate answer` instead, the commands that leave it.
 6. Reject if any `**Prior:**` of the target task is unsatisfied — resolved
    across the whole project graph and judged the same way readiness judges it
    (terminal-and-not-cancelled, [§FS-rhei-panta.6.1](rhei-panta.spec.md#61-readiness-and-rhei-next)). The error names every

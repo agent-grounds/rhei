@@ -111,6 +111,11 @@ Text output includes:
   itself, `"execute_on": "<scope>-<event>"`.
 - A state that authors `withhold_task_tooling: true` prints `Task tooling:
   withheld` ([§FS-rhei-task-tooling.4](rhei-task-tooling.spec.md#4-a-state-that-withholds)); no other state prints the line.
+- A gating state that authors a `gate:` block ([§FS-rhei-gate-brief.1](rhei-gate-brief.spec.md#1-declaring-a-gate)) prints
+  a `Gate:` line naming what the block declares, each part only when authored:
+  `Gate: display=<path>, request=<path>, questions=<n>, routes=<n>`, or
+  `Gate: declared` for a block that declares none of them. A state without the
+  block prints no line, as before.
 - A polling state's `Poll:` line carries its cadence and, when the state
   declares one, the person it waits on: `Poll: interval=10m,
   max_attempts=60, waiting_on=author`. The label is appended only when
@@ -150,6 +155,13 @@ Each state that authors `effort` includes an `"effort": "<value>"` member.
 When the field is omitted, JSON omits the member rather than emitting
 `"effort": null`; text likewise adds no empty `Effort:` line. This preserves
 the inspection shape of machines that do not opt in.
+
+A gating state that authors a `gate:` block includes a `"gate": { … }` member
+holding the block as authored, its path and prose templates unrendered: the
+`title`, `summary`, `display`, `request` and `questions` it declares, and
+`routes` when it declares any ([§FS-rhei-gate-brief.1](rhei-gate-brief.spec.md#1-declaring-a-gate)). A state without the block omits the
+member, for the same reason as `effort`. What one ticket is asked at the gate is
+its brief, read with `rhei gate show` ([§FS-rhei-gate-cmd.2](rhei-gate-cmd.spec.md#2-rhei-gate-show)).
 
 A state that authors `withhold_task_tooling` includes a
 `"withhold_task_tooling": <bool>` member with the authored value, and a state

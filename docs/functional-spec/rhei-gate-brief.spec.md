@@ -103,9 +103,18 @@ On the same edge, after the files are found, the request is read and checked:
    static questions are held to at load ([§FS-rhei-gate-brief.1.2](rhei-gate-brief.spec.md#12-validation)).
 
 A request that fails refuses the edge, and the refusal lists every problem
-found, not only the first. Under `rhei run` that is the failed visit of the state
-that wrote the request, so a malformed request is retried by its writer and
-never reaches the person.
+found, not only the first. The ticket stays in the state that wrote the request,
+so a malformed request never reaches the person: no gate is entered, and nobody
+is asked to answer it. Under `rhei run` the refusal is an edge a finished visit
+could not take, as a missing declared input is: the run warns that the ticket
+could not advance, with every problem, and leaves it stalled in the writer's
+state for the rest of the run, whose report says so ([§FS-rhei-run.3](rhei-run.spec.md#3-execution-loop)). Within
+the run the writer gets no further attempt. A later `rhei run` gives it the next
+attempt of the same visit only while the visit's completion condition is unmet
+([§FS-rhei-agents.3.2](rhei-agents.spec.md#32-completion-condition)) and its attempt budget lasts ([§FS-rhei-agents.3.2.3](rhei-agents.spec.md#323-attempt-budget)). A
+request the writer declares as an output meets that condition, so such a request
+is repaired by hand, or removed so that the next attempt writes it again, before
+the gate can be entered.
 
 ## 3. The Request File
 
@@ -339,9 +348,11 @@ a refused answer leaves no trace.
 
 The answer, rendered, is the transition's result message: one line per answered
 question, `<prompt>: <label or value>` (a `multi` answer's labels joined by
-`, `), then a last line naming the answer file's path. It is never empty, and it
-satisfies the terminal-result obligation ([§FS-rhei-states.3.3](rhei-states.spec.md#33-terminal-result)) exactly as
-`--result` does.
+`, `), then a last line naming the answer file's path. A line break inside a
+prompt, a label or a `text` answer is folded into one space, with the blank
+around it, so a reader can take the lines one per question; the answer file
+keeps the text as it was written. It is never empty, and it satisfies the
+terminal-result obligation ([§FS-rhei-states.3.3](rhei-states.spec.md#33-terminal-result)) exactly as `--result` does.
 
 ### 7.3. The `gate-answer` Input
 
@@ -387,11 +398,13 @@ without its answers.
 At a gate whose brief asks at least one **authored** required question,
 `rhei transition --from <gate>` is refused, and the refusal names
 `rhei gate answer <ticket> --from <gate> --answers <file|->` and
-`rhei gate show <ticket>` ([§FS-rhei-transition-cmd.3.5](rhei-transition-cmd.spec.md#35-gates-with-a-brief)). A gate with no block, or
-whose brief asks only synthesized questions — a degraded brief included —
-transitions exactly as before. `--force` keeps its meaning
-([§FS-rhei-transition-cmd.6](rhei-transition-cmd.spec.md#6-operator-forced-missing-edge-recovery)), and autonomous commands still never leave a gating
-state.
+`rhei gate show <ticket>` ([§FS-rhei-transition-cmd.3.5](rhei-transition-cmd.spec.md#35-gates-with-a-brief)). The live dashboard's gate
+release applies the same refusal ([§FS-rhei-viz.5.1](rhei-viz.spec.md#51-human-gate-transitions)), and `rhei complete`, which never
+leaves a gate, names the same two commands when it refuses one
+([§FS-rhei-complete.4](rhei-complete.spec.md#4-behavior)). A gate with no block, or whose brief asks only synthesized
+questions — a degraded brief included — transitions exactly as before.
+`--force` keeps its meaning ([§FS-rhei-transition-cmd.6](rhei-transition-cmd.spec.md#6-operator-forced-missing-edge-recovery)), and autonomous commands still
+never leave a gating state.
 
 ## 9. Schemas
 

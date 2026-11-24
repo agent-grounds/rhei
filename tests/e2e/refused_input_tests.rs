@@ -89,7 +89,6 @@ fn final_state_line(world: &World) -> String {
 /// (a) and (b): the run whose agent finished, then a run that reuses that work
 /// without spawning it, with `draft` declaring its result as an output.
 #[test]
-#[ignore = "red until #770: Attention says 'stalled', then 'not scheduled - rerun', never the destination's missing input; implement removes this"]
 fn issue_770_reused_visit_names_destination_input() {
     let world = World::new(Worker::Agent, Outputs::Declared);
     let finishing = world.run();
@@ -116,7 +115,6 @@ fn issue_770_reused_visit_names_destination_input() {
 /// (c): the visit's record is on disk and its work is reusable, so there is
 /// nothing to refill; the refusal says that and names the refused edge.
 #[test]
-#[ignore = "red until #770: rhei retry says 'no spawn record for its current visit' though it is on disk; implement removes this"]
 fn issue_770_retry_of_reused_visit_says_nothing_to_refill() {
     let world = World::new(Worker::Agent, Outputs::Declared);
     world.assert_refused(&world.run());
@@ -177,19 +175,16 @@ fn spent_visit_names_refused_edge(worker: Worker, outputs: Outputs) {
 }
 
 #[test]
-#[ignore = "red until #770: the spent visit says 'completion condition is still unmet: ... names nothing on disk', never the refused edge; implement removes this"]
 fn issue_770_agent_spent_visit_names_refused_edge() {
     spent_visit_names_refused_edge(Worker::Agent, Outputs::Bare);
 }
 
 #[test]
-#[ignore = "red until #770: a program's finished visit reads 'stalled', then 'names nothing on disk', never the refused edge; implement removes this"]
 fn issue_770_program_spent_visit_names_refused_edge() {
     spent_visit_names_refused_edge(Worker::Program, Outputs::Bare);
 }
 
 #[test]
-#[ignore = "red until #770: a program with its outputs on disk still reads 'names nothing on disk', never the refused edge; implement removes this"]
 fn issue_770_program_with_outputs_spent_visit_names_refused_edge() {
     spent_visit_names_refused_edge(Worker::Program, Outputs::Declared);
 }
@@ -198,7 +193,6 @@ fn issue_770_program_with_outputs_spent_visit_names_refused_edge() {
 /// worker's edge for a spent `visits:` budget, and the state declares no
 /// outputs, so the spent attempts must name that budget. §FS-rhei-errors.1.5.1
 #[test]
-#[ignore = "red until #770: a spent visit behind a spent visits: budget says 'still unmet: ... names nothing on disk'; implement removes this"]
 fn issue_770_spent_visit_behind_spent_destination_visits_names_budget() {
     let world = World::new(Worker::Agent, Outputs::Bare);
     world.change_machine(

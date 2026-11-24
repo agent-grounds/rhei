@@ -90,9 +90,10 @@ enum HaltCause {
     ManualOnly { to: String },
     /// Non-terminal with no declared outgoing transition to take.
     NoTransition,
-    /// An otherwise eligible forward entry refused the destination's visits.
-    /// §FS-rhei-errors.1.5.1
-    SpentDestination { budget: SpentLoopBudget },
+    /// A finished worker's selected forward edge, refused by its destination: a
+    /// spent `visits:` budget or a missing required input.
+    /// §FS-rhei-errors.1.5.1 §FS-rhei-errors.1.5.2 §FS-rhei-run-report.3.1
+    RefusedDestination { refusal: DestinationRefusal },
     /// The run was interrupted while this ticket's worker was in flight.
     /// Nothing about the ticket failed and nothing about it is waiting on a
     /// human: the run was stopped, and re-running it is the whole recovery.
@@ -107,6 +108,9 @@ enum HaltCause {
     SpentVisit {
         attempts: u64,
         entries: Vec<String>,
+        /// When the last attempt met its completion condition, the destination's
+        /// refusal of the edge it selected, named instead. §FS-rhei-errors.1.5.2
+        refused: Option<DestinationRefusal>,
         /// Diagnostics belong to the same invocation, even when it spent the visit.
         /// §FS-rhei-configuration-fallbacks
         configuration_fallbacks: Vec<String>,
@@ -202,7 +206,7 @@ impl HaltCause {
             | HaltCause::BlockedByPrior { .. }
             | HaltCause::Interrupted
             | HaltCause::SpentVisit { .. }
-            | HaltCause::SpentDestination { .. }
+            | HaltCause::RefusedDestination { .. }
             | HaltCause::MissingInputs { .. } => false,
         }
     }
@@ -329,11 +333,8 @@ impl HaltCause {
                 "declare a transition out of this state, or cancel the ticket".to_string(),
             ),
             // The same measured refusal as the successful worker's warning.
-            // §FS-rhei-errors.1.5.1
-            HaltCause::SpentDestination { budget } => (
-                budget.to_string(),
-                format!("raise `visits:` on state '{}', or cancel the ticket", budget.state),
-            ),
+            // §FS-rhei-errors.1.5.1 §FS-rhei-errors.1.5.2
+            HaltCause::RefusedDestination { refusal } => refusal.attention(),
             // Not "stalled", and emphatically not "mark the task cancelled":
             // the operator stopped the run, so the run says so and asks for
             // nothing else. §FS-rhei-run-report.3.1
@@ -342,13 +343,24 @@ impl HaltCause {
                 "re-run to continue".to_string(),
             ),
             // §FS-rhei-run-report.3.1: one cause and recovery on every halt surface.
-            HaltCause::SpentVisit { attempts, entries, configuration_fallbacks } => (
-                format!(
-                    "{attempts} attempts spent on this visit; still unmet: {}",
-                    completion_debt_label(entries)
-                ) + &configuration_fallback_clauses(configuration_fallbacks),
-                format!("`rhei retry {id}`, then rerun"),
-            ),
+            HaltCause::SpentVisit { attempts, entries, refused, configuration_fallbacks } => {
+                // A met condition names its refused edge, released before the grant.
+                // §FS-rhei-errors.1.5.2
+                let (held, release) = match refused {
+                    Some(refusal) => (
+                        format!("its last attempt finished, but {}", refusal.edge()),
+                        format!("{}, then ", refusal.release()),
+                    ),
+                    None => {
+                        (format!("still unmet: {}", completion_debt_label(entries)), String::new())
+                    }
+                };
+                (
+                    format!("{attempts} attempts spent on this visit; {held}")
+                        + &configuration_fallback_clauses(configuration_fallbacks),
+                    format!("{release}`rhei retry {id}`, then rerun"),
+                )
+            }
             // Name the files. The whole point of this cause is that the operator
             // does not have to go read a log to learn which one is missing.
             // §FS-rhei-run-report.3.1

@@ -74,7 +74,27 @@ fn render_spent_visit_halt(
     owed: &str,
     recovery: HaltRecovery,
 ) -> String {
-    let mut line = format!("  halting Task {task} in state '{state}': {spent} attempts spent on this visit and the completion condition is still unmet: {owed}. The ticket stays in '{state}'.");
+    render_spent_visit_hold(task, state, spent, &spent_visit_unmet(owed), recovery)
+}
+
+/// What holds a spent visit whose completion condition is unmet, as its halt
+/// line says it after the spent attempts. §FS-rhei-agents.3.2.1
+fn spent_visit_unmet(owed: &str) -> String {
+    format!("the completion condition is still unmet: {owed}")
+}
+
+/// The halt line around what holds the visit: the prefix scripts match through
+/// `attempts spent on this visit`, then `hold`, then the ending and recovery.
+/// `hold` is the unmet completion condition, or the destination's refusal of the
+/// edge a met one selected. §FS-rhei-agents.3.2.1 §FS-rhei-errors.1.5.2 §FS-rhei-retry.3
+fn render_spent_visit_hold(
+    task: &str,
+    state: &str,
+    spent: u64,
+    hold: &str,
+    recovery: HaltRecovery,
+) -> String {
+    let mut line = format!("  halting Task {task} in state '{state}': {spent} attempts spent on this visit and {hold}. The ticket stays in '{state}'.");
     match recovery {
         HaltRecovery::Visit { configured, checkpoints: None } => line.push_str(&format!(" To give this visit {configured} more attempts, run: rhei retry {task}.")),
         HaltRecovery::Visit { configured, checkpoints: Some(count) } => line.push_str(&format!(" Its subtree is still held with {count} unread checkpoint{}. To give this visit {configured} more attempts and keep the hold, run: rhei retry {task} (its self-loop would release the subtree instead).", if count == 1 { "" } else { "s" })),

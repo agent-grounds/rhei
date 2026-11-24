@@ -167,9 +167,14 @@ fn classify_halt(
     // The spawn planner knows what rerunning cannot release, even when this
     // run consumed the last attempt. §FS-rhei-run-report.3.1
     if let Some((attempts, entries)) = spent_visit_halt(task, rhei, machine, &state, spawns) {
+        // Met, so only a refused edge holds it, named as such. §FS-rhei-errors.1.5.2
+        let refused = entries.is_empty()
+            .then(|| refused_destination_halt(task, rhei, machine, &state, spawns))
+            .flatten();
         return HaltCause::SpentVisit {
             attempts,
             entries,
+            refused,
             // Preserve this invocation's diagnostics beside its unmet artifacts.
             // §FS-rhei-configuration-fallbacks
             configuration_fallbacks: missing.as_ref()
@@ -177,12 +182,12 @@ fn classify_halt(
                 .unwrap_or_default(),
         };
     }
-    // Required outputs outrank a counted destination, in this run and later
-    // runs alike; the probe also checks candidate-specific artifacts.
-    // §FS-rhei-errors.1.5.1
+    // Outputs outrank a refusing destination in every run; the probe checks candidate
+    // artifacts too. Ahead of stall, manual-only, current inputs and never-scheduled.
+    // §FS-rhei-errors.1.5.1 §FS-rhei-errors.1.5.2 §FS-rhei-run-report.3.1
     if missing.as_ref().is_none_or(|unwritten| unwritten.entries.is_empty()) {
-        if let Some(budget) = spent_destination_halt(task, rhei, machine, &state, spawns) {
-            return HaltCause::SpentDestination { budget };
+        if let Some(refusal) = refused_destination_halt(task, rhei, machine, &state, spawns) {
+            return HaltCause::RefusedDestination { refusal };
         }
     }
     if worked {

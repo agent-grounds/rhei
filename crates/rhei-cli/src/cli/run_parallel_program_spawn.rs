@@ -65,26 +65,19 @@ fn spawn_parallel_program_work_item(
     let budget =
         resolve_attempt_budget(machine.states.get(item.current_state.as_str()), settings);
     if let Some(spent_budget) = plan.budget_spent(budget) {
-        let owed: Vec<_> = missing_previous_program_outputs(
-            &task_workspace_root,
-            machine,
-            loaded.rhei.metadata.as_ref(),
-            task,
-            &item.current_state,
-            &plan,
-        ).iter().map(MissingRequiredOutput::warning_entry).collect();
         // `Skipped` is the pool's stall. §FS-rhei-run.3 §FS-rhei-agents.3.2.3
-        emit_run_message(
-            sink,
-            rhei_tui::MessageLevel::Warn,
-            render_spent_visit_halt(
-                &item.task_id_str,
-                &item.current_state,
-                spent_budget,
-                &plan.spent_budget_owed(&owed),
-                visit_halt_recovery(budget, machine, loaded.rhei.metadata.as_ref(), task),
-            ),
-        );
+        // Every site's line, refused edge included. §FS-rhei-errors.1.5.2
+        let site = NoAdvanceContext {
+            workspace_root,
+            artifact_root: &task_workspace_root,
+            machine,
+            metadata: loaded.rhei.metadata.as_ref(),
+            task,
+            state: &item.current_state,
+        };
+        let (id, rhei) = (&item.task_id_str, &loaded.rhei);
+        let halt = spent_visit_halt_line(id, site, rhei, &plan, spent_budget, budget);
+        emit_run_message(sink, rhei_tui::MessageLevel::Warn, halt);
         return Ok(ParallelProgramSpawnOutcome::Skipped);
     }
     let workspace_root = task_workspace_root.as_path();

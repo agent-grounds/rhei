@@ -253,6 +253,7 @@ fn ticket_pick_of(command: &Commands) -> Option<TicketPick> {
     };
     match command {
         Commands::Show { input, task, .. } => ticket_of("show", input, task),
+        Commands::Gate { command } => command.ticket_pick(),
         Commands::Retry { input, task, .. } => ticket_of("retry", input, task),
         Commands::Transition { input, task, .. } => ticket_of("transition", input, task),
         Commands::Complete { input, task, .. } => ticket_of("complete", input, task),

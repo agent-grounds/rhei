@@ -1,0 +1,253 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "rhei.gate.show.v1",
+  "title": "Rhei gate brief v1",
+  "description": "What `rhei gate show --json` prints: one ticket's brief at its gate. See FS-rhei-gate-cmd.2.1.",
+  "type": "object",
+  "required": [
+    "version",
+    "ticket",
+    "ticket_title",
+    "title",
+    "state",
+    "visit",
+    "since",
+    "plan",
+    "root",
+    "source",
+    "summary",
+    "display",
+    "attachments",
+    "questions",
+    "destinations",
+    "routes",
+    "digest",
+    "answer_path",
+    "problems"
+  ],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "ticket": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ticket_title": {
+      "type": "string"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "state": {
+      "type": "string",
+      "minLength": 1
+    },
+    "visit": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "since": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "plan": {
+      "type": "string"
+    },
+    "root": {
+      "type": "string"
+    },
+    "source": {
+      "enum": [
+        "request",
+        "questions",
+        "synthesized"
+      ]
+    },
+    "summary": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "display": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/file"
+        }
+      ]
+    },
+    "attachments": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/file"
+      }
+    },
+    "questions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/question"
+      }
+    },
+    "destinations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/destination"
+      }
+    },
+    "routes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/route"
+      }
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "answer_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "problems": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "$defs": {
+    "file": {
+      "type": "object",
+      "required": [
+        "path",
+        "absolute",
+        "readable",
+        "problem"
+      ],
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "absolute": {
+          "type": "string"
+        },
+        "readable": {
+          "type": "boolean"
+        },
+        "problem": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "question": {
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "prompt",
+        "required"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "boolean",
+            "choice",
+            "multi",
+            "text"
+          ]
+        },
+        "prompt": {
+          "type": "string"
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/option"
+          }
+        },
+        "help": {
+          "type": "string"
+        }
+      }
+    },
+    "option": {
+      "type": "object",
+      "required": [
+        "value",
+        "label"
+      ],
+      "properties": {
+        "value": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        }
+      }
+    },
+    "destination": {
+      "type": "object",
+      "required": [
+        "state",
+        "description",
+        "condition",
+        "final"
+      ],
+      "properties": {
+        "state": {
+          "type": "string"
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "condition": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "final": {
+          "type": "boolean"
+        }
+      }
+    },
+    "route": {
+      "type": "object",
+      "required": [
+        "to",
+        "when"
+      ],
+      "properties": {
+        "to": {
+          "type": "string"
+        },
+        "when": {
+          "type": "object"
+        }
+      }
+    }
+  }
+}

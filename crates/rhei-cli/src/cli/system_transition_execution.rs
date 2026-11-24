@@ -310,6 +310,16 @@ fn execute_transition_with_origin(
     // §FS-rhei-transition-cmd.2
     let operation_supervisor =
         origin.supervisor.as_ref().and(supervising_owner.map(|owner| &owner.id));
+    // After compare-and-swap, before the edge is looked at. §FS-rhei-transition-cmd.3.5
+    if origin.gate_brief_guard {
+        if let Err(err) = ensure_gate_left_by_answer(files.artifact_root, &task_info.task, files.artifact_id, from, machine) {
+            if let Some(task_handle) = &task_handle {
+                task_handle.release();
+            }
+            metadata_handle.release();
+            return Err(err);
+        }
+    }
     if let Some(claim) = claim {
         if let Err(err) = ensure_claimable_under_lock(claim, files.artifact_id) {
             if let Some(task_handle) = &task_handle {
@@ -725,6 +735,7 @@ fn execute_transition_with_origin(
             to,
         )?;
     }
+    let entry_context = format!("Task {} cannot enter state {}.", files.artifact_id, to);
     ensure_state_inputs_exist_for_transition_with_options(
         files.artifact_root,
         Some(&task_info.task),
@@ -735,8 +746,10 @@ fn execute_transition_with_origin(
         machine,
         &settings,
         run_options,
-        &format!("Task {} cannot enter state {}.", files.artifact_id, to),
+        &entry_context,
     )?;
+    // A gate's display and request are inputs the author did not list. §FS-rhei-gate-brief.2
+    ensure_gate_inputs_on_entry(files.artifact_root, Some(&task_info.task), files.artifact_id, to, to_state_def, &entry_context)?;
     // Ownership comes from the effective target, including a redirect. Resolution failures
     // retain the manual fallback; output prints its existing warning after commit. §FS-rhei-next.3.1
     let claim_assignee = resolve_claim_assignee(origin.claim, machine, to, &settings, &task_info.task);

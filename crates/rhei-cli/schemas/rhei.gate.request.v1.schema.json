@@ -1,0 +1,180 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "rhei.gate.request.v1",
+  "title": "Rhei gate request v1",
+  "description": "The request file the state before a gate writes: what the gate shows and asks. Every object is closed, because rhei reads it and refuses a field it does not know. See FS-rhei-gate-brief.3.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "title",
+    "questions"
+  ],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "title": {
+      "type": "string",
+      "pattern": "^[^\\n]*\\S[^\\n]*$",
+      "description": "Non-empty, one line."
+    },
+    "summary": {
+      "type": "string"
+    },
+    "display": {
+      "$ref": "#/$defs/relative_path",
+      "description": "Only when the gate block declares no display; must exist when the ticket enters the gate."
+    },
+    "attachments": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/relative_path"
+      }
+    },
+    "questions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/question"
+      },
+      "description": "Ids unique."
+    }
+  },
+  "$defs": {
+    "relative_path": {
+      "type": "string",
+      "minLength": 1,
+      "not": {
+        "pattern": "^([/\\\\]|[A-Za-z]:)"
+      },
+      "description": "Relative to the ticket's execution root; never absolute, never escaping it with `..`."
+    },
+    "question": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "prompt"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_-]*$",
+          "not": {
+            "enum": [
+              "destination",
+              "reason"
+            ]
+          },
+          "description": "Unique in the gate. `destination` and `reason` are rhei's own."
+        },
+        "kind": {
+          "enum": [
+            "boolean",
+            "choice",
+            "multi",
+            "text"
+          ]
+        },
+        "prompt": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "required": {
+          "type": "boolean",
+          "default": true
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/option"
+          },
+          "description": "Values unique."
+        },
+        "help": {
+          "type": "string"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "choice"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "options"
+            ],
+            "properties": {
+              "options": {
+                "minItems": 2
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "multi"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "options"
+            ],
+            "properties": {
+              "options": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "boolean",
+                  "text"
+                ]
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "required": [
+                "options"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "option": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "value"
+      ],
+      "properties": {
+        "value": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "label": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

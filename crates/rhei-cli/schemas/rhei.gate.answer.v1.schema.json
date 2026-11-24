@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "rhei.gate.answer.v1",
+  "title": "Rhei gate answer v1",
+  "description": "What a caller passes to `rhei gate answer`, and the file rhei records it as under runtime/gates/<task-id>/<visit>.answer.json; the recording fields are optional so the recorded file is an answer too. Closed, because rhei reads it. See FS-rhei-gate-brief.6 and FS-rhei-gate-brief.7.1.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "request_digest",
+    "answers"
+  ],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "request_digest": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The brief's `digest`, copied unchanged from `rhei gate show --json`."
+    },
+    "answers": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9_-]*$"
+      },
+      "additionalProperties": {
+        "type": [
+          "boolean",
+          "string",
+          "array",
+          "null"
+        ],
+        "items": {
+          "type": "string"
+        }
+      },
+      "description": "Question id to answer: a boolean, an option value, an array of distinct option values, or text. null counts as absent."
+    },
+    "ticket": {
+      "type": "string",
+      "minLength": 1
+    },
+    "state": {
+      "type": "string",
+      "minLength": 1
+    },
+    "visit": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "to": {
+      "type": "string",
+      "minLength": 1
+    },
+    "route": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/route_choice"
+        }
+      ],
+      "description": "null when the destination came from the `destination` question."
+    },
+    "answered_by": {
+      "type": "string"
+    },
+    "answered_at": {
+      "type": "string"
+    }
+  },
+  "$defs": {
+    "route_choice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "index",
+        "when"
+      ],
+      "properties": {
+        "index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "when": {
+          "type": "object"
+        }
+      }
+    }
+  }
+}

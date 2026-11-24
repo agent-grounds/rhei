@@ -215,7 +215,9 @@ then the block's `summary`, else none.
 durable transition ledger ([§FS-rhei-complete.3.1](rhei-complete.spec.md#31-state-transition-ledger)) of the ticket's execution root
 and, for a project, of the project root: one per `<task-id> <from>@<state>`
 movement. It is at least 1, so a ticket authored in the gate is at its first
-visit. A reset that removes the ledger starts the count again.
+visit. A reset that removes the ledger starts the count again. It is the entry
+number agent logs are named by ([§FS-rhei-agents.8.1](rhei-agents.spec.md#81-log-file-naming)), so a gate's visit and the
+log of the visit that led to it are counted the same way.
 
 `since` is when the ticket last entered the state, as an RFC 3339 UTC time, or
 `null` when that is unknown. The ledger has no times, so it is read from the run

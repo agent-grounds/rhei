@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "rhei.gate.list.v1",
+  "title": "Rhei gate list v1",
+  "description": "What `rhei gate list --json` prints: every ticket under a root that waits at a gate, oldest first. See FS-rhei-gate-cmd.4.",
+  "type": "object",
+  "required": [
+    "version",
+    "root",
+    "gates"
+  ],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "root": {
+      "type": "string"
+    },
+    "gates": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/gate"
+      }
+    }
+  },
+  "$defs": {
+    "gate": {
+      "type": "object",
+      "required": [
+        "ticket",
+        "ticket_title",
+        "title",
+        "state",
+        "plan",
+        "root",
+        "visit",
+        "since",
+        "source",
+        "required",
+        "holds",
+        "problems"
+      ],
+      "properties": {
+        "ticket": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ticket_title": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "plan": {
+          "type": "string"
+        },
+        "root": {
+          "type": "string"
+        },
+        "visit": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "since": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source": {
+          "enum": [
+            "request",
+            "questions",
+            "synthesized"
+          ]
+        },
+        "required": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "holds": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "problems": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

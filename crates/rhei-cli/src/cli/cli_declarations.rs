@@ -68,6 +68,7 @@ Inspection:
   roster      Print the effective agent, model, and defaults registry
   list        List tasks in a plan with optional filters
   show        Print one task's heading and its body as stored, by ticket id
+  gate        Read the brief of a ticket waiting at a gate, or list the gates
   schema      Print or list published accounting JSON Schemas
   viz         Render a self-contained HTML flow visualization of a plan or workspace
   budget      Inspect or set the project's invocation allowance
@@ -336,6 +337,11 @@ enum Commands {
         /// Emit one JSON object carrying the id, title, and body
         #[arg(long)]
         json: bool,
+    },
+    /// Read and answer what a ticket waiting at a gate is asked
+    Gate {
+        #[command(subcommand)]
+        command: GateCommand,
     },
     /// Leave one fact for whoever works next, anywhere in this project
     ///

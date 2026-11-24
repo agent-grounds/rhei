@@ -94,7 +94,7 @@ fn a_panta_projects_manifest_names_records_relative_to_the_project_root() {
 }
 
 /// The twelve published ids, sorted, as `rhei schema --list` prints them.
-const PUBLISHED: [&str; 12] = [
+const PUBLISHED: [&str; 17] = [
     "rhei.accounting.cost.v1",
     "rhei.accounting.invocation.v1",
     "rhei.accounting.prices.v1",
@@ -105,6 +105,11 @@ const PUBLISHED: [&str; 12] = [
     "rhei.evidence.event.v1",
     "rhei.evidence.invocation.v1",
     "rhei.evidence.manifest.v1",
+    "rhei.gate.answer.v1",
+    "rhei.gate.list.v1",
+    "rhei.gate.request.v1",
+    "rhei.gate.result.v1",
+    "rhei.gate.show.v1",
     "rhei.seal.v1",
     "rhei.summary.checkpoint.v1",
 ];

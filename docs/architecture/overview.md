@@ -72,7 +72,7 @@ of `Task 2` are `Task 2.1`, `Task 2.2`, and a child of `Task api.cache` is
 
 ### States and Transitions
 
-Tasks progress through defined **states** (for example `draft` → `pending` → `agent-review` → `completed`). The state machine can be:
+Tasks progress through defined **states**. The built-in machine has only `pending` → `completed`; a project's own machine may declare more (for example `draft` → `pending` → `agent-review` → `completed`). The state machine can be:
 
 - Simple: A flat list of valid states for validation
 - Formal: Full transition rules with callbacks for automation
@@ -117,7 +117,7 @@ The [`examples/`](../../examples/) directory contains working plan documents:
 | Example | Features Demonstrated |
 |---------|----------------------|
 | [`release-automation.rhei.md`](../../examples/release-automation.rhei.md) | Mixed task IDs, dependencies, code blocks |
-| [`human-review-loop.rhei.md`](../../examples/human-review-loop.rhei.md) | Review states, dependency chains |
+| [`human-review-loop.rhei.md`](../../examples/human-review-loop.rhei.md) | Dependency chains through child tasks, built-in states |
 | [`escaped-state-values.rhei.md`](../../examples/escaped-state-values.rhei.md) | States with spaces, custom states files |
 
 See [`examples/README.md`](../../examples/README.md) for verification commands.

@@ -30,9 +30,18 @@ pub trait GateTransitionSink: Send + Sync {
         result: Option<&str>,
     ) -> Result<String, String>;
 
+    /// Why this sink can take no gate action at all, when it cannot: an
+    /// attached surface whose run serves no control URL. A surface then opens
+    /// no gate block and says this instead, before the operator picks or types
+    /// anything. §FS-rhei-run-tui.1.5.5 §FS-rhei-run-headless.5
+    fn unavailable(&self) -> Option<String> {
+        None
+    }
+
     /// Whether this sink answers briefed gates. A sink that does not leaves
     /// every gate on the release, and the release's refusal at a briefed gate
-    /// stands. §FS-rhei-viz.5.1.2
+    /// stands. Surfaces ask on every frame, so an answer must be cheap.
+    /// §FS-rhei-viz.5.1.2
     fn answers_gates(&self) -> bool {
         false
     }

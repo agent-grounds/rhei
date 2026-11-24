@@ -354,13 +354,62 @@ fn dashboard_link_is_pinned_in_header() {
     assert_eq!(state.dashboard_url.as_deref(), Some("http://127.0.0.1:54321"));
 }
 
+/// Without a brief the release offers every edge the machine shows leaving
+/// the gate, a `from: "*"` one included, each target once. §FS-rhei-viz.5.1.3
 #[test]
-fn gate_choices_list_explicit_transitions() {
+fn gate_choices_list_every_edge_leaving_the_gate() {
     let mut state = state_with_plan();
+    let gate = &mut state.plan.machine.states[2];
+    gate.transitions.push(Transition { to: "cancelled".into(), condition: None, wildcard: true });
+    gate.transitions.push(Transition { to: "completed".into(), condition: None, wildcard: false });
+    state.refresh_plan();
     state.select_task("2"); // human-review, gating
-    let choices = super::input::gate_choices(&state);
-    assert_eq!(choices.len(), 2);
-    assert!(choices.iter().any(|(_, to)| to == "completed"));
+    let targets: Vec<String> =
+        super::input::gate_choices(&state).into_iter().map(|(_, to)| to).collect();
+    assert_eq!(targets, ["completed", "in-progress", "cancelled"]);
+}
+
+/// A sink that can take no gate action — an attached surface whose run serves
+/// no control URL — offers no gate and says why when `Enter` asks, before
+/// anything is picked or typed. §FS-rhei-run-tui.1.5.5 §FS-rhei-run-headless.5
+#[test]
+fn a_sink_that_cannot_act_opens_no_gate_and_says_why() {
+    struct Unreachable;
+    impl crate::rhei_tui::dashboard::GateTransitionSink for Unreachable {
+        fn transition_gate(
+            &self,
+            _: &str,
+            _: &str,
+            _: &str,
+            _: Option<&str>,
+        ) -> Result<String, String> {
+            panic!("nothing may be submitted through a sink that cannot act")
+        }
+        fn unavailable(&self) -> Option<String> {
+            Some("this run serves no control endpoint".into())
+        }
+        fn answers_gates(&self) -> bool {
+            panic!("an unavailable sink is not asked whether it answers")
+        }
+    }
+    let mut state = UiState::with_context(
+        PathBuf::from("/ws"),
+        2,
+        2,
+        None,
+        None,
+        Some(Arc::new(Unreachable)),
+        false,
+    );
+    state.plan = demo_model();
+    state.refresh_plan();
+    state.select_task("2");
+    assert!(!super::input::gate_available(&state), "no `⏎ gate` hint");
+    press(&mut state, KeyCode::Enter);
+    assert!(!state.gate_active && state.gate_form.is_none() && state.composer.is_none());
+    let entry = state.journal.back().expect("a journal line");
+    assert_eq!(entry.level, MessageLevel::Warn);
+    assert_eq!(entry.text, "gate 2: this run serves no control endpoint");
 }
 
 struct ReachableSink {

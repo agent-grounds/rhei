@@ -354,15 +354,17 @@ fn transition_dashboard_gate(
             current_state
         ));
     }
-    let explicit_transition =
-        machine.transitions().iter().any(|rule| rule.from.0 == from && rule.to.0 == to);
-    if !explicit_transition {
+    // A legal outgoing edge: declared from the gate, or a `from: "*"` edge that
+    // applies to it — every destination the gate's brief offers. §FS-rhei-viz.5.1.3
+    let declared = machine.transitions_from(from).any(|rule| rule.to.0 == to);
+    if !declared {
         return Err(miette!(
             help = format!(
-                "the state machine declares no '{from}' -> '{to}' edge. List the edges \
-                 leaving '{from}' with: rhei states"
+                "the state machine declares no '{from}' -> '{to}' edge and no `from: \"*\"` \
+                 edge to '{to}' that applies to '{from}'. List the edges leaving '{from}' \
+                 with: rhei states"
             ),
-            "transition from '{}' to '{}' is not an explicit human-gate transition",
+            "transition from '{}' to '{}' is not a declared human-gate transition",
             from,
             to
         ));

@@ -390,9 +390,9 @@ fn submit_gate_transition(
     }
 }
 
-/// Pick a human-gate transition: the digit keys select one of the gating
-/// state's explicit outgoing transitions, then the composer collects the result
-/// message that rides the move. §FS-rhei-run-tui.1.5.5
+/// Pick a human-gate transition: the digit keys select one of the release
+/// choices, then the composer collects the result message that rides the move.
+/// §FS-rhei-run-tui.1.5.5
 fn handle_gate(state: &mut UiState, code: KeyCode) -> InputAction {
     match code {
         KeyCode::Esc => {
@@ -428,8 +428,11 @@ fn handle_gate(state: &mut UiState, code: KeyCode) -> InputAction {
     InputAction::Continue
 }
 
-/// The explicit outgoing `(from, to)` transitions for the selected task's
-/// current gating state.
+/// The release's `(from, to)` choices for the selected task's gating state:
+/// the brief's destinations, which are every edge declared from the state and
+/// every `from: "*"` edge that applies to it, so each destination the brief
+/// shows can be picked. Without a brief, the same edges from the machine.
+/// §FS-rhei-viz.5.1.3 §FS-rhei-run-tui.1.5.5
 pub(super) fn gate_choices(state: &UiState) -> Vec<(String, String)> {
     let Some(task) = state.selected_task() else {
         return Vec::new();
@@ -440,19 +443,45 @@ pub(super) fn gate_choices(state: &UiState) -> Vec<(String, String)> {
     if !st.gating {
         return Vec::new();
     }
-    st.transitions.iter().filter(|t| !t.wildcard).map(|t| (st.name.clone(), t.to.clone())).collect()
+    let targets: Vec<&str> = match state.plan.gates.get(&task.id) {
+        Some(brief) => brief.destinations.iter().map(|d| d.state.as_str()).collect(),
+        None => st.transitions.iter().map(|t| t.to.as_str()).collect(),
+    };
+    let mut choices: Vec<(String, String)> = Vec::new();
+    for to in targets {
+        if !choices.iter().any(|(_, known)| known == to) {
+            choices.push((st.name.clone(), to.to_string()));
+        }
+    }
+    choices
 }
 
 /// Whether `Enter` opens a gate block for the selected task: a briefed gate the
-/// sink answers, or a plain one with release choices. §FS-rhei-run-tui.1.5.5
+/// sink answers, or a plain one with release choices, and never through a
+/// sink that can take no gate action. §FS-rhei-run-tui.1.5.5
 pub(super) fn gate_available(state: &UiState) -> bool {
+    let Some(sink) = state.gate.as_ref().filter(|sink| sink.unavailable().is_none()) else {
+        return false;
+    };
     let briefed = state
         .selected
         .as_ref()
         .and_then(|id| state.plan.gates.get(id))
         .is_some_and(|brief| brief.authored())
-        && state.gate.as_ref().is_some_and(|sink| sink.answers_gates());
-    !state.finished && state.gate.is_some() && (briefed || !gate_choices(state).is_empty())
+        && sink.answers_gates();
+    !state.finished && (briefed || !gate_choices(state).is_empty())
+}
+
+/// The selected task and the reason, when it waits at a gate the sink can take
+/// no action on — what `Enter` journals instead of opening a block that would
+/// fail only once the operator had answered. §FS-rhei-run-tui.1.5.5
+fn gate_unavailable(state: &UiState) -> Option<(String, String)> {
+    let task = state.selected_task()?;
+    if !state.machine_state(&task.state).is_some_and(|st| st.gating) {
+        return None;
+    }
+    let reason = state.gate.as_ref()?.unavailable()?;
+    Some((task.id.clone(), reason))
 }
 
 /// Whether the `m` intervene action currently applies (selected task is live).
@@ -465,6 +494,10 @@ pub(super) fn intervene_available(state: &UiState) -> bool {
 /// Returns whether it opened (used by the action bar key). §FS-rhei-run-tui.1.5.5
 pub(super) fn open_gate(state: &mut UiState) -> bool {
     if state.finished {
+        return false;
+    }
+    if let Some((task, reason)) = gate_unavailable(state) {
+        state.push_journal(MessageLevel::Warn, format!("gate {task}: {reason}"));
         return false;
     }
     if super::gate_form::open(state) {

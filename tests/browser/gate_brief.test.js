@@ -1,6 +1,6 @@
-// The dashboard's gate block: it renders the brief the host built and answers
-// a briefed gate by a dry run, a confirmation, then the answer.
-// §FS-rhei-viz.5.1.1 §FS-rhei-viz.5.1.2
+// The dashboard's gate block: it renders the brief the host built, answers a
+// briefed gate by a dry run, a confirmation, then the answer, and releases a
+// plain one. §FS-rhei-viz.5.1.1 §FS-rhei-viz.5.1.2 §FS-rhei-viz.5.1.3
 const {test} = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -158,4 +158,66 @@ test('a multi question keeps its picks in the order it offers them', () => {
   assert.deepEqual(Array.from(values.scope), ['a', 'b']);
   second.checked = false; second.listeners.change();
   assert.deepEqual(Array.from(values.scope), ['a']);
+});
+
+function findAll(node, wanted, found = []) {
+  if (wanted(node)) found.push(node);
+  for (const child of node.children || []) findAll(child, wanted, found);
+  return found;
+}
+
+const byClass = name => node => node.attrs && node.attrs.class === name;
+const buttons = node => findAll(node, child => child.tag === 'button');
+
+// The brief rhei synthesizes at a plain gate: a destination among every edge
+// leaving it, the `from: "*"` one to `cancelled` included, and a reason.
+const plain = {
+  ...brief, ticket: 'inbox.3', title: 'Park the ruling', state: 'parked', source: 'synthesized',
+  summary: null, display: null, attachments: [], routes: [],
+  questions: [
+    {id: 'destination', kind: 'choice', prompt: 'Where should inbox.3 go?', required: true,
+      options: [{value: 'apply', label: 'apply', description: 'An agent applies the ruling'},
+        {value: 'cancelled', label: 'cancelled', description: 'Dropped'}]},
+    {id: 'reason', kind: 'text', prompt: 'Why?', required: true},
+  ],
+  destinations: [
+    {state: 'apply', description: 'An agent applies the ruling', condition: null, final: false},
+    {state: 'cancelled', description: 'Dropped', condition: null, final: true},
+  ],
+};
+
+function liveBlock(gates, ms) {
+  const context = gateContext({
+    LIVE: true,
+    IX: {plan: {workspace: '/ws', gates, capabilities: {gate_transition: true, gate_answer: true}}},
+    isTerminal: state => state === 'cancelled',
+  });
+  return context.renderGateBlock({id: Object.keys(gates)[0] || 'inbox.4', state: ms.name}, ms);
+}
+
+test('a briefed gate gets the answer form and never the release', () => {
+  const block = liveBlock({'inbox.2': brief}, {name: 'vetting', transitions: [{to: 'approved'}, {to: 'rework'}]});
+  assert.equal(findAll(block, byClass('gform')).length, 1);
+  assert.equal(findAll(block, byClass('grelease')).length, 0);
+  assert.deepEqual(buttons(block).map(button => button.text), ['Answer…']);
+});
+
+test('a plain gate releases to every destination its brief shows and lists no questions', () => {
+  const block = liveBlock({'inbox.3': plain}, {name: 'parked', transitions: [{to: 'apply'}]});
+  assert.equal(findAll(block, byClass('gform')).length, 0);
+  const release = findAll(block, byClass('grelease'));
+  assert.equal(release.length, 1);
+  const choices = buttons(release[0]);
+  assert.deepEqual(choices.map(button => button.text), ['apply', 'cancelled (final)']);
+  assert.equal(choices[1].attrs.title, 'Dropped');
+  assert.ok(choices.every(button => !button.disabled), 'a live, wired page can release');
+  const text = textOf(block);
+  assert.doesNotMatch(text, /Where should inbox\.3 go\?|Why\?|required/, 'its questions are the controls');
+  assert.match(text, /Result — needed to finish the ticket, unless it already has a result/);
+});
+
+test('without a brief the release offers every edge the machine shows', () => {
+  const ms = {name: 'parked', transitions: [{to: 'apply'}, {to: 'cancelled', wildcard: true}, {to: 'apply'}]};
+  const block = liveBlock({}, ms);
+  assert.deepEqual(buttons(block).map(button => button.text), ['apply', 'cancelled (final)']);
 });

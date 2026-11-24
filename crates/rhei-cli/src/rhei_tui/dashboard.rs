@@ -306,7 +306,7 @@ fn handle_client(
         "/open" => handle_open(&mut stream, state, &request.query),
         // §AR-rhei-viz-flow.6: tail a running task's durable agent log for the live terminal.
         "/log" => handle_log(&mut stream, state, &request.query),
-        // §AR-rhei-viz-flow.7: the one mutation boundary — deliver a message to an agent's stdin.
+        // §AR-rhei-viz-flow.7: the one route into an agent — deliver a message to its stdin.
         "/intervene" => handle_intervene(&mut stream, intervene, &request.body),
         // §FS-rhei-viz.5.1.3: explicit human transition out of a plain gating state.
         "/transition-gate" => handle_gate_transition(&mut stream, gate_transition, &request.body),

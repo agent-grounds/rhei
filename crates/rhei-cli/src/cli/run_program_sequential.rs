@@ -100,23 +100,18 @@ fn run_sequential_program_work_items(
         verify_program_account(&task_workspace_root, task_id_str, current_state)?;
         let budget = resolve_attempt_budget(machine.states.get(current_state.as_str()), settings);
         if let Some(spent_budget) = plan.budget_spent(budget) {
-            let owed: Vec<_> = missing_previous_program_outputs(
-                &task_workspace_root,
+            // Agents' line, refused edge included. §FS-rhei-errors.1.5.2
+            let site = NoAdvanceContext {
+                workspace_root,
+                artifact_root: &task_workspace_root,
                 machine,
-                loaded.rhei.metadata.as_ref(),
+                metadata: loaded.rhei.metadata.as_ref(),
                 task,
-                current_state,
-                &plan,
-            ).iter().map(MissingRequiredOutput::warning_entry).collect();
+                state: current_state,
+            };
             run_warn!(
                 "{}",
-                render_spent_visit_halt(
-                    task_id_str,
-                    current_state,
-                    spent_budget,
-                    &plan.spent_budget_owed(&owed),
-                    visit_halt_recovery(budget, machine, loaded.rhei.metadata.as_ref(), task)
-                )
+                spent_visit_halt_line(task_id_str, site, &loaded.rhei, &plan, spent_budget, budget)
             );
             progress.stalled_tasks.insert(task_id_str.clone());
             continue;

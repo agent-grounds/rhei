@@ -160,7 +160,7 @@ fn retry_command_with_worker(
     } else {
         root.join("runtime")
     };
-    let records = retry_active_records(
+    let RetryRecords { active: records, reusable } = retry_current_records(
         &loaded,
         machine,
         task,
@@ -178,6 +178,20 @@ fn retry_command_with_worker(
         .collect::<Vec<_>>();
     if exhausted.is_empty() && poll {
         return Err(poll_retry_refusal());
+    }
+    // Remaining attempts, then reusable work, then the missing record. §FS-rhei-retry.2
+    if exhausted.is_empty() && records.is_empty() && reusable {
+        // The edge that work selected, as the run's report names it. §FS-rhei-errors.1.5.2
+        let refusal = NoAdvanceContext {
+            workspace_root: &root,
+            artifact_root: &route.execution_root,
+            machine,
+            metadata: loaded.rhei.metadata.as_ref(),
+            task,
+            state: &state,
+        }
+        .refused_entry();
+        return Err(nothing_to_refill_refusal(&task_id, &state, refusal));
     }
     if exhausted.is_empty() {
         let record = records.first().map(|(_, record, _)| record);

@@ -128,25 +128,18 @@ fn run_sequential_agent_invocation(
         verify_spent_agent_account(workspace_root)?;
         // The same stall step 5 gives any unmet completion condition: the ticket
         // keeps its state, no transition fires, and the pass moves on.
-        // §FS-rhei-run.3 §FS-rhei-agents.3.2.3
-        let owed = collect_missing_required_outputs(
+        // §FS-rhei-run.3 §FS-rhei-agents.3.2.3 §FS-rhei-errors.1.5.2
+        let site = NoAdvanceContext {
             workspace_root,
-            &task_workspace_root,
+            artifact_root: &task_workspace_root,
             machine,
-            loaded.rhei.metadata.as_ref(),
+            metadata: loaded.rhei.metadata.as_ref(),
             task,
-            current_state,
-            selected_forward_transition(&loaded.rhei, machine, task).as_deref(),
-        );
+            state: current_state,
+        };
         run_warn!(
             "{}",
-            render_spent_visit_halt(
-                task_id_str,
-                current_state,
-                spent_budget,
-                &plan.spent_budget_owed(&owed),
-                visit_halt_recovery(budget, machine, loaded.rhei.metadata.as_ref(), task)
-            )
+            spent_visit_halt_line(task_id_str, site, &loaded.rhei, &plan, spent_budget, budget)
         );
         progress.stalled_tasks.insert(task_id_str.clone());
         return Ok(());

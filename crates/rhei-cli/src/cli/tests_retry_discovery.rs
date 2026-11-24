@@ -82,7 +82,7 @@ transitions:
             let loaded = load_plan(self.root.path()).unwrap();
             let machine = super::machine_with_states(MACHINE);
             let task = find_task_by_id(&loaded.rhei.tasks, &parse_task_id("member.1")).unwrap();
-            retry_active_records(
+            retry_current_records(
                 &loaded,
                 &machine,
                 task,
@@ -92,6 +92,7 @@ transitions:
                 runtime,
             )
             .unwrap()
+            .active
         }
     }
 

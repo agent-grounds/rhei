@@ -102,26 +102,18 @@ fn spawn_parallel_agent_work_item(
         // `Skipped` is the pool's stall: the scheduler records it in
         // `stalled_tasks`, so the ticket keeps its state and is out of the
         // running for the rest of the run. §FS-rhei-run.3 §FS-rhei-agents.3.2.3
-        let owed = collect_missing_required_outputs(
+        let site = NoAdvanceContext {
             workspace_root,
-            &task_workspace_root,
+            artifact_root: &task_workspace_root,
             machine,
-            loaded.rhei.metadata.as_ref(),
+            metadata: loaded.rhei.metadata.as_ref(),
             task,
-            &item.current_state,
-            selected_forward_transition(&loaded.rhei, machine, task).as_deref(),
-        );
-        emit_run_message(
-            sink,
-            rhei_tui::MessageLevel::Warn,
-            render_spent_visit_halt(
-                &item.task_id_str,
-                &item.current_state,
-                spent_budget,
-                &plan.spent_budget_owed(&owed),
-                visit_halt_recovery(budget, machine, loaded.rhei.metadata.as_ref(), task),
-            ),
-        );
+            state: &item.current_state,
+        };
+        // The sequential site's line, refused edge included. §FS-rhei-errors.1.5.2
+        let (id, rhei) = (&item.task_id_str, &loaded.rhei);
+        let halt = spent_visit_halt_line(id, site, rhei, &plan, spent_budget, budget);
+        emit_run_message(sink, rhei_tui::MessageLevel::Warn, halt);
         return Ok(ParallelAgentSpawnOutcome::Skipped);
     }
     // The same bound at the same point as the sequential path. §FS-rhei-run.3.4

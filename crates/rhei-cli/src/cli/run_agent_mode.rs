@@ -650,28 +650,14 @@ fn run_agent_mode(
 
         let program_tasks = {
             let mut filtered: Vec<(String, String, String, ResolvedProgram)> = Vec::new();
-            let mut state_claimant: HashMap<String, String> = HashMap::new();
+            // Claimed per (machine source, state). §FS-rhei-run.5.2.1
+            let mut claims = NonConcurrentClaims::default();
             let mut deferred: BTreeSet<String> = BTreeSet::new();
             for entry in program_tasks {
-                let is_concurrent = machines
-                    .for_task_str(&entry.0)
-                    .states
-                    .get(&entry.2)
-                    .map(|d| d.concurrent)
-                    .unwrap_or(false);
-                if is_concurrent {
+                if claims.admit(machines, &entry.0, &entry.2) {
                     filtered.push(entry);
-                    continue;
-                }
-                match state_claimant.get(&entry.2) {
-                    Some(claimant) if claimant == &entry.0 => filtered.push(entry),
-                    Some(_) => {
-                        deferred.insert(entry.0);
-                    }
-                    None => {
-                        state_claimant.insert(entry.2.clone(), entry.0.clone());
-                        filtered.push(entry);
-                    }
+                } else {
+                    deferred.insert(entry.0);
                 }
             }
             if !deferred.is_empty() {
@@ -795,31 +781,17 @@ fn run_agent_mode(
         // naturally re-considered on the next pass.
         let agent_tasks = {
             let mut filtered: Vec<(String, String, String, ResolvedAgent)> = Vec::new();
-            let mut state_claimant: HashMap<String, String> = HashMap::new();
+            // Claimed per (machine source, state). §FS-rhei-run.5.2.1
+            let mut claims = NonConcurrentClaims::default();
             let mut deferred: BTreeSet<String> = BTreeSet::new();
             for entry in agent_tasks {
                 if unpromptable_tasks.contains(&entry.0) {
                     continue;
                 }
-                let is_concurrent = machines
-                    .for_task_str(&entry.0)
-                    .states
-                    .get(&entry.2)
-                    .map(|d| d.concurrent)
-                    .unwrap_or(false);
-                if is_concurrent {
+                if claims.admit(machines, &entry.0, &entry.2) {
                     filtered.push(entry);
-                    continue;
-                }
-                match state_claimant.get(&entry.2) {
-                    Some(claimant) if claimant == &entry.0 => filtered.push(entry),
-                    Some(_) => {
-                        deferred.insert(entry.0);
-                    }
-                    None => {
-                        state_claimant.insert(entry.2.clone(), entry.0.clone());
-                        filtered.push(entry);
-                    }
+                } else {
+                    deferred.insert(entry.0);
                 }
             }
             if !deferred.is_empty() {

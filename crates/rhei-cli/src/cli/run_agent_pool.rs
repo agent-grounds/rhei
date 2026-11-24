@@ -50,7 +50,7 @@ fn run_agent_worker_pool(
     let mut free_slots: BTreeSet<rhei_tui::Slot> = (0..frontend_parallel).collect();
     let mut next_extra_slot = frontend_parallel;
     let mut active_invocation_counts: HashMap<String, usize> = HashMap::new();
-    let mut active_state_counts: HashMap<String, usize> = HashMap::new();
+    let mut nonconcurrent_in_flight = NonConcurrentInFlight::default();
     let initial_program_items = if run_programs_in_worker_pool {
         program_tasks
             .iter()
@@ -76,7 +76,7 @@ fn run_agent_worker_pool(
         &mut free_slots,
         &mut next_extra_slot,
         &mut active_invocation_counts,
-        &mut active_state_counts,
+        &mut nonconcurrent_in_flight,
         &mut workers.handles,
     )?;
     *progress.advanced_any |= program_schedule_outcome.advanced;
@@ -118,7 +118,7 @@ fn run_agent_worker_pool(
         &mut free_slots,
         &mut next_extra_slot,
         &mut active_invocation_counts,
-        &mut active_state_counts,
+        &mut nonconcurrent_in_flight,
         &mut workers.handles,
     )?;
     *progress.advanced_any |= schedule_outcome.advanced;
@@ -147,7 +147,7 @@ fn run_agent_worker_pool(
                     completion.slot,
                     &mut free_slots,
                     &mut active_invocation_counts,
-                    &mut active_state_counts,
+                    &mut nonconcurrent_in_flight,
                 );
                 let completed_task_id = completion.task_id_str.clone();
                 let effect = handle_parallel_program_completion(
@@ -185,7 +185,7 @@ fn run_agent_worker_pool(
                     &mut free_slots,
                     &mut next_extra_slot,
                     &mut active_invocation_counts,
-                    &mut active_state_counts,
+                    &mut nonconcurrent_in_flight,
                     &mut workers.handles,
                     identity,
                 )?;
@@ -207,7 +207,7 @@ fn run_agent_worker_pool(
                     slot,
                     &mut free_slots,
                     &mut active_invocation_counts,
-                    &mut active_state_counts,
+                    &mut nonconcurrent_in_flight,
                 );
                 // Its start is recorded and it wrote no record, so it is charged the reserve
                 // as `unmeasurable` here, whether or not the run goes on. §FS-rhei-budgets.6.2.1
@@ -249,7 +249,7 @@ fn run_agent_worker_pool(
                     &mut free_slots,
                     &mut next_extra_slot,
                     &mut active_invocation_counts,
-                    &mut active_state_counts,
+                    &mut nonconcurrent_in_flight,
                     &mut workers.handles,
                     identity,
                 )?;
@@ -268,7 +268,7 @@ fn run_agent_worker_pool(
             completion.slot,
             &mut free_slots,
             &mut active_invocation_counts,
-            &mut active_state_counts,
+            &mut nonconcurrent_in_flight,
         );
 
         let ParallelAgentCompletion {
@@ -400,7 +400,7 @@ fn run_agent_worker_pool(
             &mut free_slots,
             &mut next_extra_slot,
             &mut active_invocation_counts,
-            &mut active_state_counts,
+            &mut nonconcurrent_in_flight,
             &mut workers.handles,
             identity,
         )?;

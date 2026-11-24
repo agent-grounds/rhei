@@ -15,7 +15,7 @@ The plan writer creates and restructures plans. It translates a goal into a depe
 Responsibilities:
 - Decompose work into independently completable tasks.
 - Assign dependencies (`**Prior:**`) to encode sequencing.
-- Set each task's authored `**State:**` to the starting state of its node's resolved profile (typically `draft` or `pending`).
+- Set each task's authored `**State:**` to the starting state of its node's resolved profile (`pending` in the built-in machine; a project's own machine may start a node elsewhere, such as `draft`).
 - Maintain the DAG invariant — no cycles, no dangling references.
 - Add or reorganize context sections (`## Overview`, `## Requirements`, etc.) before `## Tasks`.
 
@@ -28,9 +28,9 @@ The plan worker picks up an existing plan and makes progress on it. It is driven
 Responsibilities:
 - Claim the next eligible task via `rhei next` (all priors completed, unassigned, not terminal or gating, and all required current-state inputs present).
 - Work in the current state following the state's `instructions`.
-- In interactive/manual execution, advance the state when exit conditions are met (e.g., `draft` → `pending`, `pending` → `agent-review`) or finish directly with `rhei complete` when review is not required.
+- In interactive/manual execution, advance the state when exit conditions are met (e.g., `draft` → `pending` or `pending` → `agent-review`, where the active machine declares those states) or finish directly with `rhei complete` when review is not required.
 - In `rhei run` execution, leave state mutation to the orchestrator: the worker produces the required artifacts and exits, and `rhei run` performs the transition.
-- Stop at gating states (`human-review`) and terminal states (`completed`, `cancelled`).
+- Stop at gating states (such as `human-review`, where the active machine declares one) and terminal states (`completed`, and `cancelled` where the machine declares it).
 
 The plan worker does **not** add tasks, reorder tasks, change dependencies, or delete sections. In interactive/manual execution it may edit `**State:**` values and progress logs inside a task body (including child task bodies). Under `rhei run`, spawned workers leave `**State:**` changes to the orchestrator and only produce the work and artifacts for the current state.
 
@@ -38,7 +38,7 @@ The Plan Worker role corresponds to `worker` [Completion Authority](rhei-agents.
 
 ### 1.3. Reviewer
 
-The reviewer inspects completed work before it advances to the next state. In the default Rhei state machine, this role appears in two forms:
+The reviewer inspects completed work before it advances to the next state. The role exists only in a machine that declares review states: the built-in machine is only `pending` → `completed` and has none, so a plan on it has no review step. A project's own machine typically gives the role two forms:
 
 - **Agent reviewer** (`agent-review`): An automated pass that checks the implementation against the task description, its child task nodes, and repository conventions (lint, format, tests). It records concrete findings in the task body or in a required findings artifact when the active state machine declares one. The next transition is then chosen by the active execution model: manually by an interactive worker, or by `rhei run` after the reviewer subprocess exits.
 
@@ -48,14 +48,14 @@ The reviewer inspects completed work before it advances to the next state. In th
 
 The human operator has full authority over the plan. They can:
 
-- Transition tasks out of `human-review`.
+- Transition tasks out of a gating state such as `human-review`.
 - Cancel tasks at any point.
 - Edit the plan structure (add tasks, change dependencies) — usually by re-invoking the plan writer.
 - Override any state, including terminal states, when explicitly needed,
   through the attended `rhei transition --force --reason` and explicit
   `rhei recover` contracts ([§FS-rhei-transition-cmd.6](rhei-transition-cmd.spec.md#6-operator-forced-missing-edge-recovery), [§FS-rhei-recover](rhei-recover.spec.md#fs-rhei-recover-rhei-recover)).
 
-The human is the only role that can unblock `human-review` gates. This is by design: certain decisions (ship/no-ship, scope changes, external approvals) require human judgment.
+The human is the only role that can unblock a gating state such as `human-review`, where the active machine declares one. This is by design: certain decisions (ship/no-ship, scope changes, external approvals) require human judgment.
 
 ## 2. Coordination Through the State Machine
 
@@ -70,7 +70,9 @@ The state machine is the single coordination protocol between all roles. It defi
 
 This means agents do not need to communicate with each other directly. They communicate through artifacts and the authoritative plan state managed by the orchestrator: one agent writes outputs for its state, `rhei run` advances the task, and the next agent reads the resulting state and artifacts.
 
-### 2.1. State Flow (Default Machine)
+### 2.1. State Flow (an Example Project Machine)
+
+The [built-in machine](states.yaml) is only `pending` → `completed`, with no draft, review, gating or `cancelled` state. The graph below is what a project's own `states.yaml` may declare instead, and the states the roles above and the patterns below name come from a machine like it:
 
 ```
 draft --> pending --> agent-review --> completed
@@ -89,7 +91,7 @@ cancelled   |             v               |
 
 The `pending → completed` direct transition allows agents to finish simple tasks that do not require a separate review pass.
 
-The `human-review` state is deliberately isolated: agents can send work into it (from `pending` or `agent-review`), but only a human can transition out of it. This separation ensures that human judgment gates are never bypassed by automated workflows.
+In this machine the `human-review` state is declared `gating: true` and deliberately isolated: agents can send work into it (from `pending` or `agent-review`), but only a human can transition out of it. This separation ensures that human judgment gates are never bypassed by automated workflows.
 
 Each arrow is a declared transition. Agents follow the `instructions` field on each state to know what work must be completed before the next handoff. The transition itself is then performed either by an interactive/manual worker or by the `rhei run` orchestrator.
 
@@ -343,7 +345,7 @@ One agent session acts as both writer and worker. This is useful when the agent 
 2. Agent invokes the plan writer to produce a `.rhei.md` file.
 3. Agent invokes the plan worker on the same file.
 4. Worker iterates through tasks, advancing states, implementing, and logging progress.
-5. Worker stops when all tasks are `completed` or blocked on `human-review`.
+5. Worker stops when all tasks are `completed` or blocked on a gating state such as `human-review`.
 
 This is the default for small, well-scoped work within a single agent session. The plan still provides value: it gives the human a structured view of progress, and the agent a memory of what it has and hasn't done. For larger work or multi-agent workflows, Pattern 0 (`rhei run`) is preferred.
 
@@ -351,7 +353,7 @@ This is the default for small, well-scoped work within a single agent session. T
 
 For larger work, the plan writer and plan worker run in separate agent sessions — possibly days apart.
 
-1. **Session 1 (planning):** Human describes a project. Agent produces a plan with tasks in `draft` or `pending`.
+1. **Session 1 (planning):** Human describes a project. Agent produces a plan with tasks in their starting state (`pending`, or `draft` where the machine declares it).
 2. **Human review:** Human reads the plan, adjusts scope, promotes drafts to `pending`, reorders priorities.
 3. **Session 2 (execution):** A new agent session invokes the plan worker. It reads the plan fresh, selects the first eligible task, and begins work.
 4. **Subsequent sessions:** If the worker stops (human gate, end of session, ambiguity), a new session picks up where it left off by re-reading the plan.
@@ -436,7 +438,7 @@ Because tasks are isolated in distinct files, Git effortlessly merges cross-bran
 
 ### 3.6. Pattern 4: Human-in-the-Loop Checkpoints
 
-Plans that require human approval use the `human-review` state as a gate.
+Plans that require human approval use a gating state, such as `human-review`, as the gate. The built-in machine has none, so the gate comes from the plan's own machine: a `states.yaml` that declares `human-review` with `gating: true` is what makes the snippet below valid, and on the built-in machine `rhei validate` refuses it as an invalid state. [`examples/hourly-human-intervention-example/`](../../examples/hourly-human-intervention-example/README.md) is a working one: its `graalvm-human-review` state is `gating: true`.
 
 ```markdown
 ### Task 3: Deploy to production
@@ -455,7 +457,7 @@ Meanwhile, agents continue working on other branches of the DAG that are not blo
 
 ### 3.7. Pattern 5: Draft Expansion
 
-For exploratory or long-running projects, tasks start as `draft` — placeholder titles that are not yet ready for execution.
+For exploratory or long-running projects whose machine declares a `draft` state (the built-in machine does not), tasks start as `draft` — placeholder titles that are not yet ready for execution.
 
 1. Plan writer creates tasks in `draft` with rough titles but minimal descriptions.
 2. When all prior tasks are completed, `rhei next` claims the draft task (sets `**Assignee:**` without changing its state).
@@ -564,7 +566,7 @@ A Rhei plan can model a CI/CD pipeline where each task is a pipeline stage. The 
 **Prior:** Task 4
 ```
 
-Task 5 starts as `draft` — it will only be promoted to `pending` after staging is verified. The pipeline advances automatically through callbacks, but human gates can be inserted at any stage.
+Task 5 starts as `draft`, a state this pipeline's own machine declares (the built-in one does not) — it will only be promoted to `pending` after staging is verified. The pipeline advances automatically through callbacks, but human gates can be inserted at any stage.
 
 ### 3.13. Pattern 11: A program creates follow-on work for its run
 

@@ -33,9 +33,8 @@ fn confirm_operator_hop(handoff: &OperatorHandoff) -> MietteResult<String> {
         // §FS-rhei-errors.6
         return Err(miette!(help = OS_ACCOUNT_HELP, "cannot identify invoking OS account"));
     }
-    eprintln!("Operator {}: type {expected}", account_name.trim());
     // §FS-rhei-errors.6
-    std::io::stderr().flush().map_err(|err| miette!(help = "restore a writable standard error stream on the operator terminal before requesting fresh confirmation.", "cannot print operator confirmation: {err}"))?;
+    write_operator_prompt(&mut std::io::stderr().lock(), account_name.trim(), expected).map_err(|err| miette!(help = "restore a writable standard error stream on the operator terminal before requesting fresh confirmation.", "cannot print operator confirmation: {err}"))?;
     let mut response = String::new();
     let read = std::io::stdin().read_line(&mut response)
         // §FS-rhei-errors.6
@@ -45,6 +44,13 @@ fn confirm_operator_hop(handoff: &OperatorHandoff) -> MietteResult<String> {
         return Err(miette!(help = "if this correction is intended, the human operator must run it again at an interactive terminal and type the displayed hop exactly.", "operator confirmation did not match the exact hop; no changes made"));
     }
     Ok(account_name.trim().to_string())
+}
+
+/// The prompt line leaves in one write ending in its newline, so no reader sees it without its
+/// hop. §FS-rhei-transition-cmd.6
+fn write_operator_prompt(out: &mut impl Write, account: &str, expected: &str) -> std::io::Result<()> {
+    out.write_all(format!("Operator {account}: type {expected}\n").as_bytes())?;
+    out.flush()
 }
 
 /// Isolated callers share production acquisition and safe contention reporting. §FS-rhei-recover.3

@@ -40,8 +40,9 @@ A typical plan grows in three passes:
 1. **Outline** — write the `# Rhei:` title and draft `## Overview`,
    `## Context`, or similar prose sections that motivate the work.
 2. **Break down** — add a `## Tasks` section and enumerate tasks with
-   numeric or named ids. Give every task a `**State:**` (usually `draft`
-   or `pending`) and a short description.
+   numeric or named ids. Give every task a `**State:**` (`pending`, the
+   built-in machine's starting state, or `draft` where the active machine
+   declares it) and a short description.
 3. **Refine** — add `**Prior:**` dependencies, split tasks into child
    task nodes, and transition states as work progresses.
 
@@ -143,7 +144,7 @@ frontmatter *may* carry is [§FS-rhei-authoring.4.6](rhei-authoring.spec.md#46-a
 
 ```markdown
 ### Task 3: Ship release notes
-**State:** agent-review
+**State:** pending
 **Prior:** Task 1, Task 2
 ```
 

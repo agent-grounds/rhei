@@ -65,7 +65,7 @@ fn gate_answer_path_names_the_ticket_and_the_visit() {
         attachments: Vec::new(),
         destinations: Vec::new(),
     };
-    assert_eq!(view.answer_path(), "runtime/gates/agora.1/3.answer.json");
+    assert_eq!(view.answer_path(), "runtime/gates/agora.1/human-judgment.3.answer.json");
     let text = render_gate_brief(&view);
     assert!(text.ends_with("rhei gate answer agora.1 --from human-judgment --answers <file|->\n"), "{text}");
 }
@@ -84,4 +84,31 @@ fn gate_file_view_says_why_a_file_cannot_be_read() {
     let escaping = gate_file_view(dir.path(), "../outside.md");
     assert!(!escaping.readable);
     assert!(escaping.problem.as_deref().is_some_and(|problem| problem.contains("..")), "{escaping:?}");
+}
+
+/// The latest answer is the one answered last, then the one written last: a
+/// copy touched later does not overtake an answer given after it.
+/// §FS-rhei-gate-brief.7.3
+#[test]
+fn the_latest_gate_answer_is_the_last_answered_then_the_last_written() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let gates = dir.path().join("runtime/gates/plan.1");
+    std::fs::create_dir_all(&gates).expect("gates");
+    let answer = |state: &str, at: Option<&str>| {
+        let at = at.map(|at| format!(r#", "answered_at": "{at}""#)).unwrap_or_default();
+        let text = format!(r#"{{ "version": 1, "request_digest": "sha256:0", "answers": {{}}, "state": "{state}"{at} }}"#);
+        std::fs::write(gates.join(format!("{state}.1.answer.json")), text).expect("answer");
+    };
+    assert!(latest_gate_answer(dir.path(), "plan.1").is_none(), "no answer yet");
+    answer("review", Some("2026-11-22T10:00:00Z"));
+    answer("vetting", Some("2026-11-22T09:00:00Z"));
+    std::fs::write(gates.join("notes.json"), "{}").expect("not an answer");
+    let latest = latest_gate_answer(dir.path(), "plan.1").expect("an answer");
+    assert_eq!(latest.relative, "runtime/gates/plan.1/review.1.answer.json");
+
+    // A file with no `answered_at` to read ranks below every answer that has one.
+    std::fs::write(gates.join("parked.1.answer.json"), "not json").expect("broken");
+    let latest = latest_gate_answer(dir.path(), "plan.1").expect("an answer");
+    assert_eq!(latest.relative, "runtime/gates/plan.1/review.1.answer.json");
+    assert!(latest.document.is_some_and(|found| found.state.as_deref() == Some("review")));
 }

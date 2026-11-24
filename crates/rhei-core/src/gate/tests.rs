@@ -448,3 +448,16 @@ fn a_gate_block_on_a_state_that_is_not_gating_is_refused() {
     let misspelt = machine("    gating: true\n    gate: { titel: x }").unwrap_err();
     assert!(misspelt.contains("titel"), "{misspelt}");
 }
+
+// §FS-rhei-gate-brief.7.3 §FS-rhei-states.4.2
+#[test]
+fn every_state_may_branch_on_the_implicit_gate_answer() {
+    let branching =
+        "    gating: true\n    instructions: |\n      {if input.gate-answer.exists}\n      \
+                     Read {gate_answer}.\n      {endif}";
+    assert!(machine(branching).is_ok(), "{:?}", machine(branching).err());
+    let typo =
+        machine("    gating: true\n    instructions: \"{if input.gate-answers.exists}x{endif}\"")
+            .unwrap_err();
+    assert!(typo.contains("'gate-answers' is not a declared input"), "{typo}");
+}

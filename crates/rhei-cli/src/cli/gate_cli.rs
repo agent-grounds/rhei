@@ -137,14 +137,20 @@ fn gate_command(command: GateCommand, before_subcommand: Option<PathBuf>) -> Mie
             let machine = state_machine.or(before_subcommand);
             gate_show_command(target.path(), &target.scope_with(&[]), machine.as_deref(), &task, json)
         }
-        GateCommand::Answer { input, task, .. } => {
-            // Resolved like `show`, so an unknown ticket is the resolver's diagnostic.
+        GateCommand::Answer { input, task, state_machine, from, answers, dry_run, json } => {
             let (input, task) = split_gate_ticket_target(input, task, "gate answer")?;
-            resolve_ticket_plan_target(input, Some(&TicketPick::ticket("gate answer", &task)))?;
-            Err(miette!(
-                help = "this build reads gate briefs with `rhei gate show` but cannot answer them yet",
-                "`rhei gate answer` is not available in this build"
-            ))
+            let target = resolve_ticket_plan_target(input, Some(&TicketPick::ticket("gate answer", &task)))?;
+            let machine = state_machine.or(before_subcommand);
+            gate_answer_command(&GateAnswerRequest {
+                input: target.path(),
+                rhei_scope: &target.scope_with(&[]),
+                state_machine_path: machine.as_deref(),
+                task: &task,
+                from: &from,
+                answers: &answers,
+                dry_run,
+                json,
+            })
         }
         GateCommand::List { input, state_machine, json } => {
             let target = resolve_plan_target(input)?;

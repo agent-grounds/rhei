@@ -254,7 +254,9 @@ impl StateMachine {
                     if let Some(input_name) =
                         condition.strip_prefix("input.").and_then(|s| s.strip_suffix(".exists"))
                     {
-                        if !state.inputs.iter().any(|a| a.name == input_name) {
+                        // Every state has the implicit `gate-answer`. §FS-rhei-gate-brief.7.3
+                        let implicit = input_name == crate::gate::GATE_ANSWER_INPUT;
+                        if !implicit && !state.inputs.iter().any(|a| a.name == input_name) {
                             return Err(StateMachineLoadError::Invalid(format!(
                                 "state '{state_name}' {field_name} contains \
                                  '{{if {condition}}}' but '{input_name}' is not a declared input \

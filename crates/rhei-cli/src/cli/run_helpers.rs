@@ -400,6 +400,8 @@ fn compose_agent_prompt(render_context: &RuntimeTemplateContext<'_>) -> MietteRe
             fenced_markdown(&section.content)
         ));
     }
+    // The answer that moved the ticket here, beside the declared handoffs. §FS-rhei-gate-brief.7.3.1
+    prompt.push_str(&render_gate_answer_handoff(render_context)?);
     // §FS-rhei-supervision.5.2: directions from above, bounded by this state's
     // own instructions and artifact contract.
     prompt.push_str(&render_supervisor_brief(render_context)?);

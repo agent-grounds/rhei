@@ -805,6 +805,11 @@ fn execute_transition_with_origin(
         ));
     }
 
+    // Every check has passed: a dry run stops before the first write, and an answer is
+    // recorded under the lock, undone unless the state write lands. §FS-rhei-gate-brief.7.1
+    let Some(mut answer_file) = GateAnswerFile::write(origin.gate_answer.as_ref(), files.artifact_root, to)? else {
+        return Ok(to.to_string());
+    };
     // Charged before the state that records it is written, so a ticket at its
     // bound is refused rather than moved and then told.
     // §FS-rhei-budgets.4.1 §FS-rhei-budgets.1
@@ -828,6 +833,7 @@ fn execute_transition_with_origin(
         Ok(None) => {}
         Ok(minted) => updated_metadata = minted,
         Err(err) => {
+            answer_file.undo();
             if let Some(task_handle) = &task_handle {
                 task_handle.release();
             }
@@ -893,6 +899,7 @@ fn execute_transition_with_origin(
         &metadata_raw_updated,
         task_raw_updated.as_deref(),
     )?;
+    answer_file.keep();
 
     #[cfg(test)]
     if origin.claim {
@@ -1007,6 +1014,7 @@ fn execute_transition_with_origin(
                 } else {
                     None
                 };
+                answer_file.undo();
                 if let Some(task_handle) = &task_handle {
                     task_handle.release();
                 }

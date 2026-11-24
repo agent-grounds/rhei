@@ -167,8 +167,7 @@ pub struct RouteChoice {
 #[serde(deny_unknown_fields)]
 pub struct GateAnswer {
     pub version: u64,
-    pub request_digest: String,
-    pub answers: IndexMap<String, Value>,
+    // The recording fields lead, in the order the recorded file shows them.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ticket: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -181,6 +180,8 @@ pub struct GateAnswer {
     /// `destination` question rather than a route.
     #[serde(default, skip_serializing_if = "Option::is_none", with = "nullable_route")]
     pub route: Option<Option<RouteChoice>>,
+    pub request_digest: String,
+    pub answers: IndexMap<String, Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub answered_by: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

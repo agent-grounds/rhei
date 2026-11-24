@@ -153,6 +153,8 @@ fn build_program_command(
             cmd.env(format!("RHEI_INPUT_{env_base}_PATH"), relative);
         }
     }
+    // The implicit `gate-answer` input, unless the state declares one. §FS-rhei-gate-brief.7.3
+    cmd.envs(gate_answer_environment(render_context));
 
     for (key, value) in &resolved.program.env {
         cmd.env(key, resolve_runtime_template_text(value, render_context));

@@ -138,10 +138,12 @@ under `crates/rhei-cli/src/cli/`:
   `file_locks`, `render_install_commands`, `install_skill_agents`, and
   `diagnostics` contain the remaining command families, the cross-platform
   file-lock helpers every locking command shares, and shared diagnostics.
-- `gate_cli`, `gate_inputs`, `gate_view`, and `gate_commands` contain `rhei
-  gate`: its arguments, the files a gate's brief is made of and the checks on
-  entering and leaving a gate, one ticket's view at its gate, and the printing
-  of briefs, lists, and schemas.
+- `gate_cli`, `gate_inputs`, `gate_view`, `gate_commands`, `gate_answer`, and
+  `gate_answer_input` contain `rhei gate`: its arguments, the files a gate's
+  brief is made of and the checks on entering and leaving a gate, one ticket's
+  view at its gate, the printing of briefs, lists, and schemas, the answer and
+  the file it records under the transition's lock, and the implicit
+  `gate-answer` input the states after a gate read.
 - `tests_index` lists the CLI unit tests the crate root's `tests` module
   includes, so the root lists only the parts that ship.
 - `tests_cli_render`, `tests_complete_reset_tooling`, `tests_file_locks`,

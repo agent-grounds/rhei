@@ -82,7 +82,7 @@ fn show_json_prints_the_brief_field_for_field() {
     );
     let digest = brief["digest"].as_str().expect("digest");
     assert!(digest.starts_with("sha256:") && digest.len() == 71, "{digest}");
-    assert_eq!(brief["answer_path"], "runtime/gates/verdict.1/1.answer.json");
+    assert_eq!(brief["answer_path"], "runtime/gates/verdict.1/review.1.answer.json");
     assert_eq!(brief["problems"], json!([]));
     assert_matches_schema(&schema(&fx, "show"), &brief, "the request brief");
     assert_eq!(result.stderr, "", "a document on stdout, nothing on stderr");

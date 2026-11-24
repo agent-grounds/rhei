@@ -22,7 +22,8 @@ When no marker exists, the command exits successfully, prints `no forced
 recovery pending`, and changes nothing. Otherwise stdin must be a terminal and
 the invoking operator must type back the marker's recovery id, task id, exact
 `from -> to` hop, and the previewed decision (`rollback` or `forward`), spelled
-`recover <recovery-id> <task-id> <from> -> <to> <decision>`. A blank,
+`recover <recovery-id> <task-id> <from> -> <to> <decision>`. The prompt is the
+same whole line as [§FS-rhei-transition-cmd.6](rhei-transition-cmd.spec.md#6-operator-forced-missing-edge-recovery), written at once. A blank,
 mismatching, EOF, or non-terminal response refuses without effects. Every new
 invocation or retry requires a fresh typed response.
 

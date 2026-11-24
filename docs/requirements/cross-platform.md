@@ -165,9 +165,20 @@ matched once it is whole. What a failure reports is still the transcript as it
 was written, escapes and all, because that is what says what the terminal was
 actually sent.
 
+A wait for a prompt waits for the whole prompt line, not for the first text
+that matches. A child may write its prompt in several pieces, and a ConPTY may
+redraw a line in several frames, so the text a wait matches can be shown before
+the rest of its line. An answer sent then lands in the middle of the prompt:
+the terminal echoes it there, the line the test asserts on is broken, and the
+child is answered before it has finished asking (agent-grounds/rhei#761). So the
+wait fires only once the terminal shows the line ending after the match — a
+newline or a carriage return in the shown text.
+
 The measure is the stream quoted in agent-grounds/rhei#448 — the prompt's space
 drawn as a cursor-forward and a window title in the line — which signals the
-prompt, as does the same stream with the sequences split across reads.
+prompt, as does the same stream with the sequences split across reads; and a
+prompt delivered as `…: type `, then later its hop, then later its line end,
+which signals only after the line end.
 
 ### 7.2 A Terminal Is Created Close-On-Exec, And A Verdict On Its Hang-Up Waits For It
 

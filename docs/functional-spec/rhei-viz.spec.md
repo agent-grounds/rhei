@@ -261,13 +261,13 @@ one-shot or EOF-driven transport — the block states plainly that the agent can
 be messaged live and names the remedy (set `intervene_stdin` on the agent's
 profile and rerun), rather than dead-ending the operator or inviting input that
 would fail after they type. Intervene messages a running agent; it never
-transitions or edits the plan [§AR-rhei-viz-flow.7](../architecture/rhei-viz-flow.spec.md#7-intervene-the-single-mutation-boundary).
+transitions or edits the plan [§AR-rhei-viz-flow.7](../architecture/rhei-viz-flow.spec.md#7-the-mutation-boundaries-intervene-and-the-human-gate).
 
 The same channel is reachable from the terminal, for operators who run without a
 browser open: `rhei intervene --task <id> [--slot <N>] -m "<message>"` discovers
 the live run's loopback address and delivers the message through the identical
 `/intervene` boundary and capability gate as the composer. It is the headless
-sibling of the composer, not a second code path [§AR-rhei-viz-flow.7](../architecture/rhei-viz-flow.spec.md#7-intervene-the-single-mutation-boundary). Each
+sibling of the composer, not a second code path [§AR-rhei-viz-flow.7](../architecture/rhei-viz-flow.spec.md#7-the-mutation-boundaries-intervene-and-the-human-gate). Each
 message delivered either way is recorded in the agent's evidence end record
 ([§FS-rhei-evidence.5.4](rhei-evidence.spec.md#54-interventions)). A surface
 attached with `rhei attach` is the third client of that same boundary
@@ -306,9 +306,10 @@ every gate renders through one path. It shows:
   ([§FS-rhei-viz.11](rhei-viz.spec.md#11-open-in-editor-route)), as it opens an artifact; the page shows no file's content, here or
   anywhere else;
 - the attachments, each the same way;
-- the questions in order, each with its kind, whether it is required, its
-  prompt and help, and a `choice` or `multi` question's options with their
-  labels and descriptions;
+- at a briefed gate, the questions in order, each with its kind, whether it is
+  required, its prompt and help, and a `choice` or `multi` question's options
+  with their labels and descriptions. A plain gate lists no questions: its
+  two synthesized ones are the release's own controls ([§FS-rhei-viz.5.1.3](rhei-viz.spec.md#513-releasing-a-plain-gate));
 - the destinations, each with its description, edge condition and final mark,
   and the routes in the order they are tried, each with the answers it matches;
 - a degraded brief's problems ([§FS-rhei-gate-brief.4.2](rhei-gate-brief.spec.md#42-degraded-brief)), so the operator sees why a gate
@@ -356,14 +357,19 @@ pass, as it does a release.
 
 Where the brief's questions are only the synthesized `destination` and
 `reason` — no `gate:` block, a block that asks nothing, or a degraded brief —
-the block keeps the release it has always offered, because a release is those
-two questions under other names: the target and the result message. The block
-lists the state's explicit outgoing transitions as human choices and submits
-the selected task, `from` state, and `to` state to the run's loopback server.
-The server must apply the same explicit human-transition semantics as `rhei
-transition`: compare the task's current state to `from`, validate that `to` is
-a legal outgoing transition, honor callbacks and callback redirects, write the
-plan through the normal atomic transition path, and report the effective target
+the block keeps the release it has always offered. It draws those two
+questions as the release's controls rather than listing them: the destination
+as its choices, the reason as its result message.
+
+The choices are the brief's destinations: every edge declared from the state,
+and every `from: "*"` edge that applies to it ([§FS-rhei-transitions.4.6](rhei-transitions.spec.md#46-wildcard-semantics)), so
+each destination the brief shows can be picked. The block submits the selected
+task, `from` state, and `to` state to the run's loopback server. The server
+must apply the same explicit human-transition semantics as `rhei transition`:
+compare the task's current state to `from`, validate that `to` is a legal
+outgoing transition — an edge declared from the state or a `from: "*"` edge
+that applies to it — honor callbacks and callback redirects, write the plan
+through the normal atomic transition path, and report the effective target
 state.
 
 Because it applies the same semantics, it also inherits the terminal-result
@@ -382,6 +388,11 @@ rejection reason naming `rhei transition <id> --from <state> --to <state>
 --result "<why>"`. A blank or whitespace-only field is the same as no field at
 all. The rejection is rendered in the block, and the run is unaffected either
 way: it picks up an applied transition on its next pass.
+
+That field is the brief's synthesized `reason`, held to the release's rule and
+not to the question's required mark, which is why the block shows no such
+mark. `rhei gate answer` is the path that asks the reason on every hop
+([§FS-rhei-gate-brief.4.1](rhei-gate-brief.spec.md#41-synthesized-questions)).
 
 The release still inherits the refusal at a gate with a brief
 ([§FS-rhei-transition-cmd.3.5](rhei-transition-cmd.spec.md#35-gates-with-a-brief)), for any client that posts one there, an older page included:

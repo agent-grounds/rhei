@@ -49,7 +49,7 @@ The reviewer inspects completed work before it advances to the next state. The r
 The human operator has full authority over the plan. They can:
 
 - Transition tasks out of a gating state such as `human-review`.
-- Cancel tasks at any point.
+- Cancel tasks at any point, where the machine declares a cancellation state.
 - Edit the plan structure (add tasks, change dependencies) — usually by re-invoking the plan writer.
 - Override any state, including terminal states, when explicitly needed,
   through the attended `rhei transition --force --reason` and explicit

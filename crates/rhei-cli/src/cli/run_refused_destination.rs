@@ -70,16 +70,28 @@ impl DestinationRefusal {
 
     /// What a spent visit's halt line says after its attempts in place of an
     /// unmet completion condition: the refused edge and what to do before the
-    /// grant the line ends with. §FS-rhei-errors.1.5.2 §FS-rhei-agents.3.2.1
-    fn spent_visit_hold(&self) -> String {
+    /// grant the line ends with. Its subject is the invocation's own last attempt
+    /// when that met the condition, and otherwise the sibling whose work did.
+    /// §FS-rhei-errors.1.5.2 §FS-rhei-agents.3.2.1
+    fn spent_visit_hold(&self, own_last_met: bool) -> String {
         let release = match self {
             Self::MissingInputs { entries, .. } if entries.len() == 1 => "write it".into(),
             Self::MissingInputs { .. } => "write them".into(),
             Self::Visits(_) => self.release(),
         };
         let edge = self.edge();
-        format!("the last one met its completion condition, but {edge}; {release} before retrying")
+        let met = if own_last_met { "the last one" } else { "another invocation of this visit" };
+        format!("{met} met its completion condition, but {edge}; {release} before retrying")
     }
+}
+
+/// Where a visit's invocations keep their spawn records, and what an agent
+/// state's invocations resolve under: the run's settings and options. A program
+/// runs once and is never fanned out, so it resolves none. §FS-rhei-errors.1.5.2
+#[derive(Clone, Copy)]
+struct VisitWorkers<'a> {
+    runtime_dir: &'a Path,
+    agents: Option<(&'a RheiSettings, &'a RunOptions)>,
 }
 
 /// Real selection enforces every allowance. Diagnostic selection relaxes only
@@ -247,6 +259,52 @@ impl NoAdvanceContext<'_> {
         );
         (!entries.is_empty()).then(|| DestinationRefusal::MissingInputs { to: to.into(), entries })
     }
+
+    /// Whether this visit's work would have the engine try the edge it selected,
+    /// judged over every invocation as the engine judges a successful exit
+    /// (§FS-rhei-states.3.3): one current-visit record proves successful work
+    /// that was not reverted, and no invocation still owes the ticket anything
+    /// (`task_has_pending_agent_invocations`). The engine's one other condition,
+    /// that no sibling is still in flight, holds at every halt, so which arm
+    /// ended last never decides it. §FS-rhei-errors.1.5.2 §FS-rhei-run.3.7.4
+    fn visit_work_met(&self, rhei: &rhei_core::ast::Rhei, workers: VisitWorkers<'_>) -> bool {
+        let id = self.task.id.to_string();
+        let moves = ticket_move_count(self.artifact_root, workers.runtime_dir, &id);
+        let succeeded = spawn_records_for_state(workers.runtime_dir, &id, self.state)
+            .into_iter()
+            .any(|(_, record)| {
+                record.proves_successful_work(&id, self.state, moves) && record.reverted.is_none()
+            });
+        let Some((settings, opts)) = workers.agents.filter(|_| succeeded) else {
+            return succeeded;
+        };
+        let Some(definition) = self.machine.states.get(self.state) else { return false };
+        task_has_pending_agent_invocations(
+            self.artifact_root,
+            workers.runtime_dir,
+            self.task,
+            self.state,
+            self.task.state.as_str(),
+            self.machine,
+            self.metadata,
+            definition,
+            settings,
+            opts,
+            selected_forward_transition(rhei, self.machine, self.task).as_deref(),
+        )
+        .is_ok_and(|pending| !pending)
+    }
+
+    /// The one rule every surface names a refused edge by: the visit's work is
+    /// met, and the destination refuses the edge it selected.
+    /// §FS-rhei-errors.1.5.2
+    fn refused_visit_edge(
+        &self,
+        rhei: &rhei_core::ast::Rhei,
+        workers: VisitWorkers<'_>,
+    ) -> Option<DestinationRefusal> {
+        self.visit_work_met(rhei, workers).then(|| self.refused_entry()).flatten()
+    }
 }
 
 /// Every successful-worker no-advance warning uses the same wording and event
@@ -273,7 +331,7 @@ fn emit_no_advance_warning(
 }
 
 /// Reports explain the same successful completion even on a zero-spawn run.
-/// A current-visit record is required: a failed exit or an earlier visit cannot
+/// Current-visit work is required: a failed exit or an earlier visit cannot
 /// establish a successful-worker hold. Attempt/output causes are checked first
 /// by the classifier. §FS-rhei-errors.1.5.1 §FS-rhei-errors.1.5.2
 fn refused_destination_halt(
@@ -285,23 +343,18 @@ fn refused_destination_halt(
 ) -> Option<DestinationRefusal> {
     let id = task.id.to_string();
     let root = spawns.tasks.artifact_root(&id);
-    let runtime = if machine.states.get(state)?.program.is_some() {
+    let is_program = machine.states.get(state)?.program.is_some();
+    let runtime = if is_program {
         root.join("runtime")
     } else {
         spawns.machines.agent_runtime_dir(&id, root, spawns.runtime_dir)
     };
-    let moves = ticket_move_count(root, &runtime, &id);
-    // End times have second precision; filter by visit before ordering, so a
-    // fast loop cannot pick an earlier stay with the same timestamp.
-    // §FS-rhei-errors.1.5.1 §FS-rhei-errors.1.5.2
-    let record = spawn_records_for_state(&runtime, &id, state)
-        .into_iter()
-        .map(|(_, record)| record)
-        .filter(|record| record.moves == moves)
-        .max_by(|left, right| (&left.ended, left.attempt).cmp(&(&right.ended, right.attempt)))?;
-    if !record.proves_successful_work(&id, state, moves) || record.reverted.is_some() {
-        return None;
-    }
+    let mut read = None;
+    let agents = if is_program {
+        None
+    } else {
+        Some((spawns.settings_or_merged(&mut read)?, spawns.opts))
+    };
     NoAdvanceContext {
         workspace_root: spawns.tasks.workspace_root,
         artifact_root: root,
@@ -310,17 +363,18 @@ fn refused_destination_halt(
         task,
         state,
     }
-    .refused_entry()
+    .refused_visit_edge(rhei, VisitWorkers { runtime_dir: &runtime, agents })
 }
 
 /// The halt line of a spent visit at every spawn site, agent or program, alone or
-/// pooled. It names what the completion condition still owes, or, when the last
-/// attempt met it and exited 0, the destination that refused the edge it selected.
-/// The spent attempts and the ending stay as they are. §FS-rhei-agents.3.2.1
-/// §FS-rhei-errors.1.5.2 §FS-rhei-retry.3
+/// pooled. It names what the completion condition still owes, or, when the
+/// visit's work met it, the destination that refused the edge it selected, by
+/// the rule the run report reads. The spent attempts and the ending stay as
+/// they are. §FS-rhei-agents.3.2.1 §FS-rhei-errors.1.5.2 §FS-rhei-retry.3
 fn spent_visit_halt_line(
     task_id: &str,
     site: NoAdvanceContext<'_>,
+    workers: VisitWorkers<'_>,
     rhei: &rhei_core::ast::Rhei,
     plan: &SpawnPlan,
     spent: u64,
@@ -346,15 +400,13 @@ fn spent_visit_halt_line(
         )
     };
     let recovery = visit_halt_recovery(budget, site.machine, site.metadata, site.task);
-    // A reverted last attempt keeps its own hold. §FS-rhei-run.3.7.4
-    let refused = plan
-        .previous
-        .as_ref()
-        .filter(|last| owed.is_empty() && last.reverted.is_none())
-        .filter(|last| last.proves_successful_work(&last.task, &last.state, plan.moves))
-        .and_then(|_| site.refused_entry());
+    let refused = owed.is_empty().then(|| site.refused_visit_edge(rhei, workers)).flatten();
+    // A reverted last attempt met nothing. §FS-rhei-run.3.7.4
+    let own_last_met = plan.previous.as_ref().is_some_and(|last| {
+        last.reverted.is_none() && last.proves_successful_work(&last.task, &last.state, plan.moves)
+    });
     let hold = match refused {
-        Some(refusal) => refusal.spent_visit_hold(),
+        Some(refusal) => refusal.spent_visit_hold(own_last_met),
         None => spent_visit_unmet(&plan.spent_budget_owed(&owed)),
     };
     render_spent_visit_hold(task_id, site.state, spent, &hold, recovery)

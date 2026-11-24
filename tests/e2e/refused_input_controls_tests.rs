@@ -84,6 +84,27 @@ fn issue_770_false_guard_is_not_attributed_to_the_input() {
     }
 }
 
+/// Reusable work whose edge no destination refused leaves `rhei retry` nothing
+/// to refill, and nothing to name: it refuses, and writes nothing. §FS-rhei-retry.2
+#[test]
+fn issue_770_retry_of_reused_visit_behind_a_false_guard_names_no_edge() {
+    let world = World::new(Worker::Agent, Outputs::Declared);
+    world.change_machine("description: Drafted", "description: Drafted, condition: 1 < 0");
+    world.assert_refused(&world.run());
+    world.assert_refused(&world.run());
+    let (records, plan) = (world.spawn_records(), world.read("plan.rhei.md"));
+    assert!(!records.is_empty(), "the finished visit's spawn record is on disk");
+    let retry = world.cli(&["retry", "plan.1"]);
+    let said = text(&retry);
+    assert!(!retry.status.success(), "retry must refuse: {said}");
+    assert!(said.contains("nothing to refill"), "{said}");
+    for named in ["'read'", "note", "no spawn record", "run the task first"] {
+        assert!(!said.contains(named), "retry names {named:?}: {said}");
+    }
+    assert_eq!(world.spawn_records(), records, "a refused retry writes nothing");
+    assert_eq!(world.read("plan.rhei.md"), plan, "a refused retry writes nothing");
+}
+
 /// Missing required outputs keep their priority: the worker owes its result,
 /// so its completion condition is unmet and the input is not the reason.
 #[test]

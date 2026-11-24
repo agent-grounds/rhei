@@ -109,9 +109,11 @@ fn run_sequential_program_work_items(
                 task,
                 state: current_state,
             };
+            let workers = VisitWorkers { runtime_dir: &task_runtime_dir, agents: None };
+            let rhei = &loaded.rhei;
             run_warn!(
                 "{}",
-                spent_visit_halt_line(task_id_str, site, &loaded.rhei, &plan, spent_budget, budget)
+                spent_visit_halt_line(task_id_str, site, workers, rhei, &plan, spent_budget, budget)
             );
             progress.stalled_tasks.insert(task_id_str.clone());
             continue;

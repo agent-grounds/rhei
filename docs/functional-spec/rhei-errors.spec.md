@@ -386,7 +386,9 @@ not changed: inputs are checked on the edge selection already chose, so the edge
 named is the one refused, and a later declared edge does not advance in its
 place. An `optional: true` input never refuses entry ([§FS-rhei-states.3.1](rhei-states.spec.md#31-optional-inputs)) and
 is never named. The input is resolved against the root the refused entry
-checked it against.
+checked it against. A destination refused both for a spent `visits:` budget and
+for a missing input is named by its budget, because entry checks the budget first
+and the warning names the same; the input is named once the budget is raised.
 
 **Attention.** The report's exact-reason requirement ([§FS-rhei-run-report.2](rhei-run-report.spec.md#2-markdown-ui))
 applies in the run whose successful worker could not advance and in every later
@@ -411,8 +413,13 @@ halts unsuccessfully.
 successful visit ([§FS-rhei-agents.3.2](rhei-agents.spec.md#32-completion-condition)), so its attempts can run out while only
 its edge is refused. The spent visit keeps its priority, but its halt line and
 Attention row name the refused edge, never an unmet completion condition
-([§FS-rhei-agents.3.2.1](rhei-agents.spec.md#321-runtime-semantics)). The halt line keeps its text through `attempts spent on
-this visit`, which scripts match, and the ending of [§FS-rhei-retry.3](rhei-retry.spec.md#3-output-and-halt-advice):
+([§FS-rhei-agents.3.2.1](rhei-agents.spec.md#321-runtime-semantics)). In a fanned-out state the condition is the visit's, met as
+the engine requires before it tries the edge ([§FS-rhei-states.3.3](rhei-states.spec.md#33-terminal-result)): one invocation's
+successful work with none still owing, whichever ended last, so every surface
+names the same edge, and the line of an invocation whose own last attempt failed
+says another invocation of this visit met it. The halt line keeps its text
+through `attempts spent on this visit`, which scripts match, and the ending of
+[§FS-rhei-retry.3](rhei-retry.spec.md#3-output-and-halt-advice):
 
 ```text
 halting Task plan.1 in state 'draft': 2 attempts spent on this visit and the last one met its completion condition, but its edge into 'read' is refused: required input note (/work/plan/runtime/plan.1.note.md) is missing; write it before retrying. The ticket stays in 'draft'. To give this visit 2 more attempts, run: rhei retry plan.1.

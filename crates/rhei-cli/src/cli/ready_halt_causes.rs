@@ -108,7 +108,7 @@ enum HaltCause {
     SpentVisit {
         attempts: u64,
         entries: Vec<String>,
-        /// When the last attempt met its completion condition, the destination's
+        /// When the visit's work met its completion condition, the destination's
         /// refusal of the edge it selected, named instead. §FS-rhei-errors.1.5.2
         refused: Option<DestinationRefusal>,
         /// Diagnostics belong to the same invocation, even when it spent the visit.
@@ -344,11 +344,12 @@ impl HaltCause {
             ),
             // §FS-rhei-run-report.3.1: one cause and recovery on every halt surface.
             HaltCause::SpentVisit { attempts, entries, refused, configuration_fallbacks } => {
-                // A met condition names its refused edge, released before the grant.
+                // Met work names its refused edge, released before the grant; the
+                // visit's work, since a fan-out's last arm to end need not be it.
                 // §FS-rhei-errors.1.5.2
                 let (held, release) = match refused {
                     Some(refusal) => (
-                        format!("its last attempt finished, but {}", refusal.edge()),
+                        format!("its work finished, but {}", refusal.edge()),
                         format!("{}, then ", refusal.release()),
                     ),
                     None => {

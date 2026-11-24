@@ -60,7 +60,7 @@ calls = root / 'runtime' / (env('RHEI_STATE') + '-calls')
 seen = len(calls.read_text().splitlines()) if calls.exists() else 0
 if seen >= 25:
     raise SystemExit(17)
-append(calls, 'success\n')
+append(calls, env('RHEI_TASK_ID') + '\n')
 write(root / 'runtime' / 'results' / (env('RHEI_TASK_ID') + '.md'), 'drafted\n')
 "#,
         );
@@ -145,6 +145,36 @@ transitions:
 
     pub fn calls(&self, state: &str) -> usize {
         self.read(&format!("runtime/{state}-calls")).lines().count()
+    }
+
+    /// The spawns of `state` for one ticket alone, where tickets share a file.
+    pub fn calls_of(&self, state: &str, ticket: &str) -> usize {
+        self.read(&format!("runtime/{state}-calls")).lines().filter(|id| *id == ticket).count()
+    }
+
+    /// The attempts charged to `ticket`'s visit to `state`, as its spawn record
+    /// says: an attempt interrupted by a run shutdown is spawned but not charged.
+    pub fn charged(&self, state: &str, ticket: &str) -> u64 {
+        let name = format!("task-{ticket}-{state}.json");
+        fs::read(self.dir.join("runtime/spawns").join(name))
+            .ok()
+            .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok())
+            .and_then(|record| record["charged"].as_u64())
+            .unwrap_or(0)
+    }
+
+    /// Every spawn record on disk, by path, with its bytes.
+    pub fn spawn_records(&self) -> Vec<(PathBuf, Vec<u8>)> {
+        let Ok(entries) = fs::read_dir(self.dir.join("runtime/spawns")) else { return Vec::new() };
+        let mut records: Vec<_> = entries
+            .map(|entry| entry.unwrap().path())
+            .map(|path| {
+                let bytes = fs::read(&path).unwrap();
+                (path, bytes)
+            })
+            .collect();
+        records.sort();
+        records
     }
 
     /// Write the input the destination is waiting for, where it looks for it.

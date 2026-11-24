@@ -59,7 +59,7 @@ One object, on stdout:
   "destinations": [ { "state": "completed", "description": "The ruling is recorded", "condition": null, "final": true } ],
   "routes": [ { "to": "completed", "when": { "approve": true } } ],
   "digest": "sha256:<64 hex>",
-  "answer_path": "runtime/gates/agora.1/1.answer.json",
+  "answer_path": "runtime/gates/agora.1/human-judgment.1.answer.json",
   "problems": []
 }
 ```
@@ -113,9 +113,22 @@ command:
 6. Records the answer file and takes the edge through the ordinary transition
    path, under the same plan lock as the state write
    ([§FS-rhei-gate-brief.7](rhei-gate-brief.spec.md#7-recording)), with the rendered answers as its result message. A
-   refusal there is `refused`, and the answer file is removed.
+   refusal there is `refused`, and the answer file is removed. The one
+   exception is the compare-and-swap, checked again under the lock: a ticket
+   that another caller moved between steps 2 and 6 is `conflict`, so of two
+   answers to one visit exactly one moves the ticket. For the same reason a
+   `stale` digest is reported as `conflict` when the ticket has left `--from`
+   by the time it is found: the brief was read after the other answer moved
+   the ticket.
 
-Exit 0 when the ticket moved, 1 on any refusal.
+Steps 1 to 5 report every error they find; once one of them refuses, the
+later ones are not run, except that step 4's `invalid` and `stale` errors are
+reported together. Exit 0 when the ticket moved, 1 on any refusal.
+
+An answer is a manual release from a gate, so a move into a state with a
+`visits` budget while a run is live is followed by the same advisory on stderr
+as `rhei transition` gives ([§FS-rhei-transition-cmd.3.4](rhei-transition-cmd.spec.md#34-live-gate-release-into-a-visits-budget)); the JSON on stdout is
+unchanged.
 
 ### 3.1. `--dry-run`
 
@@ -124,6 +137,13 @@ the digest, the answers, the routes, the edge's existence and condition, and the
 source outputs, target inputs and terminal result that can be known without
 running callbacks — and then writes nothing and runs no callback. Its exit code
 and output are those the real answer would give, with `"dry_run": true`.
+
+It takes the plan lock to read the ticket, as a real answer does, and stops
+where the real answer would write its answer file: no answer file, state,
+ledger, result or budget charge is written, and no `on_leave` redirect is
+known, so `to` is the destination. The plan's lock file is the one file it may
+create. A refusal that only a callback or the budget would give is therefore
+not predicted.
 
 ### 3.2. Output (`--json`)
 
@@ -136,16 +156,17 @@ and output are those the real answer would give, with `"dry_run": true`.
   "from": "human-judgment",
   "to": "completed",
   "route": { "index": 0, "when": { "approve": true } },
-  "answer_path": "runtime/gates/agora.1/1.answer.json",
-  "result": "Accept the verdict as the record?: yes\nAnswer: runtime/gates/agora.1/1.answer.json",
+  "answer_path": "runtime/gates/agora.1/human-judgment.1.answer.json",
+  "result": "Accept the verdict as the record?: yes\nAnswer: runtime/gates/agora.1/human-judgment.1.answer.json",
   "errors": []
 }
 ```
 
 `route` is `null` when the destination came from the `destination` question.
-`result` is the rendered answers ([§FS-rhei-gate-brief.7.2](rhei-gate-brief.spec.md#72-the-result-message)). On refusal, stdout still
-carries the object, with `"ok": false`, `to` and `route` `null` where they are
-unknown, and `errors` listing each as
+`to` is where the ticket went, after any `on_leave` redirect. `result` is the
+rendered answers ([§FS-rhei-gate-brief.7.2](rhei-gate-brief.spec.md#72-the-result-message)). On refusal, stdout still
+carries the object, with `"ok": false`; `to`, `route`, `answer_path` and
+`result` are `null` where they are unknown, and `errors` lists each as
 `{ "kind": <kind>, "question": <id> | null, "message": <text> }`, with the kinds
 of [§FS-rhei-gate-brief.6.2](rhei-gate-brief.spec.md#62-refusals). Without `--json` the same errors are printed to stderr, one
 per line.

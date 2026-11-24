@@ -20,6 +20,8 @@ use crate::rhei_tui::dashboard::{GateTransitionSink, InterveneSink, PlanLoader};
 use crate::rhei_tui::event::{EventSink, MessageLevel, RunEvent};
 
 mod derive;
+mod gate_block;
+mod gate_form;
 mod input;
 mod outcome;
 mod render;
@@ -404,6 +406,8 @@ fn forward_sigint_to_self() -> io::Result<()> {
 
 #[cfg(test)]
 mod consumes_tests;
+#[cfg(test)]
+mod gate_form_tests;
 #[cfg(test)]
 mod outline_fold_tests;
 #[cfg(test)]

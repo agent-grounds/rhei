@@ -204,6 +204,17 @@
     color: var(--fg); background: var(--surface);
     border: 1px solid color-mix(in srgb, #6cae7c 35%, var(--hairline)); }
   .gatebox input.gresult:disabled { opacity: 0.55; cursor: not-allowed; }
+  /* the brief every gate renders, and the answer form of a briefed one (§FS-rhei-viz.5.1) */
+  .gatebox .gbrief { margin-bottom: 10px; }
+  .gatebox .gtitle { font-weight: 600; margin-bottom: 2px; overflow-wrap: anywhere; }
+  .gatebox .gsummary { color: var(--fg); white-space: pre-wrap; margin: 6px 0; }
+  .gatebox .gfile { font-size: 12px; margin: 3px 0; overflow-wrap: anywhere; }
+  .gatebox .gfile .gk { color: var(--dim); }
+  .gatebox .gq { margin: 8px 0; padding-top: 6px; border-top: 1px solid var(--hairline); }
+  .gatebox .gqid { font-weight: 600; }
+  .gatebox .gqprompt { font-size: 12.5px; margin: 2px 0 4px; overflow-wrap: anywhere; }
+  .gatebox .gopt { display: block; font-size: 12px; margin: 2px 0; cursor: pointer; }
+  .gatebox .gqerr { font-size: 11.5px; }
 
   /* ---- intervene (running tasks; static active-state preview) ---- */
   .intervene { margin-top: 14px; padding: 10px 12px; border-radius: 6px;
@@ -601,11 +612,11 @@ function renderSurroundings(){
   else nc.appendChild(el("span",{class:"none",text: ms&&ms.terminal?"terminal — no exits":"—"}));
   frag.appendChild(nc);
 
-  // Human gate — a live-only, explicit transition action for gating states.
-  // It calls the same transition path as `rhei transition`; static/frozen pages
-  // keep the choices visible but inert. §FS-rhei-viz.5.1
+  // Human gate — the brief, then a live-only answer or release through the
+  // paths `rhei gate answer` and `rhei transition` take; static/frozen pages
+  // keep the brief and its controls visible but inert. §FS-rhei-viz.5.1
   if(ms&&ms.gating){
-    frag.appendChild(renderGateTransition(n, ms));
+    frag.appendChild(renderGateBlock(n, ms));
   }
 
   // prompt — the state's instructions, instantiated for THIS task with linked artifacts
@@ -743,9 +754,22 @@ function dot(c){ const d=document.createElement("span"); d.className="dot"; d.st
 function gateTransitionAvailable(){
   return LIVE && !!(IX && IX.plan && IX.plan.capabilities && IX.plan.capabilities.gate_transition);
 }
-function renderGateTransition(node, ms){
+// The block every gating state shows: the brief, then an answer form at a
+// briefed gate or the release at a plain one. §FS-rhei-viz.5.1
+function renderGateBlock(node, ms){
   const box=el("div",{class:"gatebox"});
   box.appendChild(el("h3",{text:"human gate"}));
+  const brief=gateBrief(IX.plan, node.id);
+  if(brief) box.appendChild(renderGateBrief(brief));
+  if(gateAuthored(brief)) box.appendChild(renderGateAnswer(node, brief));
+  else box.appendChild(renderGateRelease(node, ms, brief));
+  return box;
+}
+// The release of a plain gate: its synthesized questions are the target and the
+// result message, under the names they have always had. §FS-rhei-viz.5.1.3
+function renderGateRelease(node, ms, brief){
+  const box=el("div",{class:"grelease"});
+  if(brief) box.appendChild(renderGateQuestionList(brief));
   const choices=(ms.transitions||[]).filter(t=>!t.wildcard);
   const canAct=gateTransitionAvailable();
   const desc=canAct
@@ -757,7 +781,7 @@ function renderGateTransition(node, ms){
   // The operator's own account of the decision, carried through the move like
   // `rhei transition --result`. Always offered; flagged as needed when a choice
   // finishes the ticket, because that is the case the server refuses without
-  // one. §FS-rhei-viz.5.1 §FS-rhei-states.3.3
+  // one. §FS-rhei-viz.5.1.3 §FS-rhei-states.3.3
   const anyTerminal=choices.some(t=>isTerminal(t.to));
   const label=el("label",{class:"glabel"});
   label.appendChild(document.createTextNode("Result"));
@@ -1503,6 +1527,9 @@ function applyLive(snap){
   const nextAccounting = prevSel
     ? JSON.stringify((((snap.task_runtime||{})[prevSel]||{}).accounting)||null)
     : null;
+  // A new visit or a rewritten request redraws the gate block. §FS-rhei-viz.5.1.1
+  const prevDigest = prevSel ? (gateBrief(IX.plan, prevSel)||{}).digest||null : null;
+  const nextDigest = prevSel ? (gateBrief(snap, prevSel)||{}).digest||null : null;
   for(const t of (snap.tasks||[])){ const n=IX.byId[t.id];
     if(n && n.state!==t.state){ changed[t.id]=true; n.state=t.state; } }
   IX.plan = snap;                        // refresh machine / about / accounting
@@ -1513,7 +1540,7 @@ function applyLive(snap){
   const supScroll = (document.querySelector(".sbody")||{}).scrollTop || 0;
   renderSupp();
   const sb=document.querySelector(".sbody"); if(sb) sb.scrollTop=supScroll;
-  if(prevSel && (changed[prevSel] || prevCat!==nextCat || prevAccounting!==nextAccounting)){
+  if(prevSel && (changed[prevSel] || prevCat!==nextCat || prevAccounting!==nextAccounting || prevDigest!==nextDigest)){
     // §FS-rhei-cost-accounting.9: selected-task token rollups live-refresh from /snapshot.
     renderSurroundings(); showStateDetail(IX.byId[prevSel].state);
   }
@@ -1609,6 +1636,173 @@ function sendGateTransition(node, to, result){
     .then(r=>r.ok?r.json():{ok:false,error:"gate transition request failed"})
     .then(j=>j&&j.ok ? {ok:true,to:j.to} : {ok:false,error:(j&&j.error)||"gate transition failed"})
     .catch(err=>({ok:false,error:err&&err.message?err.message:"gate transition request failed"}));
+}
+
+// ---- gate brief and answer --------------------------------------------------
+// The brief is the one the host built with `rhei gate show`'s code; the page
+// reads no request or states file. An answer goes to /answer-gate, which takes
+// the path `rhei gate answer` takes: a dry run names the destination, the
+// operator confirms it, and only then is the gate answered. §FS-rhei-viz.5.1.1 §FS-rhei-viz.5.1.2
+function gateBrief(plan, id){ return ((plan&&plan.gates)||{})[id]||null; }
+function gateAuthored(brief){ return !!brief && brief.source!=="synthesized"; }
+function gateAnswerAvailable(){
+  return LIVE && !!(IX && IX.plan && IX.plan.capabilities && IX.plan.capabilities.gate_answer);
+}
+function gateDestinationText(d){
+  let text=d.state;
+  if(d.final) text+=" (final)";
+  if(d.condition) text+=" when "+d.condition;
+  if(d.description) text+=" — "+d.description;
+  return text;
+}
+function gateRouteText(r){
+  const when=Object.entries(r.when||{}).map(([id,v])=>`${id} = ${JSON.stringify(v)}`);
+  return `${r.to} when ${when.length?when.join(", "):"always"}`;
+}
+// A label that only repeats the value is shown once.
+function gateOptionText(o){ return o.label && o.label!==o.value ? `${o.label} (${o.value})` : o.value; }
+// A file the brief shows: its path, whether it can be read, and — live, inside
+// the workspace — a link that opens it in the operator's editor. §FS-rhei-viz.11
+function gateFileItem(label, f){
+  const item=el("div",{class:"gfile"});
+  item.appendChild(el("span",{class:"gk",text:label+" "}));
+  const ws=String((IX&&IX.plan&&IX.plan.workspace)||"").replace(/\/$/,"");
+  const abs=String(f.absolute||"");
+  const rel=(LIVE && ws && abs.startsWith(ws+"/")) ? abs.slice(ws.length+1) : null;
+  item.appendChild(rel && f.readable ? openLink(rel, f.path, abs) : el("span",{text:f.path, title:abs}));
+  item.appendChild(el("span",{class:f.readable?"gstatus":"gstatus gerr",
+    text:f.readable?"  readable":"  unreadable: "+(f.problem||"")}));
+  return item;
+}
+function renderGateBrief(brief){
+  const box=el("div",{class:"gbrief"});
+  box.appendChild(el("div",{class:"gtitle",text:brief.title}));
+  box.appendChild(el("div",{class:"gstatus",
+    text:`${brief.ticket} · gate ${brief.state} · visit ${brief.visit} · since ${brief.since||"unknown"}`}));
+  if(brief.summary) box.appendChild(el("div",{class:"gdesc gsummary",text:brief.summary}));
+  if(brief.display) box.appendChild(gateFileItem("Read", brief.display));
+  for(const a of brief.attachments||[]) box.appendChild(gateFileItem("Attached", a));
+  if((brief.destinations||[]).length)
+    box.appendChild(el("div",{class:"gdesc",text:"Leads to: "+brief.destinations.map(gateDestinationText).join(" · ")}));
+  if((brief.routes||[]).length)
+    box.appendChild(el("div",{class:"gdesc",text:"Routes, first match wins: "+brief.routes.map(gateRouteText).join(" · ")}));
+  for(const p of brief.problems||[]) box.appendChild(el("div",{class:"gdesc gerr",text:"degraded: "+p}));
+  return box;
+}
+function renderGateQuestionList(brief){
+  const box=el("div",{class:"gqlist"});
+  for(const q of brief.questions||[]){
+    const opts=(q.options||[]).map(gateOptionText);
+    box.appendChild(el("div",{class:"gdesc",text:`${q.id} · ${q.kind} · ${q.required?"required":"optional"} — ${q.prompt}`
+      +(opts.length?` [${opts.join(", ")}]`:"")}));
+  }
+  return box;
+}
+// What the operator gave. Unanswered, blank and empty picks are left out, so a
+// skipped required question is refused rather than answered for them.
+function gateGiven(v){ return v!==undefined && v!==null && v!=="" && !(Array.isArray(v)&&!v.length); }
+function gateAnswerDocument(brief, values){
+  const answers={};
+  for(const q of brief.questions||[]) if(gateGiven(values[q.id])) answers[q.id]=values[q.id];
+  return {version:brief.version, request_digest:brief.digest, answers};
+}
+// Refusals beside the question they name; the rest under the form.
+function gateErrorsFor(errors, brief){
+  const asked=new Set((brief.questions||[]).map(q=>q.id)), byQuestion={}, general=[];
+  for(const e of errors||[]){
+    if(e.question && asked.has(e.question)) (byQuestion[e.question]=byQuestion[e.question]||[]).push(e);
+    else general.push(e);
+  }
+  return {byQuestion, general};
+}
+function sendGateAnswer(node, brief, values, dryRun){
+  const body={task_id:node.id, from:brief.state, answers:gateAnswerDocument(brief, values), dry_run:!!dryRun};
+  return fetch("answer-gate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})
+    .then(r=>r.ok?r.json():{ok:false,error:"gate answer request failed"})
+    .then(j=>j||{ok:false,error:"gate answer request failed"})
+    .catch(err=>({ok:false,error:err&&err.message?err.message:"gate answer request failed"}));
+}
+// Dry run, confirm the destination it reports, then answer. Resolves to the
+// stage it ended at — refused, cancelled or answered — and the last reply.
+function runGateAnswer(node, brief, values, confirmMove){
+  return sendGateAnswer(node, brief, values, true).then(dry=>{
+    if(!dry.ok) return {stage:"refused", reply:dry};
+    if(!confirmMove(`this moves ${brief.ticket} to ${dry.to}`)) return {stage:"cancelled", reply:dry};
+    return sendGateAnswer(node, brief, values, false).then(real=>({stage:real.ok?"answered":"refused", reply:real}));
+  });
+}
+// One control per question, nothing preselected. §FS-rhei-viz.5.1.2
+function gateControl(node, q, values, canAct){
+  const box=el("div",{class:"gctl"}), name=`gate-${node.id}-${q.id}`;
+  const add=(input, label, desc)=>{
+    const l=el("label",{class:"gopt"}); input.disabled=!canAct; l.appendChild(input);
+    l.appendChild(document.createTextNode(" "+label));
+    if(desc) l.appendChild(el("span",{class:"gstatus",text:" — "+desc}));
+    box.appendChild(l);
+  };
+  if(q.kind==="boolean"){
+    for(const [label, v] of [["yes",true],["no",false]]){
+      const r=el("input",{type:"radio",name});
+      r.addEventListener("change",()=>{ if(r.checked) values[q.id]=v; });
+      add(r, label);
+    }
+  } else if(q.kind==="choice" || q.kind==="multi"){
+    const opts=q.options||[];
+    for(const o of opts){
+      const input=el("input",{type:q.kind==="multi"?"checkbox":"radio",name});
+      input.addEventListener("change",()=>{
+        if(q.kind==="choice"){ if(input.checked) values[q.id]=o.value; return; }
+        const picked=new Set(values[q.id]||[]);
+        if(input.checked) picked.add(o.value); else picked.delete(o.value);
+        values[q.id]=opts.map(x=>x.value).filter(v=>picked.has(v));
+      });
+      add(input, gateOptionText(o), o.description);
+    }
+  } else {
+    const t=el("input",{class:"gresult",type:"text",placeholder:canAct?"":"Static preview — not delivered"});
+    t.disabled=!canAct;
+    t.addEventListener("input",()=>{ values[q.id]=t.value; });
+    box.appendChild(t);
+  }
+  return box;
+}
+function renderGateAnswer(node, brief){
+  const form=el("div",{class:"gform"}), canAct=gateAnswerAvailable(), values={}, slots={};
+  form.appendChild(el("div",{class:"gdesc",text:canAct
+    ? "Answer the questions. Rhei checks the answer and says where it leads before anything is written."
+    : LIVE ? "This live dashboard is not wired for gate answers." : "Static preview — answers are not delivered."}));
+  (brief.questions||[]).forEach((q,i)=>{
+    const field=el("div",{class:"gq"}), head=el("div",{});
+    head.appendChild(el("span",{class:"gqid",text:`${i+1}. ${q.id}`}));
+    head.appendChild(el("span",{class:"gstatus",text:`  ${q.kind} · ${q.required?"required":"optional"}`}));
+    field.appendChild(head);
+    field.appendChild(el("div",{class:"gqprompt",text:q.prompt}));
+    if(q.help) field.appendChild(el("div",{class:"gstatus",text:q.help}));
+    field.appendChild(gateControl(node, q, values, canAct));
+    slots[q.id]=el("div",{class:"gerr gqerr"}); field.appendChild(slots[q.id]);
+    form.appendChild(field);
+  });
+  const row=el("div",{class:"grow"}), status=el("span",{class:"gstatus"});
+  const btn=el("button",{class:"btn",text:"Answer…"}); btn.disabled=!canAct;
+  btn.addEventListener("click",()=>{
+    if(btn.disabled) return;
+    btn.disabled=true; status.className="gstatus"; status.textContent="checking the answer…";
+    for(const slot of Object.values(slots)) slot.textContent="";
+    const confirmMove=move=>{ status.textContent=move; return window.confirm(`${move}. Answer the gate?`); };
+    runGateAnswer(node, brief, values, confirmMove).then(({stage, reply})=>{
+      btn.disabled=false;
+      if(stage==="answered"){ status.textContent=`answered — ${brief.ticket} moved to ${reply.to}`; refreshSnapshotOnce(); return; }
+      if(stage==="cancelled"){ status.textContent="not answered"; return; }
+      const {byQuestion, general}=gateErrorsFor(reply.errors, brief);
+      for(const [id, errs] of Object.entries(byQuestion)) slots[id].textContent=errs.map(e=>"✗ "+e.message).join(" · ");
+      const shown=general.map(e=>`${e.kind}: ${e.message}`);
+      if(reply.error) shown.push(reply.error);
+      status.className="gstatus gerr"; status.textContent=shown.join(" · ")||"refused — see the questions above";
+      if(general.some(e=>e.kind==="stale")) refreshSnapshotOnce();
+    });
+  });
+  row.appendChild(btn); row.appendChild(status); form.appendChild(row);
+  return form;
 }
 
 // ---- bootstrap --------------------------------------------------------------

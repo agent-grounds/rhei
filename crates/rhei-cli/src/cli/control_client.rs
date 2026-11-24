@@ -55,8 +55,8 @@ pub(crate) fn post_control(url: &str, route: &str, body: &str) -> Result<Control
 /// accepts a message it cannot deliver is worse than one that is not offered.
 // §FS-rhei-run-headless.5
 fn no_control_server() -> String {
-    "this run serves no control endpoint — restart it with `--dashboard` to intervene or \
-     release gates from an attached surface"
+    "this run serves no control endpoint — restart it with `--dashboard` to intervene, or to \
+     release or answer gates, from an attached surface"
         .to_string()
 }
 
@@ -113,7 +113,7 @@ impl rhei_tui::InterveneSink for ControlInterveneSink {
     }
 }
 
-/// Release human gates over the control server. §FS-rhei-viz.5.1
+/// Release and answer human gates over the control server. §FS-rhei-viz.5.1
 pub(crate) struct ControlGateSink {
     control_url: Option<String>,
 }
@@ -147,6 +147,36 @@ impl rhei_tui::GateTransitionSink for ControlGateSink {
                 .to_string())
         } else {
             Err(reply.error.unwrap_or_else(|| "the run refused the gate release".to_string()))
+        }
+    }
+
+    fn answers_gates(&self) -> bool {
+        true
+    }
+
+    /// Post to the run's `/answer-gate`. A reply carrying `errors` is the
+    /// answer document, refusals included; any other is the server saying it
+    /// could not answer at all. §FS-rhei-viz.5.1.2 §FS-rhei-run-headless.5
+    fn answer_gate(
+        &self,
+        task_id: &str,
+        from: &str,
+        answers: &str,
+        dry_run: bool,
+    ) -> Result<serde_json::Value, String> {
+        let url = self.control_url.as_deref().ok_or_else(no_control_server)?;
+        let answers: serde_json::Value = serde_json::from_str(answers)
+            .map_err(|err| format!("the answer is not a JSON document: {err}"))?;
+        let body = serde_json::json!({
+            "task_id": task_id, "from": from, "answers": answers, "dry_run": dry_run,
+        })
+        .to_string();
+        let reply = post_control(url, "/answer-gate", &body)
+            .map_err(|err| format!("could not reach the run at {url}: {err}"))?;
+        if reply.body.get("errors").is_some() {
+            Ok(reply.body)
+        } else {
+            Err(reply.error.unwrap_or_else(|| "the run did not answer the gate".to_string()))
         }
     }
 }

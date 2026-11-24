@@ -9,7 +9,7 @@ use ratatui::widgets::{Block, Borders, Clear, Paragraph};
 use ratatui::Frame;
 
 use super::derive::run_rollup;
-use super::input::{gate_choices, intervene_available};
+use super::input::{gate_available, intervene_available};
 use super::state::{ComposerKind, UiState, View};
 use super::text::truncate_chars;
 use super::theme::{category, category_glyph, Category, Theme};
@@ -94,8 +94,10 @@ pub(super) fn draw(f: &mut Frame, state: &UiState) {
     if let Some(composer) = &state.composer {
         render_composer(f, area, state, composer);
     }
-    if state.gate_active {
-        render_gate(f, area, state);
+    if let Some(form) = &state.gate_form {
+        super::gate_block::render_form(f, area, state, form);
+    } else if state.gate_active {
+        super::gate_block::render_release(f, area, state);
     }
 }
 
@@ -299,7 +301,7 @@ fn render_action_bar(f: &mut Frame, area: Rect, state: &UiState) {
     if intervene_available(state) {
         hints.push("m message agent".to_string());
     }
-    if !gate_choices(state).is_empty() && !state.finished && state.gate.is_some() {
+    if gate_available(state) {
         hints.push("⏎ gate".to_string());
     }
     match state.view {
@@ -403,31 +405,7 @@ fn render_composer(f: &mut Frame, area: Rect, state: &UiState, composer: &super:
     f.render_widget(Paragraph::new(line).block(block), popup);
 }
 
-fn render_gate(f: &mut Frame, area: Rect, state: &UiState) {
-    let theme = &state.theme;
-    let choices = gate_choices(state);
-    let task = state.selected.clone().unwrap_or_default();
-    let mut lines = vec![Line::from(Span::styled(
-        format!("human gate — {task}"),
-        Style::default().add_modifier(Modifier::BOLD),
-    ))];
-    for (i, (from, to)) in choices.iter().enumerate() {
-        lines.push(Line::from(format!("  {}  {from} → {to}", i + 1)));
-    }
-    lines.push(Line::from(Span::styled(
-        "  digit to choose · Esc cancel",
-        Style::default().fg(theme.dim()),
-    )));
-    let popup = centered_rect(area, 48, lines.len() as u16 + 2);
-    f.render_widget(Clear, popup);
-    let block = Block::default()
-        .title(" gate ")
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(theme.accent()));
-    f.render_widget(Paragraph::new(lines).block(block), popup);
-}
-
-fn centered_rect(area: Rect, width: u16, height: u16) -> Rect {
+pub(super) fn centered_rect(area: Rect, width: u16, height: u16) -> Rect {
     let width = width.min(area.width);
     let height = height.min(area.height);
     let x = area.x + (area.width.saturating_sub(width)) / 2;

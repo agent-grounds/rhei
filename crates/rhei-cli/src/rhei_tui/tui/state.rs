@@ -237,6 +237,8 @@ pub(super) struct UiState {
     pub(super) filter_editing: bool,
     pub(super) composer: Option<Composer>,
     pub(super) gate_active: bool,
+    /// The open form of a briefed gate. §FS-rhei-run-tui.1.5.5
+    pub(super) gate_form: Option<super::gate_form::GateForm>,
     pub(super) help: bool,
     pub(super) inspector_scroll: u16,
     pub(super) journal_scroll: u16,
@@ -294,6 +296,7 @@ impl UiState {
             filter_editing: false,
             composer: None,
             gate_active: false,
+            gate_form: None,
             help: false,
             inspector_scroll: 0,
             journal_scroll: 0,
@@ -315,6 +318,7 @@ impl UiState {
                 self.plan = model;
             }
         }
+        super::gate_form::sync(self);
         self.ensure_selection();
     }
 
@@ -522,6 +526,7 @@ impl UiState {
                 });
                 self.composer = None;
                 self.gate_active = false;
+                self.gate_form = None;
                 self.push_journal(
                     MessageLevel::Info,
                     format!(

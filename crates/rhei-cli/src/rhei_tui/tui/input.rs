@@ -36,6 +36,9 @@ pub(super) fn handle_key_event(
     if state.composer.is_some() {
         return handle_composer(state, code);
     }
+    if state.gate_form.is_some() {
+        return super::gate_form::handle_key(state, code);
+    }
     if state.gate_active {
         return handle_gate(state, code);
     }
@@ -440,16 +443,32 @@ pub(super) fn gate_choices(state: &UiState) -> Vec<(String, String)> {
     st.transitions.iter().filter(|t| !t.wildcard).map(|t| (st.name.clone(), t.to.clone())).collect()
 }
 
+/// Whether `Enter` opens a gate block for the selected task: a briefed gate the
+/// sink answers, or a plain one with release choices. §FS-rhei-run-tui.1.5.5
+pub(super) fn gate_available(state: &UiState) -> bool {
+    let briefed = state
+        .selected
+        .as_ref()
+        .and_then(|id| state.plan.gates.get(id))
+        .is_some_and(|brief| brief.authored())
+        && state.gate.as_ref().is_some_and(|sink| sink.answers_gates());
+    !state.finished && state.gate.is_some() && (briefed || !gate_choices(state).is_empty())
+}
+
 /// Whether the `m` intervene action currently applies (selected task is live).
 pub(super) fn intervene_available(state: &UiState) -> bool {
     !state.finished && state.selected.as_ref().map(|id| state.is_live(id)).unwrap_or(false)
 }
 
-/// Open the gate chooser for the selected task when it sits in a live gating
-/// state. Returns whether it opened (used by the action bar key).
+/// Open the gate block for the selected task when it sits in a live gating
+/// state: the form at a briefed gate, the release choices at a plain one.
+/// Returns whether it opened (used by the action bar key). §FS-rhei-run-tui.1.5.5
 pub(super) fn open_gate(state: &mut UiState) -> bool {
     if state.finished {
         return false;
+    }
+    if super::gate_form::open(state) {
+        return true;
     }
     if gate_choices(state).is_empty() || state.gate.is_none() {
         return false;

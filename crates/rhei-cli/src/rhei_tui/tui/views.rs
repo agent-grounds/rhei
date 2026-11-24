@@ -483,7 +483,7 @@ const ARTIFACT_EXCERPT_BYTES: u64 = 16 * 1024;
 /// false for both `/etc/passwd` and `C:out.md`, and an inspector that reads
 /// either one is reading outside the run it is inspecting.
 // §FS-rhei-run-tui.1.5.3 §FS-rhei-states.1.3
-fn artifact_excerpt(workspace: &Path, relative: &str) -> (Vec<String>, bool) {
+pub(super) fn artifact_excerpt(workspace: &Path, relative: &str) -> (Vec<String>, bool) {
     if relative.contains('{') || relative.contains("..") || crate::path_is_rooted(relative) {
         return (Vec::new(), false);
     }

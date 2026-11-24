@@ -104,6 +104,7 @@ fn demo_model() -> VizModel {
                 machine_state("completed", false, vec![]),
             ],
         },
+        gates: Default::default(),
     }
 }
 
@@ -665,6 +666,7 @@ fn parked_model() -> VizModel {
             name: "ci".into(),
             states: vec![verify, machine_state("needs-human", true, vec![])],
         },
+        gates: Default::default(),
     }
 }
 

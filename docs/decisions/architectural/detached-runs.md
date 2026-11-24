@@ -100,8 +100,8 @@ ring buffer to size, no protocol between run and surface beyond a file format
 that had to exist anyway for `--json`.
 
 **Stopping is a signal, not a route.** `rhei stop` sends `SIGINT` to the run's
-pid. The loopback server keeps the single inbound mutation boundary
-[§AR-rhei-viz-flow.7](../../architecture/rhei-viz-flow.spec.md#7-intervene-the-single-mutation-boundary) gives it, and stopping inherits [§FS-rhei-run.3.2](../../functional-spec/rhei-run.spec.md#32-interruption-and-process-ownership) in full
+pid. The loopback server keeps the mutation boundaries
+[§AR-rhei-viz-flow.7](../../architecture/rhei-viz-flow.spec.md#7-the-mutation-boundaries-intervene-and-the-human-gate) gives it, and stopping inherits [§FS-rhei-run.3.2](../../functional-spec/rhei-run.spec.md#32-interruption-and-process-ownership) in full
 rather than growing a second, subtly different teardown.
 
 **In an attached surface, `Ctrl+C` detaches.** The driving TUI re-raises

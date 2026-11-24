@@ -460,7 +460,7 @@ Beyond Flow, the tab bar offers three compact views over the same model:
 #### 1.5.5. Live actions: intervene and human gate
 
 The TUI exposes the dashboard's live actions through the same sinks as the
-browser, not separate mutation paths ([§FS-rhei-viz.5](rhei-viz.spec.md#5-running-execution-view) [§AR-rhei-viz-flow.7](../architecture/rhei-viz-flow.spec.md#7-intervene-the-single-mutation-boundary)).
+browser, not separate mutation paths ([§FS-rhei-viz.5](rhei-viz.spec.md#5-running-execution-view) [§AR-rhei-viz-flow.7](../architecture/rhei-viz-flow.spec.md#7-the-mutation-boundaries-intervene-and-the-human-gate)).
 
 - **Intervene** — `m` opens a one-line composer only for a selected live task
   whose agent is reachable through the intervention sink. `Enter` sends, `Esc`
@@ -472,10 +472,16 @@ browser, not separate mutation paths ([§FS-rhei-viz.5](rhei-viz.spec.md#5-runni
   and since; the summary; the display file's path and whether it can be read,
   followed by a bounded head excerpt of its content under the inspector's
   artifact excerpt rule ([§FS-rhei-run-tui.1.5.3](rhei-run-tui.spec.md#153-flow-view-default)), read against the ticket's execution
-  root; the attachments; the questions with their kinds, required marks and
-  options; the destinations and the routes; and a degraded brief's problems.
-  What the block then takes follows the dashboard ([§FS-rhei-viz.5.1.2](rhei-viz.spec.md#512-answering-a-briefed-gate), [§FS-rhei-viz.5.1.3](rhei-viz.spec.md#513-releasing-a-plain-gate)), and
-  `Esc` closes it.
+  root; the attachments; at a briefed gate the questions with their kinds,
+  required marks and options; the destinations and the routes; and a degraded
+  brief's problems. What the block then takes follows the dashboard
+  ([§FS-rhei-viz.5.1.2](rhei-viz.spec.md#512-answering-a-briefed-gate), [§FS-rhei-viz.5.1.3](rhei-viz.spec.md#513-releasing-a-plain-gate)), and `Esc` closes it. The block opens only where the
+  gate sink can act: a sink that cannot act at all, such as an attached
+  surface's when its run serves no control URL ([§FS-rhei-run-headless.5](rhei-run-headless.spec.md#5-rhei-attach)), opens
+  nothing, offers no `⏎ gate` hint, and answers `Enter` with a journal line
+  naming the remedy. The form opens only where the sink answers gates;
+  elsewhere a briefed gate gets the release, and the release's refusal there
+  names the commands that answer it.
   - At a **briefed gate** the block is a form. `↑`/`↓` or `Tab`/`Shift+Tab`
     move between questions. A `boolean` takes `y`, `n` or `Space`; a `choice`
     takes `←`/`→` or its option's digit; a `multi` moves among its options with
@@ -487,9 +493,11 @@ browser, not separate mutation paths ([§FS-rhei-viz.5](rhei-viz.spec.md#5-runni
     in the form, beside its question when it names one, with the answers kept,
     and is echoed in the journal; an answer that lands closes the block and is
     journalled with its move.
-  - At a **plain gate** the block numbers the state's explicit outgoing
-    transitions as digit choices. Picking one opens the same one-line composer
-    intervene uses, this time for the transition's **result message**: `Enter`
+  - At a **plain gate** the block numbers the brief's destinations as digit
+    choices — every edge declared from the state, and every `from: "*"` edge
+    that applies to it — and lists no questions, since the choice and the
+    composer are its two synthesized ones. Picking one opens the same
+    one-line composer intervene uses, this time for the transition's **result message**: `Enter`
     submits the choice through the gate sink carrying whatever was typed, an
     empty line submits with no message, and `Esc` cancels the move entirely.
     The composer is labelled with the chosen `from → to` and says when the

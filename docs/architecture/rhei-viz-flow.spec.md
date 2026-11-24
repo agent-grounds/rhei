@@ -10,7 +10,7 @@ read-only with respect to plan state. [§FS-rhei-run-tui](../functional-spec/rhe
 ## 1. Context: two renderers, one design
 
 The Flow design exists today in two places that share an intent but no code, and
-the spec's parity requirement ([§FS-rhei-viz](../functional-spec/rhei-viz.spec.md#fs-rhei-viz-flow-visualization) [§AR-rhei-viz-flow.7](rhei-viz-flow.spec.md#7-intervene-the-single-mutation-boundary), [§AR-rhei-viz-flow.8](rhei-viz-flow.spec.md#8-shared-derivation-a-single-source-of-truth)) is the instruction to
+the spec's parity requirement ([§FS-rhei-viz](../functional-spec/rhei-viz.spec.md#fs-rhei-viz-flow-visualization) [§AR-rhei-viz-flow.7](rhei-viz-flow.spec.md#7-the-mutation-boundaries-intervene-and-the-human-gate), [§AR-rhei-viz-flow.8](rhei-viz-flow.spec.md#8-shared-derivation-a-single-source-of-truth)) is the instruction to
 collapse them onto one model and one renderer.
 
 | | Static (the Flow prototype) | Dynamic (the legacy dashboard) |
@@ -70,7 +70,7 @@ The architecture rests on three "exactly once" invariants:
 - **One asset.** A single self-contained HTML/CSS/JS string is the *only* renderer.
   The static path inlines the model into it and writes a file; the live path
   serves the same string at `/` and lets its JS re-render from `/snapshot`.
-  A byte-identical *asset* ([§FS-rhei-viz](../functional-spec/rhei-viz.spec.md#fs-rhei-viz-flow-visualization) [§AR-rhei-viz-flow.7](rhei-viz-flow.spec.md#7-intervene-the-single-mutation-boundary)) is guaranteed by construction, not by
+  A byte-identical *asset* ([§FS-rhei-viz](../functional-spec/rhei-viz.spec.md#fs-rhei-viz-flow-visualization) [§AR-rhei-viz-flow.7](rhei-viz-flow.spec.md#7-the-mutation-boundaries-intervene-and-the-human-gate)) is guaranteed by construction, not by
   keeping two templates in sync; rendered output then differs only by the runtime
   overlay ([§AR-rhei-viz-flow.4](rhei-viz-flow.spec.md#4-the-data-contract-static-base--runtime-overlay)). The current `dashboard/html.rs` is retired.
 - **One model.** Both surfaces consume the [§AR-rhei-viz-flow.8](rhei-viz-flow.spec.md#8-shared-derivation-a-single-source-of-truth) `VizModel`; the live payload is a
@@ -192,23 +192,44 @@ GET /log?task=<id>&state=<state>&from=<byte-offset>
 the full ANSI scrollback comes from `/log`. In the static surface there is no
 `/log`; the terminal shows the representative transcript embedded in the model.
 
-## 7. Intervene: the single mutation boundary
+## 7. The mutation boundaries: intervene and the human gate
 
-The surface is read-only with respect to plan state, with **exactly one hole**:
-[§FS-rhei-viz](../functional-spec/rhei-viz.spec.md#fs-rhei-viz-flow-visualization) [§AR-rhei-viz-flow.5](rhei-viz-flow.spec.md#5-data-flow) lets the operator message a running agent. This is the only
-inbound, state-changing-adjacent path, and it is the focal point of any security
-review.
+The surface is read-only with respect to plan state, with **two holes**, and
+they are the focal point of any security review. Intervene
+([§FS-rhei-viz](../functional-spec/rhei-viz.spec.md#fs-rhei-viz-flow-visualization) [§AR-rhei-viz-flow.5](rhei-viz-flow.spec.md#5-data-flow)) lets the operator message a running agent
+and writes no plan state. The human gate ([§FS-rhei-viz.5.1](../functional-spec/rhei-viz.spec.md#51-human-gate-transitions)) lets the operator
+move a ticket out of a gating state, through the transition path the command
+line uses. No other route the server serves writes anything.
 
 **Hard architectural boundary.** `POST /intervene` carries a message destined for
-a single running agent's **stdin and nothing else**. There is no path from the
-loopback server to plan-state mutation: it cannot transition a task, edit the
-plan, write task metadata, or invoke the orchestrator's transition logic. The
-route resolves a slot, writes bytes to that slot's agent stdin, and returns.
+a single running agent's **stdin and nothing else**. It has no path to
+plan-state mutation: it cannot transition a task, edit the plan, write task
+metadata, or invoke the orchestrator's transition logic. The route resolves a
+slot, writes bytes to that slot's agent stdin, and returns.
 
 ```
 POST /intervene { slot | task_id, message }
   → orchestrator slot registry → child stdin writer (that slot only)
   ✗ no transition, no plan write, no metadata mutation
+```
+
+**The gate routes write only through the host.** `POST /transition-gate`
+releases a plain gate ([§FS-rhei-viz.5.1.3](../functional-spec/rhei-viz.spec.md#513-releasing-a-plain-gate)) and `POST /answer-gate` answers a briefed one
+([§FS-rhei-viz.5.1.2](../functional-spec/rhei-viz.spec.md#512-answering-a-briefed-gate)). Each parses its request and hands it to the host's gate sink, and
+neither holds plan logic of its own. The sink takes the path `rhei transition`
+and `rhei gate answer` take: the ticket must sit at `from`, a gating state; the
+edge must be declared from it; an answer is checked against the brief and its
+digest; callbacks, artifact checks and the compare-and-swap write run as they
+do on the command line, under the plan lock, and the move lands in
+`runtime/state-transitions.log`. `/answer-gate` also records the answer file
+([§FS-rhei-gate-brief.7.1](../functional-spec/rhei-gate-brief.spec.md#71-the-answer-file)). Neither route reaches an agent, and a static or frozen page offers
+neither.
+
+```
+POST /transition-gate { task_id, from, to, result }
+POST /answer-gate     { task_id, from, answers, dry_run }
+  → host gate sink → the command line's transition path (gating `from`, declared edge, plan lock)
+  ✗ no agent stdin, no write but the move and the answer file
 ```
 
 **Two clients, one boundary.** The Flow composer is one client of `POST
@@ -218,8 +239,8 @@ dashboard publishes its URL on startup to `runtime/dashboard.json` (`{ url, pid 
 and removes the file when the run ends. `rhei intervene` resolves the run's
 workspace from its `--plan`/`.` argument, reads that file, and POSTs to the same
 route — so the CLI inherits the identical capability gate, audit log, and
-read-only-with-one-hole boundary; it adds no new mutation path. A failure to
-publish the file costs only headless intervention, never the run.
+boundary; it adds no new mutation path. A failure to publish the file costs
+only headless intervention, never the run.
 
 **New plumbing this requires.** Delivery is **agent-capability-dependent**. Most
 stdin-prompt transports are EOF-driven: `agent_spawn.rs` writes the prompt and
@@ -249,8 +270,9 @@ slot, task id, current state, byte length, and the message — and is echoed int
 the task's durable agent log so it appears inline in the transcript and the live
 terminal. An intervention that cannot be delivered (unsupported agent, closed
 stdin, write failure) is logged with its failure reason and is not silently lost.
-The audit trail makes the one mutation boundary observable after the fact, which
-is what a security review will check.
+The audit trail makes the intervene boundary observable after the fact, which
+is what a security review will check; the gate routes' moves are in the
+transition log beside every other move.
 
 ## 8. Shared derivation: a single source of truth
 
@@ -294,7 +316,7 @@ behavior lands last.
    (Tasks / Slots / Cost / Journal / Links / Gantt / Cube / Sankey); the Flow view
    becomes primary. Retire `dashboard/html.rs`.
 6. Add the durable-log terminal endpoint `/log` ([§AR-rhei-viz-flow.6](rhei-viz-flow.spec.md#6-live-agent-terminal-full-durable-log)) and the run-end freeze ([§AR-rhei-viz-flow.5.3](rhei-viz-flow.spec.md#53-run-end-freeze-correct-by-construction)).
-7. Add the `/intervene` channel with its stdin registry and audit log ([§AR-rhei-viz-flow.7](rhei-viz-flow.spec.md#7-intervene-the-single-mutation-boundary)), and
+7. Add the `/intervene` channel with its stdin registry and audit log ([§AR-rhei-viz-flow.7](rhei-viz-flow.spec.md#7-the-mutation-boundaries-intervene-and-the-human-gate)), and
    the `rhei viz` subcommand (`rhei-cli` → `rhei-viz-model::render_static`).
 
 ## 10. Decisions recorded
@@ -302,7 +324,7 @@ behavior lands last.
 1. **Intervene is the one mutation boundary, and it is logged.** `/intervene`
    delivers bytes to a single agent's stdin and nothing else; no server path
    reaches plan state. Every intervention (and every delivery failure) is written
-   to `runtime/interventions.log` and mirrored into the task transcript ([§AR-rhei-viz-flow.7](rhei-viz-flow.spec.md#7-intervene-the-single-mutation-boundary)).
+   to `runtime/interventions.log` and mirrored into the task transcript ([§AR-rhei-viz-flow.7](rhei-viz-flow.spec.md#7-the-mutation-boundaries-intervene-and-the-human-gate)).
 2. **Keep the model/builder split.** `rhei-viz-model` (pure) vs. `rhei-viz`
    (builder, depends on core+validator) keeps `rhei-tui` free of `rhei-core` and
    `rhei-validator` ([§AR-rhei-viz-flow.3](rhei-viz-flow.spec.md#3-crate-layering)).

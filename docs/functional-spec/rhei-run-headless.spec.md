@@ -361,7 +361,7 @@ ones, which is the order resolution tries them in.
 
 The loopback server that serves the dashboard ([§FS-rhei-viz.7.1](rhei-viz.spec.md#71-dynamic-live-during-rhei-run)) is the run's
 **control server**: it carries `/snapshot`, `/intervene`
-([§AR-rhei-viz-flow.7](../architecture/rhei-viz-flow.spec.md#7-intervene-the-single-mutation-boundary)), `/transition-gate` ([§FS-rhei-viz.5.1.3](rhei-viz.spec.md#513-releasing-a-plain-gate)), and `/answer-gate`
+([§AR-rhei-viz-flow.7](../architecture/rhei-viz-flow.spec.md#7-the-mutation-boundaries-intervene-and-the-human-gate)), `/transition-gate` ([§FS-rhei-viz.5.1.3](rhei-viz.spec.md#513-releasing-a-plain-gate)), and `/answer-gate`
 ([§FS-rhei-viz.5.1.2](rhei-viz.spec.md#512-answering-a-briefed-gate)). The browser page is one thing it serves, not the reason it exists.
 
 `--headless` therefore always starts the control server, so an attached surface
@@ -372,8 +372,8 @@ up. Turning off a view the operator does not want must not also turn off the
 ability to intervene in the run.
 
 **`rhei stop` is not a route.** Stopping a run sends it a signal, exactly as an
-operator's Ctrl+C does, so the server keeps the single inbound mutation
-boundary it was designed around ([§AR-rhei-viz-flow.7](../architecture/rhei-viz-flow.spec.md#7-intervene-the-single-mutation-boundary)) and stopping inherits the
+operator's Ctrl+C does, so the server gains no mutation boundary beyond the
+ones it was designed around ([§AR-rhei-viz-flow.7](../architecture/rhei-viz-flow.spec.md#7-the-mutation-boundaries-intervene-and-the-human-gate)) and stopping inherits the
 interruption contract of [§FS-rhei-run.3.2](rhei-run.spec.md#32-interruption-and-process-ownership) without restating it.
 
 ## 5. `rhei attach`
@@ -400,7 +400,11 @@ did not start. It is a **reader of files plus a client of the control server**:
   run's `control_url`, through the identical boundaries the browser dashboard
   and `rhei intervene` use. When the run serves no control URL, every one of
   them reports itself unavailable rather than failing after the operator has
-  typed.
+  typed: the gate block does not open, and the journal names the remedy
+  ([§FS-rhei-run-tui.1.5.5](rhei-run-tui.spec.md#155-live-actions-intervene-and-human-gate)). Whether the run answers gates is read from its
+  snapshot's `capabilities.gate_answer` ([§FS-rhei-viz.8](rhei-viz.spec.md#8-data-contract)), as intervene's reach
+  is read from the snapshot, so a run that cannot take an answer is never
+  offered a form that fails once it is filled in.
 
 Several surfaces may attach to one run at once, and a browser dashboard may be
 open beside them. None of them is privileged: they are all readers of the same

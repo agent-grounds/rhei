@@ -2,9 +2,8 @@
 // them to stop.
 //
 // Stopping is a signal, not a route. The loopback control server keeps the
-// single inbound mutation boundary it was designed around, and stopping
-// inherits the run's interruption contract whole instead of growing a second
-// teardown.
+// mutation boundaries it was designed around, and stopping inherits the run's
+// interruption contract whole instead of growing a second teardown.
 
 // §FS-rhei-run.3.2 §FS-rhei-run-headless.6 §FS-rhei-run-headless.7
 // §DA-detached-runs

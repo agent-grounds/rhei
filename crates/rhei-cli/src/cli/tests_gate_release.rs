@@ -62,3 +62,59 @@ fn complete_at_a_briefed_gate_names_gate_show_and_gate_answer() {
     assert!(help.contains("answer it with: rhei gate answer"), "{help}");
     assert!(!help.contains("rhei transition"), "{help}");
 }
+
+/// A plan whose one ticket waits at `parked`, a plain gate whose only explicit
+/// edge goes to `apply`, beside a machine whose `from: "*"` edge reaches
+/// `cancelled` from it. `apply` finishes at `done`.
+fn plain_gate_plan(dir: &Path) -> (PathBuf, PathBuf, &'static str) {
+    let plan = dir.join("plan.rhei.md");
+    let states = dir.join("states.yaml");
+    fs::write(&plan, "# Rhei: Gate\n\n## Tasks\n\n### Task 1: Park\n**State:** parked\n\nPark.\n")
+        .expect("write plan");
+    let yaml = "name: test\nversion: 1\nstates:\n  parked:\n    description: parked\n    gating: true\n  \
+                apply:\n    description: applies the ruling\n  done:\n    description: done\n    final: true\n  \
+                cancelled:\n    description: dropped\n    final: true\n    role: cancellation\ntransitions:\n  \
+                - { from: parked, to: apply }\n  - { from: apply, to: done }\n  - { from: \"*\", to: cancelled }\n";
+    fs::write(&states, yaml).expect("write states");
+    (plan, states, yaml)
+}
+
+/// The release takes every destination a plain gate's brief offers, a
+/// `from: "*"` edge's included, and still refuses a target no edge reaches.
+/// §FS-rhei-viz.5.1.3
+#[test]
+fn the_dashboard_releases_a_plain_gate_along_a_wildcard_edge() {
+    let dir = tempfile::tempdir().expect("tmpdir");
+    let (plan, states, yaml) = plain_gate_plan(dir.path());
+    let machine = rhei_validator::StateMachine::from_yaml_str(yaml).expect("machine");
+    let callback_paths = resolve_callback_paths(Some(&states), &plan).expect("callbacks");
+
+    let err = transition_dashboard_gate(
+        &plan,
+        &machine,
+        &callback_paths,
+        "plan.1",
+        "parked",
+        "parked",
+        None,
+        true,
+    )
+    .expect_err("no edge reaches the gate itself");
+    assert!(err.to_string().contains("is not a declared human-gate transition"), "{err}");
+    assert!(gate_release_refusal(&err).contains("rhei states"), "{err}");
+
+    let to = transition_dashboard_gate(
+        &plan,
+        &machine,
+        &callback_paths,
+        "plan.1",
+        "parked",
+        "cancelled",
+        Some("Dropped after review."),
+        true,
+    )
+    .expect("a wildcard edge leaving the gate is a legal release");
+    assert_eq!(to, "cancelled");
+    let moved = fs::read_to_string(&plan).expect("read plan");
+    assert!(moved.contains("**State:** cancelled"), "{moved}");
+}

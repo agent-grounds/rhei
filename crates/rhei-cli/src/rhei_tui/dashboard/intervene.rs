@@ -7,9 +7,9 @@ use std::sync::Arc;
 
 use super::http::{write_response, write_status};
 
-/// The single inbound, state-changing-adjacent path (§AR-rhei-viz-flow.7): deliver a message
-/// to the stdin of the agent running one task, and **nothing else**. There is
-/// no path from the loopback server to plan-state mutation. The host
+/// The one inbound path into a running agent (§AR-rhei-viz-flow.7): deliver a message
+/// to the stdin of the agent running one task, and **nothing else**. It has
+/// no path to plan-state mutation; only the gate routes write the plan. The host
 /// (`rhei-cli`) implements delivery, the agent-capability gate, and the durable
 /// audit trail; the server is a thin pass-through.
 pub trait InterveneSink: Send + Sync {

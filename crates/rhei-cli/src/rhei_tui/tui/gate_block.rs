@@ -186,7 +186,7 @@ fn mark(kind: &str, picked: bool) -> &'static str {
 struct QuestionView<'a> {
     question: &'a GateQuestion,
     number: usize,
-    /// `None` on a plain gate, which lists its questions without controls.
+    /// What the operator has given so far; `None` draws no control.
     given: Option<&'a Option<Given>>,
     focused: bool,
     cursor: usize,
@@ -396,8 +396,9 @@ pub(super) fn render_form(f: &mut Frame, area: Rect, state: &UiState, form: &Gat
     );
 }
 
-/// The block at a plain gate: the brief, its synthesized questions listed,
-/// and the numbered release choices. Without a brief it is the choices alone.
+/// The block at a plain gate: the brief, then the numbered release choices.
+/// Its two synthesized questions are not listed, because the choices and the
+/// result composer are them. Without a brief it is the choices alone.
 /// §FS-rhei-viz.5.1.3 §FS-rhei-run-tui.1.5.5
 pub(super) fn render_release(f: &mut Frame, area: Rect, state: &UiState) {
     let theme = &state.theme;
@@ -406,19 +407,6 @@ pub(super) fn render_release(f: &mut Frame, area: Rect, state: &UiState) {
     let mut lines = Vec::new();
     if let Some(brief) = state.plan.gates.get(&task) {
         lines = brief_head(theme, brief, width);
-        lines.push(Line::default());
-        lines.push(Line::from(Span::styled("Questions".to_string(), dim(theme))));
-        for (index, question) in brief.questions.iter().enumerate() {
-            let view = QuestionView {
-                question,
-                number: index + 1,
-                given: None,
-                focused: false,
-                cursor: 0,
-                errors: Vec::new(),
-            };
-            lines.extend(question_lines(theme, &view, width));
-        }
         lines.extend(brief_tail(theme, brief, width));
         lines.push(Line::default());
     }

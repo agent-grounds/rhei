@@ -116,11 +116,29 @@ impl rhei_tui::InterveneSink for ControlInterveneSink {
 /// Release and answer human gates over the control server. §FS-rhei-viz.5.1
 pub(crate) struct ControlGateSink {
     control_url: Option<String>,
+    /// What the run's snapshot said about answering gates, once it said it.
+    answers: Mutex<GateAnswerProbe>,
 }
+
+/// How far the question "does this run answer gates?" has got.
+#[derive(Clone, Copy)]
+enum GateAnswerProbe {
+    Unasked,
+    /// The snapshot's `capabilities.gate_answer`. A run's capabilities are
+    /// fixed when it starts, so one answer holds for the whole attachment.
+    Known(bool),
+    /// The snapshot could not be read at this instant; ask again later.
+    Unread(Instant),
+}
+
+/// How long an unread snapshot keeps the form closed before the run is asked
+/// again. The surface asks on every frame, and a read can wait out its whole
+/// timeout on a wedged run, so a frame must not ask each time.
+const GATE_ANSWER_REPROBE: Duration = Duration::from_secs(30);
 
 impl ControlGateSink {
     pub(crate) fn new(control_url: Option<String>) -> Self {
-        Self { control_url }
+        Self { control_url, answers: Mutex::new(GateAnswerProbe::Unasked) }
     }
 }
 
@@ -150,8 +168,34 @@ impl rhei_tui::GateTransitionSink for ControlGateSink {
         }
     }
 
+    fn unavailable(&self) -> Option<String> {
+        self.control_url.is_none().then(no_control_server)
+    }
+
+    /// Asks the run, as intervene's reach is asked: the snapshot's
+    /// `capabilities.gate_answer`, so a run that cannot take an answer, an
+    /// older one included, is offered the release rather than a form that
+    /// fails once it is filled in. §FS-rhei-run-headless.5
     fn answers_gates(&self) -> bool {
-        true
+        let Some(url) = self.control_url.as_deref() else {
+            return false;
+        };
+        let mut probe = self.answers.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        match *probe {
+            GateAnswerProbe::Known(answers) => return answers,
+            GateAnswerProbe::Unread(at) if at.elapsed() < GATE_ANSWER_REPROBE => return false,
+            _ => {}
+        }
+        *probe = match fetch_control_snapshot(url) {
+            Some(snapshot) => GateAnswerProbe::Known(
+                snapshot
+                    .pointer("/capabilities/gate_answer")
+                    .and_then(serde_json::Value::as_bool)
+                    .unwrap_or(false),
+            ),
+            None => GateAnswerProbe::Unread(Instant::now()),
+        };
+        matches!(*probe, GateAnswerProbe::Known(true))
     }
 
     /// Post to the run's `/answer-gate`. A reply carrying `errors` is the

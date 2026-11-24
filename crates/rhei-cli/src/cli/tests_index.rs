@@ -22,6 +22,7 @@ include!("tests_show_target.rs");
 include!("tests_gate_view.rs");
 include!("tests_gate_release.rs");
 include!("tests_gate_surface.rs");
+include!("tests_control_gate_sink.rs");
 include!("tests_loose_rhei_pick.rs");
 include!("tests_cancellation_roles.rs");
 include!("tests_complete_result_input.rs");

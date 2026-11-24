@@ -751,84 +751,6 @@ function renderSurroundings(){
 }
 function flatChip(t){ return el("span",{class:"chip flat",text:t}); }
 function dot(c){ const d=document.createElement("span"); d.className="dot"; d.style.background=c; return d; }
-function gateTransitionAvailable(){
-  return LIVE && !!(IX && IX.plan && IX.plan.capabilities && IX.plan.capabilities.gate_transition);
-}
-// The block every gating state shows: the brief, then an answer form at a
-// briefed gate or the release at a plain one. §FS-rhei-viz.5.1
-function renderGateBlock(node, ms){
-  const box=el("div",{class:"gatebox"});
-  box.appendChild(el("h3",{text:"human gate"}));
-  const brief=gateBrief(IX.plan, node.id);
-  if(brief) box.appendChild(renderGateBrief(brief));
-  if(gateAuthored(brief)) box.appendChild(renderGateAnswer(node, brief));
-  else box.appendChild(renderGateRelease(node, ms, brief));
-  return box;
-}
-// The release of a plain gate: its synthesized questions are the target and the
-// result message, under the names they have always had. §FS-rhei-viz.5.1.3
-function renderGateRelease(node, ms, brief){
-  const box=el("div",{class:"grelease"});
-  if(brief) box.appendChild(renderGateQuestionList(brief));
-  const choices=(ms.transitions||[]).filter(t=>!t.wildcard);
-  const canAct=gateTransitionAvailable();
-  const desc=canAct
-    ? "Pick an explicit outgoing transition. Rhei validates the current state before writing."
-    : LIVE
-      ? "This live dashboard is not wired for gate transitions."
-      : "Static preview — gate transitions are not delivered.";
-  box.appendChild(el("div",{class:"gdesc",text:desc}));
-  // The operator's own account of the decision, carried through the move like
-  // `rhei transition --result`. Always offered; flagged as needed when a choice
-  // finishes the ticket, because that is the case the server refuses without
-  // one. §FS-rhei-viz.5.1.3 §FS-rhei-states.3.3
-  const anyTerminal=choices.some(t=>isTerminal(t.to));
-  const label=el("label",{class:"glabel"});
-  label.appendChild(document.createTextNode("Result"));
-  if(anyTerminal){
-    label.appendChild(document.createTextNode(" "));
-    // An existing non-empty result satisfies the obligation too, so this is a
-    // "needed unless" and not a "required". §FS-rhei-states.3.3
-    label.appendChild(el("span",{class:"gneed",text:"— needed to finish the ticket, unless it already has a result"}));
-  }
-  const resultInput=el("input",{class:"gresult", type:"text",
-    placeholder: canAct ? "Why this ticket ended here…" : "Static preview — not delivered"});
-  if(!canAct) resultInput.disabled=true;
-  label.appendChild(resultInput);
-  box.appendChild(label);
-  const row=el("div",{class:"grow"});
-  const status=el("span",{class:"gstatus"});
-  if(!choices.length){
-    row.appendChild(el("span",{class:"none",text:"No explicit exits from this gate."}));
-  }
-  for(const t of choices){
-    const btn=el("button",{class:"btn",text:t.to,title:t.condition||""});
-    btn.disabled=!canAct;
-    btn.addEventListener("click",()=>{
-      if(btn.disabled) return;
-      const ok=window.confirm(`Transition Task ${node.id} from ${node.state} to ${t.to}?`);
-      if(!ok) return;
-      row.querySelectorAll("button").forEach(b=>b.disabled=true);
-      status.className="gstatus";
-      status.textContent="transitioning…";
-      sendGateTransition(node,t.to,resultInput.value).then(res=>{
-        if(res.ok){
-          status.textContent=`transitioned to ${res.to||t.to}`;
-          resultInput.value="";
-          refreshSnapshotOnce();
-        } else {
-          status.className="gstatus gerr";
-          status.textContent=res.error||"transition failed";
-          row.querySelectorAll("button").forEach(b=>b.disabled=false);
-        }
-      });
-    });
-    row.appendChild(btn);
-  }
-  row.appendChild(status);
-  box.appendChild(row);
-  return box;
-}
 // §FS-rhei-viz.4: retain each movement's own reason and state identity.
 function previousMovements(node){
   return (node.history||[]).filter(h=>h&&h.from).slice().reverse().slice(0,3);
@@ -1689,15 +1611,6 @@ function renderGateBrief(brief){
   for(const p of brief.problems||[]) box.appendChild(el("div",{class:"gdesc gerr",text:"degraded: "+p}));
   return box;
 }
-function renderGateQuestionList(brief){
-  const box=el("div",{class:"gqlist"});
-  for(const q of brief.questions||[]){
-    const opts=(q.options||[]).map(gateOptionText);
-    box.appendChild(el("div",{class:"gdesc",text:`${q.id} · ${q.kind} · ${q.required?"required":"optional"} — ${q.prompt}`
-      +(opts.length?` [${opts.join(", ")}]`:"")}));
-  }
-  return box;
-}
 // What the operator gave. Unanswered, blank and empty picks are left out, so a
 // skipped required question is refused rather than answered for them.
 function gateGiven(v){ return v!==undefined && v!==null && v!=="" && !(Array.isArray(v)&&!v.length); }
@@ -1803,6 +1716,97 @@ function renderGateAnswer(node, brief){
   });
   row.appendChild(btn); row.appendChild(status); form.appendChild(row);
   return form;
+}
+
+function gateTransitionAvailable(){
+  return LIVE && !!(IX && IX.plan && IX.plan.capabilities && IX.plan.capabilities.gate_transition);
+}
+// The block every gating state shows: the brief, then an answer form at a
+// briefed gate or the release at a plain one. §FS-rhei-viz.5.1
+function renderGateBlock(node, ms){
+  const box=el("div",{class:"gatebox"});
+  box.appendChild(el("h3",{text:"human gate"}));
+  const brief=gateBrief(IX.plan, node.id);
+  if(brief) box.appendChild(renderGateBrief(brief));
+  if(gateAuthored(brief)) box.appendChild(renderGateAnswer(node, brief));
+  else box.appendChild(renderGateRelease(node, ms, brief));
+  return box;
+}
+// What the release offers: the brief's destinations, which are every edge
+// declared from the state and every `from: "*"` edge that applies to it, so
+// each destination the brief shows can be picked. Without a brief, the same
+// edges from the machine. §FS-rhei-viz.5.1.3
+function gateReleaseChoices(ms, brief){
+  if(brief) return (brief.destinations||[]).map(d=>({to:d.state, condition:d.condition||null,
+    final:!!d.final, description:d.description||null}));
+  const seen=new Set();
+  return (ms.transitions||[]).filter(t=>!seen.has(t.to) && seen.add(t.to))
+    .map(t=>({to:t.to, condition:t.condition||null, final:isTerminal(t.to), description:null}));
+}
+// The release of a plain gate. Its two synthesized questions are its controls,
+// not a list above them: the destination is the choice, the reason the result
+// message, held to the release's rule rather than the question's mark. §FS-rhei-viz.5.1.3
+function renderGateRelease(node, ms, brief){
+  const box=el("div",{class:"grelease"});
+  const choices=gateReleaseChoices(ms, brief);
+  const canAct=gateTransitionAvailable();
+  const desc=canAct
+    ? "Pick where the ticket goes. Rhei validates the current state before writing."
+    : LIVE
+      ? "This live dashboard is not wired for gate transitions."
+      : "Static preview — gate transitions are not delivered.";
+  box.appendChild(el("div",{class:"gdesc",text:desc}));
+  // The operator's own account of the decision, carried through the move like
+  // `rhei transition --result`. Always offered; flagged as needed when a choice
+  // finishes the ticket, because that is the case the server refuses without
+  // one. §FS-rhei-viz.5.1.3 §FS-rhei-states.3.3
+  const anyTerminal=choices.some(c=>c.final);
+  const label=el("label",{class:"glabel"});
+  label.appendChild(document.createTextNode("Result"));
+  if(anyTerminal){
+    label.appendChild(document.createTextNode(" "));
+    // An existing non-empty result satisfies the obligation too, so this is a
+    // "needed unless" and not a "required". §FS-rhei-states.3.3
+    label.appendChild(el("span",{class:"gneed",text:"— needed to finish the ticket, unless it already has a result"}));
+  }
+  const resultInput=el("input",{class:"gresult", type:"text",
+    placeholder: canAct ? "Why this ticket ended here…" : "Static preview — not delivered"});
+  if(!canAct) resultInput.disabled=true;
+  label.appendChild(resultInput);
+  box.appendChild(label);
+  const row=el("div",{class:"grow"});
+  const status=el("span",{class:"gstatus"});
+  if(!choices.length){
+    row.appendChild(el("span",{class:"none",text:"No exits from this gate."}));
+  }
+  for(const c of choices){
+    const title=[c.description, c.condition && "when "+c.condition].filter(Boolean).join(" — ");
+    const btn=el("button",{class:"btn",text:c.final?`${c.to} (final)`:c.to,title});
+    btn.disabled=!canAct;
+    btn.addEventListener("click",()=>{
+      if(btn.disabled) return;
+      const ok=window.confirm(`Transition Task ${node.id} from ${node.state} to ${c.to}?`);
+      if(!ok) return;
+      row.querySelectorAll("button").forEach(b=>b.disabled=true);
+      status.className="gstatus";
+      status.textContent="transitioning…";
+      sendGateTransition(node,c.to,resultInput.value).then(res=>{
+        if(res.ok){
+          status.textContent=`transitioned to ${res.to||c.to}`;
+          resultInput.value="";
+          refreshSnapshotOnce();
+        } else {
+          status.className="gstatus gerr";
+          status.textContent=res.error||"transition failed";
+          row.querySelectorAll("button").forEach(b=>b.disabled=false);
+        }
+      });
+    });
+    row.appendChild(btn);
+  }
+  row.appendChild(status);
+  box.appendChild(row);
+  return box;
 }
 
 // ---- bootstrap --------------------------------------------------------------

@@ -305,7 +305,9 @@ fn a_refusal_keeps_the_form_and_its_answers() {
 }
 
 /// A gate whose questions rhei synthesized keeps the release it has always
-/// offered, with the brief drawn above the choices. §FS-rhei-viz.5.1.3
+/// offered, with the brief drawn above the choices. The choices are the
+/// brief's destinations, a `from: "*"` one included, and its two synthesized
+/// questions are those choices and the composer, not a list. §FS-rhei-viz.5.1.3
 #[test]
 fn a_plain_gate_keeps_its_release_under_the_brief() {
     let dir = tempfile::tempdir().expect("tmpdir");
@@ -314,10 +316,39 @@ fn a_plain_gate_keeps_its_release_under_the_brief() {
         "back to the author, who reworks the proposal from the reviewer's notes and sends it back";
     let brief = state.plan.gates.get_mut("1").unwrap();
     brief.destinations[1].description = Some(long.into());
-    // A synthesized destination question labels each option with its value.
-    for option in brief.questions[1].options.iter_mut().flatten() {
-        option.label = Some(option.value.clone());
-    }
+    // The machine's wildcard edge to `cancelled` is a destination too.
+    brief.destinations.push(GateDestination {
+        state: "cancelled".into(),
+        description: Some("Dropped".into()),
+        terminal: true,
+        ..Default::default()
+    });
+    brief.questions = vec![
+        GateQuestion {
+            id: "destination".into(),
+            kind: "choice".into(),
+            prompt: "Where should 1 go?".into(),
+            required: true,
+            options: Some(
+                ["approved", "rework", "cancelled"]
+                    .iter()
+                    .map(|to| GateOption {
+                        value: (*to).into(),
+                        label: Some((*to).into()),
+                        ..Default::default()
+                    })
+                    .collect(),
+            ),
+            help: None,
+        },
+        GateQuestion {
+            id: "reason".into(),
+            kind: "text".into(),
+            prompt: "Why?".into(),
+            required: true,
+            ..Default::default()
+        },
+    ];
     state.refresh_plan();
     press(&mut state, KeyCode::Enter);
     assert!(state.gate_active && state.gate_form.is_none());
@@ -333,13 +364,21 @@ fn a_plain_gate_keeps_its_release_under_the_brief() {
         "│         notes and sends it back",
         "1  vetting → approved",
         "2  vetting → rework",
+        "3  vetting → cancelled",
     ] {
         assert!(shown.contains(expected), "missing {expected:?} in\n{shown}");
     }
-    assert!(
-        shown.contains("- small") && !shown.contains("small (small)"),
-        "a label that repeats its value shows once"
-    );
+    for absent in ["Questions", "Where should 1 go?", "Why?", "required"] {
+        assert!(!shown.contains(absent), "a plain gate lists no questions: {absent:?} in\n{shown}");
+    }
+
+    // The wildcard destination is a choice like any other.
+    press(&mut state, KeyCode::Char('3'));
+    let composer = state.composer.as_ref().expect("the choice opens the result composer");
+    match &composer.kind {
+        super::state::ComposerKind::GateResult { to, .. } => assert_eq!(to, "cancelled"),
+        _ => panic!("expected a gate composer"),
+    }
 }
 
 /// An open form follows the plan: a new brief redraws it, keeping each answer

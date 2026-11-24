@@ -131,6 +131,7 @@ mod evidence_seal_tests;
 mod evidence_support;
 mod evidence_version_tests;
 mod examples_tests;
+mod examples_validate_tests;
 mod exclusions_context_tests;
 mod exclusions_regressions_tests;
 mod exclusions_required_tests;

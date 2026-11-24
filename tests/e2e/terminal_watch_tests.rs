@@ -103,7 +103,6 @@ const QUIET: Duration = Duration::from_millis(500);
 /// The prompt of agent-grounds/rhei#761 arrived as several writes; the wait fires only on its
 /// whole line, so an answer never lands between `: type ` and the hop. §REQ-cross-platform.7.1
 #[test]
-#[ignore = "red until #761: the wait fires on `: type ` before the hop; implement removes this"]
 fn a_prompt_written_in_pieces_prompts_only_on_its_line_end() {
     let (feed, fed) = std::sync::mpsc::channel();
     let watch = TerminalWatch::start(Fed(fed), PROMPT);

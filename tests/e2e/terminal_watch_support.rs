@@ -36,7 +36,7 @@ impl TerminalWatch {
                 }
                 let mut all = published.lock().unwrap();
                 all.extend_from_slice(&buffer[..count]);
-                if !prompted && String::from_utf8_lossy(&shown(&all)).contains(prompt) {
+                if !prompted && shows_prompt_line(&all, prompt) {
                     prompted = true;
                     let _ = prompt_tx.send(());
                 }
@@ -66,6 +66,13 @@ impl TerminalWatch {
     fn read_so_far(&self) -> String {
         String::from_utf8_lossy(&self.read.lock().unwrap()).into_owned()
     }
+}
+
+/// Whether the terminal shows `prompt` with a line end (`\n` or `\r`) after it: a prompt
+/// written in pieces is waited on until its whole line is shown. §REQ-cross-platform.7.1
+fn shows_prompt_line(bytes: &[u8], prompt: &str) -> bool {
+    let text = String::from_utf8_lossy(&shown(bytes)).into_owned();
+    text.find(prompt).is_some_and(|at| text[at + prompt.len()..].contains(['\n', '\r']))
 }
 
 /// The text `bytes` show on a terminal, which is what a wait matches.

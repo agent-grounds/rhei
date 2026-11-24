@@ -185,3 +185,19 @@ fn operator_recovery_is_required_for_a_terminal_wildcard_source() {
     assert_eq!(fs::read(&plan).unwrap(), before);
     assert!(!dir.path().join("runtime/state-transitions.log").exists());
 }
+
+/// The operator prompt is one write, whole with its hop and newline. §FS-rhei-transition-cmd.6
+#[test]
+fn operator_prompt_leaves_in_one_write() {
+    struct Writes(Vec<Vec<u8>>);
+    impl Write for Writes {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            self.0.push(buf.to_vec());
+            Ok(buf.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> { Ok(()) }
+    }
+    let mut out = Writes(Vec::new());
+    write_operator_prompt(&mut out, "vjovanov", "force plan.1 human-gate -> implement").unwrap();
+    assert_eq!(out.0, vec![b"Operator vjovanov: type force plan.1 human-gate -> implement\n".to_vec()]);
+}

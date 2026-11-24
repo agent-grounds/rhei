@@ -6,6 +6,9 @@
 
 // §AR-source-file-size.3 §FS-rhei-agents.8.4 §FS-rhei-agents.3.2.3
 
+// Which of a visit's records ended last, and what that says about its edge.
+include!("tests_refused_visit_edge.rs");
+
 mod spawn_records {
     use super::super::*;
 

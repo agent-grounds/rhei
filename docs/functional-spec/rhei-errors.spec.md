@@ -413,13 +413,13 @@ halts unsuccessfully.
 successful visit ([§FS-rhei-agents.3.2](rhei-agents.spec.md#32-completion-condition)), so its attempts can run out while only
 its edge is refused. The spent visit keeps its priority, but its halt line and
 Attention row name the refused edge, never an unmet completion condition
-([§FS-rhei-agents.3.2.1](rhei-agents.spec.md#321-runtime-semantics)). In a fanned-out state the condition is the visit's, met as
-the engine requires before it tries the edge ([§FS-rhei-states.3.3](rhei-states.spec.md#33-terminal-result)): one invocation's
-successful work with none still owing, whichever ended last, so every surface
-names the same edge, and the line of an invocation whose own last attempt failed
-says another invocation of this visit met it. The halt line keeps its text
-through `attempts spent on this visit`, which scripts match, and the ending of
-[§FS-rhei-retry.3](rhei-retry.spec.md#3-output-and-halt-advice):
+([§FS-rhei-agents.3.2.1](rhei-agents.spec.md#321-runtime-semantics)). In a fanned-out state the edge is named only when the run
+tried it: under its present rule, once the visit's last invocation to end met its
+condition with none still owing ([§FS-rhei-states.3.3](rhei-states.spec.md#33-terminal-result)). The line of an invocation
+whose own last attempt failed then says another invocation of this visit met it;
+when the last to end failed, the edge was never tried and the spent visit keeps its
+unmet hold. The halt line keeps its text through `attempts spent on this visit`,
+which scripts match, and the ending of [§FS-rhei-retry.3](rhei-retry.spec.md#3-output-and-halt-advice):
 
 ```text
 halting Task plan.1 in state 'draft': 2 attempts spent on this visit and the last one met its completion condition, but its edge into 'read' is refused: required input note (/work/plan/runtime/plan.1.note.md) is missing; write it before retrying. The ticket stays in 'draft'. To give this visit 2 more attempts, run: rhei retry plan.1.

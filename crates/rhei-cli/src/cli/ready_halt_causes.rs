@@ -344,9 +344,8 @@ impl HaltCause {
             ),
             // §FS-rhei-run-report.3.1: one cause and recovery on every halt surface.
             HaltCause::SpentVisit { attempts, entries, refused, configuration_fallbacks } => {
-                // Met work names its refused edge, released before the grant; the
-                // visit's work, since a fan-out's last arm to end need not be it.
-                // §FS-rhei-errors.1.5.2
+                // The run tried the edge on the visit's finished work, so its refusal
+                // is the hold, released before the grant. §FS-rhei-errors.1.5.2
                 let (held, release) = match refused {
                     Some(refusal) => (
                         format!("its work finished, but {}", refusal.edge()),

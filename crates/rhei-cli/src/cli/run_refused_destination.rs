@@ -260,21 +260,19 @@ impl NoAdvanceContext<'_> {
         (!entries.is_empty()).then(|| DestinationRefusal::MissingInputs { to: to.into(), entries })
     }
 
-    /// Whether this visit's work would have the engine try the edge it selected,
-    /// judged over every invocation as the engine judges a successful exit
-    /// (§FS-rhei-states.3.3): one current-visit record proves successful work
-    /// that was not reverted, and no invocation still owes the ticket anything
-    /// (`task_has_pending_agent_invocations`). The engine's one other condition,
-    /// that no sibling is still in flight, holds at every halt, so which arm
-    /// ended last never decides it. §FS-rhei-errors.1.5.2 §FS-rhei-run.3.7.4
+    /// Whether the run tried the edge this visit's work selected. Each exit path
+    /// tries it only on a successful exit after which nothing is left to wait
+    /// for: the sequential path when no invocation still owes the ticket
+    /// anything (`task_has_pending_agent_invocations`, §FS-rhei-states.3.3), the
+    /// pool also only when no sibling's exit is still to come. So the visit's
+    /// last invocation to end must have proved its work (`last_to_end_met`),
+    /// and none may still owe. When a failed invocation ended last the edge was
+    /// never tried, and no surface names it. §FS-rhei-errors.1.5.2
     fn visit_work_met(&self, rhei: &rhei_core::ast::Rhei, workers: VisitWorkers<'_>) -> bool {
         let id = self.task.id.to_string();
         let moves = ticket_move_count(self.artifact_root, workers.runtime_dir, &id);
-        let succeeded = spawn_records_for_state(workers.runtime_dir, &id, self.state)
-            .into_iter()
-            .any(|(_, record)| {
-                record.proves_successful_work(&id, self.state, moves) && record.reverted.is_none()
-            });
+        let records = spawn_records_for_state(workers.runtime_dir, &id, self.state);
+        let succeeded = last_to_end_met(records.iter().map(|(_, record)| record), &id, self.state, moves);
         let Some((settings, opts)) = workers.agents.filter(|_| succeeded) else {
             return succeeded;
         };
@@ -295,8 +293,8 @@ impl NoAdvanceContext<'_> {
         .is_ok_and(|pending| !pending)
     }
 
-    /// The one rule every surface names a refused edge by: the visit's work is
-    /// met, and the destination refuses the edge it selected.
+    /// The one rule every surface names a refused edge by: the run tried the
+    /// edge this visit's work selected, and the destination refuses it.
     /// §FS-rhei-errors.1.5.2
     fn refused_visit_edge(
         &self,
@@ -305,6 +303,28 @@ impl NoAdvanceContext<'_> {
     ) -> Option<DestinationRefusal> {
         self.visit_work_met(rhei, workers).then(|| self.refused_entry()).flatten()
     }
+}
+
+/// Whether the record of this visit that ended last proves successful work
+/// nobody reverted (§FS-rhei-run.3.7.4). Records of earlier visits are dropped
+/// before the last is chosen. `ended` has second precision, so a tie counts
+/// only when every tied record proves it: which of them the run judged last
+/// cannot be told. A single worker has one record, which this reduces to.
+/// §FS-rhei-errors.1.5.2
+fn last_to_end_met<'r>(
+    records: impl IntoIterator<Item = &'r SpawnRecord>,
+    task_id: &str,
+    state: &str,
+    moves: u64,
+) -> bool {
+    let visit: Vec<&SpawnRecord> = records
+        .into_iter()
+        .filter(|record| record.task == task_id && record.state == state && record.moves == moves)
+        .collect();
+    let Some(last) = visit.iter().map(|record| record.ended.as_str()).max() else { return false };
+    visit.iter().filter(|record| record.ended == last).all(|record| {
+        record.proves_successful_work(task_id, state, moves) && record.reverted.is_none()
+    })
 }
 
 /// Every successful-worker no-advance warning uses the same wording and event

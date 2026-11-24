@@ -69,7 +69,15 @@ collect ────────────────────────
 ## Run it
 
 By default the example is deterministic (canned positions) so it runs without
-model credentials. Validate the checked-in workspace from the repository root:
+model credentials. The committed settings invoke `mock-agent.py` with Python 3,
+which the callbacks also use. The launcher reads the stdin prompt and locates the
+mock within the copied workspace. When the prompt includes a Result section, the
+mock writes a nonempty result to that section's path before exiting successfully.
+This supplies the results required for both `judge → converged` and
+`apply → completed`; `workflow.py` still produces the positions, digests,
+decision and downstream application. [§FS-rhei-states.3.3.1](../../docs/functional-spec/rhei-states.spec.md#331-agent-discussion-example-completion)
+
+Validate the checked-in workspace from the repository root:
 
 ```bash
 cargo run -p rhei-cli -- --state-machine examples/agent-discussion/discussion-states.yaml validate examples/agent-discussion
@@ -95,6 +103,8 @@ After the run, inspect:
 - `runtime/discussion/digest/round-*.md` — the judge's per-round synthesis
 - `runtime/discussion/decision.md` — the converged consensus
 - `runtime/discussion/applied.md` — proof the downstream task consumed the decision
+- `runtime/results/agent-discussion.discussion-seed.md` — mock result permitting the discussion's terminal entry
+- `runtime/results/agent-discussion.apply-decision.md` — mock result permitting the downstream task's terminal entry
 
 ## Variations
 

@@ -111,8 +111,9 @@ fn spawn_parallel_agent_work_item(
             state: &item.current_state,
         };
         // The sequential site's line, refused edge included. §FS-rhei-errors.1.5.2
-        let (id, rhei) = (&item.task_id_str, &loaded.rhei);
-        let halt = spent_visit_halt_line(id, site, rhei, &plan, spent_budget, budget);
+        let (id, rhei, agents) = (&item.task_id_str, &loaded.rhei, Some((settings, opts)));
+        let workers = VisitWorkers { runtime_dir: &agent_runtime_dir, agents };
+        let halt = spent_visit_halt_line(id, site, workers, rhei, &plan, spent_budget, budget);
         emit_run_message(sink, rhei_tui::MessageLevel::Warn, halt);
         return Ok(ParallelAgentSpawnOutcome::Skipped);
     }

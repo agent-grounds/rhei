@@ -64,22 +64,32 @@ fn issue_770_parallel_reused_visit_names_destination_input() {
         gaps.extend(row_gaps(&world, run, &["write", "cancel"]));
         gaps.extend(World::misleading_gaps(&format!("{run} console"), &text(&result), &[]));
     }
-    assert_eq!(world.calls("draft"), 2, "each finished visit is reused, never re-spawned");
+    for ticket in ["plan.1", "plan.2"] {
+        let calls = world.calls_of("draft", ticket);
+        assert_eq!(calls, 1, "{ticket}: its finished visit is reused, never re-spawned");
+    }
     assert!(gaps.is_empty(), "{}", gaps.join("\n"));
 }
 
 /// The pool's agent and program spawn sites print the spent visit's halt line,
-/// which names the refused edge between its prefix and its ending.
+/// which names the refused edge between its prefix and its ending. Runs are
+/// driven by each ticket's charged attempts, never by the spawns both share: a
+/// sibling's fatal refusal can interrupt a pooled program, spawned but uncharged.
 #[test]
 fn issue_770_parallel_spent_visit_names_refused_edge() {
     for worker in [Worker::Agent, Worker::Program] {
         let world = pooled(worker, Outputs::Bare);
-        while world.calls("draft") < 4 {
-            assert!(run_parallel(&world).status.code() == Some(1));
+        let spent = || ["plan.1", "plan.2"].iter().all(|id| world.charged("draft", id) == 2);
+        for _ in 0..8 {
+            if spent() {
+                break;
+            }
+            run_parallel(&world);
         }
-        assert_eq!(world.calls("draft"), 4, "{worker:?}: both tickets spent both attempts");
+        assert!(spent(), "{worker:?}: both visits spent within 8 runs");
+        let calls = world.calls("draft");
         let halted = run_parallel(&world);
-        assert_eq!(world.calls("draft"), 4, "{worker:?}: a spent visit is not spawned again");
+        assert_eq!(world.calls("draft"), calls, "{worker:?}: a spent visit is not spawned again");
         let all = text(&halted);
         let halt = all.lines().map(str::trim).find(|line| line.starts_with("halting Task plan.1"));
         let halt = halt.unwrap_or_else(|| panic!("{worker:?}: no halt line\n{all}"));

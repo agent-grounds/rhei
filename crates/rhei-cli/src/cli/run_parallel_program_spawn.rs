@@ -76,7 +76,8 @@ fn spawn_parallel_program_work_item(
             state: &item.current_state,
         };
         let (id, rhei) = (&item.task_id_str, &loaded.rhei);
-        let halt = spent_visit_halt_line(id, site, rhei, &plan, spent_budget, budget);
+        let workers = VisitWorkers { runtime_dir: &task_runtime_dir, agents: None };
+        let halt = spent_visit_halt_line(id, site, workers, rhei, &plan, spent_budget, budget);
         emit_run_message(sink, rhei_tui::MessageLevel::Warn, halt);
         return Ok(ParallelProgramSpawnOutcome::Skipped);
     }

@@ -310,6 +310,7 @@ mod provider_wait_quiet_tests;
 mod provider_wait_scan_tests;
 mod provider_wait_spent_bound_tests;
 mod refused_input_controls_tests;
+mod refused_input_fanout_tests;
 mod refused_input_parallel_tests;
 mod refused_input_support;
 mod refused_input_tests;

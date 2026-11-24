@@ -42,6 +42,7 @@ include!("validator/validator_entry.rs");
 include!("validator/validator_tree_coherence.rs");
 include!("validator/validator_links.rs");
 include!("validator/link_containment.rs");
+include!("validator/gate_validation.rs");
 
 #[cfg(test)]
 mod tests {

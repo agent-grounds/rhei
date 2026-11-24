@@ -441,12 +441,15 @@ its own; delete that file for `billing` to run under the project's instead
 **Worked Examples**
 
 The [`examples/`](../../examples/) directory contains end-to-end plans that
-exercise the patterns above:
+exercise the patterns above. Each one validates against the machine it names,
+and one that names none is judged by the built-in `rhei` machine, so it uses
+only `pending` and `completed`:
 
 - [`release-automation.rhei.md`](../../examples/release-automation.rhei.md) —
   mixed numeric and named task ids with fenced code inside a child task.
 - [`human-review-loop.rhei.md`](../../examples/human-review-loop.rhei.md) —
-  multi-state workflow with chained dependencies.
+  a chain of dependencies through child tasks, on the built-in `pending` and
+  `completed` states.
 - [`escaped-state-values.rhei.md`](../../examples/escaped-state-values.rhei.md) —
   multi-word state values paired with a custom states file.
 

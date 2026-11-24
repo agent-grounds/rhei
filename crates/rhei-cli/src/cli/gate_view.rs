@@ -49,9 +49,10 @@ struct GateView {
 }
 
 impl GateView {
-    /// Where an answer at this visit is recorded. §FS-rhei-gate-brief.7.1
+    /// Where an answer at this visit is recorded: by state as well as visit,
+    /// because a ticket may pass more than one gate. §FS-rhei-gate-brief.7.1
     fn answer_path(&self) -> String {
-        format!("runtime/gates/{}/{}.answer.json", self.ticket, self.visit)
+        format!("runtime/gates/{}/{}.{}.answer.json", self.ticket, self.state, self.visit)
     }
 }
 

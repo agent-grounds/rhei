@@ -246,6 +246,10 @@ fn resolve_runtime_template_variable(
         "rhei_root" => Some(context.workspace_root.display().to_string()),
         "checkout_root" => Some(context.checkout_root.display().to_string()),
         _ => {
+            // §FS-rhei-gate-brief.7.3
+            if let Some(resolved) = gate_answer_variable(variable, context) {
+                return resolved;
+            }
             if variable.strip_prefix("model.").is_some() {
                 return None;
             }
@@ -329,6 +333,10 @@ fn resolve_runtime_template_variable(
 /// Supported forms: `input.<name>.exists`, `mcp.<name>.available`,
 /// `skill.<id>.available`.
 fn evaluate_if_condition(condition: &str, context: &RuntimeTemplateContext<'_>) -> bool {
+    // §FS-rhei-gate-brief.7.3
+    if let Some(resolved) = gate_answer_variable(condition, context) {
+        return resolved.as_deref() == Some("true");
+    }
     if let Some(name) = condition.strip_prefix("input.").and_then(|s| s.strip_suffix(".exists")) {
         let visit_count = Some(render_visit_count(
             context.metadata,

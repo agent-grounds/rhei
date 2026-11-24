@@ -14,6 +14,10 @@ struct TransitionOrigin {
     /// Only `rhei transition` sets this: a gate whose brief asks authored
     /// required questions is answered, not transitioned. §FS-rhei-transition-cmd.3.5
     gate_brief_guard: bool,
+    /// Only `rhei gate answer` sets this: the answer file it records under the
+    /// plan lock, or a dry run that stops before the first write.
+    /// §FS-rhei-gate-brief.7.1 §FS-rhei-gate-cmd.3.1
+    gate_answer: Option<GateAnswerRecord>,
     /// Override the default `triggered_by` slot. `None` falls back to
     /// `"user"` (or `"callback"` when an on_leave redirect rerouted).
     triggered_by: Option<&'static str>,
@@ -248,6 +252,7 @@ fn execute_system_timeout_transition(
             manual_release: None,
             claim: false,
             gate_brief_guard: false,
+            gate_answer: None,
             triggered_by: Some("system"),
             seed_data: Some(serde_json::Value::Object(data)),
             skip_source_outputs: true,
@@ -302,6 +307,7 @@ fn execute_system_tooling_transition(
             manual_release: None,
             claim: false,
             gate_brief_guard: false,
+            gate_answer: None,
             triggered_by: Some("system"),
             seed_data: Some(serde_json::Value::Object(data)),
             skip_source_outputs: true,
@@ -356,6 +362,7 @@ fn execute_system_program_exit_transition(
             manual_release: None,
             claim: false,
             gate_brief_guard: false,
+            gate_answer: None,
             triggered_by: Some("system"),
             seed_data: Some(serde_json::Value::Object(data)),
             // Deliberately still the bare exit test: the source state's declared

@@ -150,6 +150,8 @@ mod fence_reader_memory_tests;
 mod fence_reader_role_tests;
 mod fence_reader_support;
 mod fence_structure_tests;
+mod gate_answer_flow_tests;
+mod gate_answer_tests;
 mod gate_command_tests;
 mod gate_entry_tests;
 mod gate_support;

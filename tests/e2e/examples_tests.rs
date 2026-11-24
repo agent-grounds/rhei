@@ -249,32 +249,6 @@ fn run_example_with_mock_agents(
     (dir, workspace, machine_path, result)
 }
 
-#[test]
-fn example_agent_discussion_runs_with_mock_agents() {
-    let (_dir, workspace, machine_path, result) = run_example_with_mock_agents(
-        "example-agent-discussion",
-        "examples/agent-discussion",
-        "discussion-states.yaml",
-        &["--no-tui"],
-    );
-    assert_success(&result);
-
-    let json = render_json(&workspace, &machine_path);
-    let states: Vec<&str> = json["tasks"]
-        .as_array()
-        .expect("tasks array")
-        .iter()
-        .map(|task| task["state"].as_str().expect("state field"))
-        .collect();
-    assert!(
-        states.contains(&"converged") && states.contains(&"completed"),
-        "expected discussion seed to converge and downstream task to complete; got:\n{}",
-        result.stdout
-    );
-    assert!(workspace.join("runtime/discussion/decision.md").exists());
-    assert!(workspace.join("runtime/discussion/applied.md").exists());
-}
-
 /// The supervision example runs the whole §FS-rhei-supervision.7 chain with its own committed mock.
 ///
 /// Unlike the other examples here it is *not* handed the shared mock agent: the

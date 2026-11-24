@@ -824,6 +824,23 @@ skips `**Prior:**` readiness as the human escape hatch
 ([§FS-rhei-transition-cmd.3](rhei-transition-cmd.spec.md#3-behavior)), and keeps that; nothing about a deliberate
 out-of-order move argues for a free pass on writing down why.
 
+#### 3.3.1. Agent-discussion Example Completion
+
+A disposable copy of `examples/agent-discussion`, run with its committed
+settings in the default deterministic mode and without model credentials or
+user configuration, must exit successfully: `agent-discussion.discussion-seed`
+reaches `converged` and `agent-discussion.apply-decision` reaches `completed`.
+Both tasks must have non-whitespace results at their conventional
+`runtime/results/<task-id>.md` paths before their terminal entries, including
+the judge callback's redirect to `converged`.
+
+The example must retain its two-round discussion: each of the four participants
+writes a position in both rounds, the judge records each round's digest, and
+the second round converges into `runtime/discussion/decision.md`. The downstream
+task remains blocked until the discussion converges, then consumes the decision
+and writes `runtime/discussion/applied.md`. Running the committed settings,
+rather than replacing them with a test harness agent, must satisfy this contract.
+
 ## 4. Template Variables in Instructions and Personality
 
 The `instructions` and `personality` fields support template variable substitution. Variables use the same `{variable}` syntax as artifact path templates. `rhei next` resolves all template variables before printing output, so agents receive fully expanded prompts with no manual variable resolution required.

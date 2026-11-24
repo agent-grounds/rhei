@@ -309,6 +309,9 @@ mod provider_wait_quiet_support;
 mod provider_wait_quiet_tests;
 mod provider_wait_scan_tests;
 mod provider_wait_spent_bound_tests;
+mod refused_input_controls_tests;
+mod refused_input_support;
+mod refused_input_tests;
 mod registry_location_tests;
 #[cfg(unix)]
 mod release_write_then_report_tests;

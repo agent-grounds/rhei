@@ -362,6 +362,77 @@ worker logs, or `rhei retry`, which grants invocation attempts rather than
 destination entries. The task remains in its source state and the run still
 halts unsuccessfully.
 
+#### 1.5.2. Successful workers blocked by a destination's missing input
+
+A destination refuses entry in a second way. An agent or program may exit
+successfully and meet its completion condition while the forward transition
+that completion selected would enter a state whose required `inputs:` artifact
+is not on disk ([§FS-rhei-states.3](rhei-states.spec.md#3-artifact-contracts)). The subject that check measured is the
+destination's input, and every surface that explains the ticket names it. The
+no-advance warning already does:
+
+```text
+warning: agent exited 0 but task plan.1 could not auto-advance from 'draft': Task plan.1 cannot enter state read.
+Missing required input artifact: note (runtime/plan.1.note.md)
+```
+
+The explanation follows the completion context, as in [§FS-rhei-errors.1.5.1](rhei-errors.spec.md#151-successful-workers-blocked-by-counted-entries).
+The refused edge must satisfy its guards, its exit-code selection and its
+source state's required-output checks, including the ticket's result on a
+terminal edge. A missing input behind an independently ineligible edge is not
+the cause. Missing required outputs and spent invocation attempts keep their
+diagnostic priority ([§FS-rhei-agents.3.2.1](rhei-agents.spec.md#321-runtime-semantics), [§FS-rhei-agents.3.2.3](rhei-agents.spec.md#323-attempt-budget)). Selection is
+not changed: inputs are checked on the edge selection already chose, so the edge
+named is the one refused, and a later declared edge does not advance in its
+place. An `optional: true` input never refuses entry ([§FS-rhei-states.3.1](rhei-states.spec.md#31-optional-inputs)) and
+is never named. The input is resolved against the root the refused entry
+checked it against.
+
+**Attention.** The report's exact-reason requirement ([§FS-rhei-run-report.2](rhei-run-report.spec.md#2-markdown-ui))
+applies in the run whose successful worker could not advance and in every later
+run the same refusal holds, including a run that reuses that work without
+spawning it. Attention names the source state, the destination, and each
+missing required input by name and by absolute path ([§FS-rhei-run-report.3.1](rhei-run-report.spec.md#31-layout)).
+Its next action says to write the named file and rerun, or cancel the ticket.
+For example:
+
+```text
+| plan.1 | draft | finished, but cannot enter 'read': required input note (/work/plan/runtime/plan.1.note.md) is missing | write that file and rerun, or cancel the ticket |
+```
+
+It must not instead call the ticket stalled or not scheduled. Nor may it
+recommend inspecting the successful worker's logs, rerunning alone, claiming the
+ticket with `rhei next`, or `rhei retry`: no attempt is missing, so no grant
+releases the edge. Where the Transition Ledger and Task Final States give a
+reason, it is this one. The task remains in its source state and the run still
+halts unsuccessfully.
+
+**Spent attempts.** A state that declares no `outputs:` is spawned again on a
+successful visit ([§FS-rhei-agents.3.2](rhei-agents.spec.md#32-completion-condition)), so its attempts can run out while only
+its edge is refused. The spent visit keeps its priority, but its halt line and
+Attention row name the refused edge, never an unmet completion condition
+([§FS-rhei-agents.3.2.1](rhei-agents.spec.md#321-runtime-semantics)). The halt line keeps its text through `attempts spent on
+this visit`, which scripts match, and the ending of [§FS-rhei-retry.3](rhei-retry.spec.md#3-output-and-halt-advice):
+
+```text
+halting Task plan.1 in state 'draft': 2 attempts spent on this visit and the last one met its completion condition, but its edge into 'read' is refused: required input note (/work/plan/runtime/plan.1.note.md) is missing; write it before retrying. The ticket stays in 'draft'. To give this visit 2 more attempts, run: rhei retry plan.1.
+```
+
+Its next action is to write the named file, then `rhei retry <id>`, then rerun.
+Writing the file alone leaves the spent visit halted, and a grant alone spawns a
+worker whose edge is refused again. The same holds when the refusal is a spent
+`visits:` budget ([§FS-rhei-errors.1.5.1](rhei-errors.spec.md#151-successful-workers-blocked-by-counted-entries)). The halt line and the reason then name that
+budget, and the next action is to raise `visits:` on the destination, then
+`rhei retry <id>`, then rerun.
+
+**Retry.** While the visit's work is reusable, `rhei retry` has nothing to
+refill. It refuses, says so, and names the refused edge ([§FS-rhei-retry.2](rhei-retry.spec.md#2-grant-and-refusals)). It
+never reports the visit's record as missing.
+
+These diagnostics do not change transition selection or eligibility, input
+resolution, counters, attempt charging, the re-spawn of a state without
+`outputs:`, run exit status or poll semantics.
+
 ### 1.6. Composed block context
 
 A composition error names the mount alias or public endpoint the user wrote and

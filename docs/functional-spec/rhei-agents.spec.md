@@ -1815,10 +1815,10 @@ Under `orchestrator` authority, `rhei run`:
      budget is a stall like any other stall of step 5 ([§FS-rhei-run.3](rhei-run.spec.md#3-execution-loop)), and it
      is reported as one; the engine never converts "I stopped paying for this"
      into "this ticket failed".
-     This is one sentence with two moments, not two sentences: it is printed by
-     the attempt that spends the last of the budget, and again by any later pass
-     that reaches the ticket and declines to spawn it. Both say the same thing
-     because both are the same fact.
+     The attempt that spends the last of the budget and any later pass that declines
+     to spawn the ticket print this one sentence, because both are the same fact. A visit
+     whose last attempt met its completion condition, its edge refused only by the destination,
+     names that refusal in place of the unmet clause and keeps the rest ([§FS-rhei-errors.1.5.2](rhei-errors.spec.md#152-successful-workers-blocked-by-a-destinations-missing-input)).
    - Each entry names the artifact and the **resolved** path that was checked,
      so a stale or mis-templated path is visible without re-deriving it. When a
      resolved path still contains an unresolved `{...}` template, the entry is

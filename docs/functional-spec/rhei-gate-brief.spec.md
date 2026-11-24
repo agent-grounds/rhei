@@ -307,8 +307,11 @@ it is never a forced move.
 
 ### 7.1. The Answer File
 
-The answer is written to `runtime/gates/<task-id>/<visit>.answer.json`, with the
-project-qualified id, under the plan lock and before the state write:
+The answer is written to `runtime/gates/<task-id>/<state>.<visit>.answer.json`
+under the ticket's execution root, with the project-qualified id and the gate's
+canonical state name. The state is in the name because a ticket may pass more
+than one gate and `visit` is counted per state
+([§FS-rhei-gate-brief.4.4](rhei-gate-brief.spec.md#44-visit-and-since)), so two gates' first answers never share a file:
 
 ```json
 { "version": 1, "ticket": "agora.1", "state": "human-judgment", "visit": 1,
@@ -318,8 +321,19 @@ project-qualified id, under the plan lock and before the state write:
 ```
 
 `route` is `null` when the destination came from the `destination` question.
-When the transition is refused after the file is written, the file is removed,
-so a refused answer leaves no trace.
+`answered_by` is the OS account that ran the command, and `answered_at` the
+RFC 3339 UTC time it answered. `to` is the target the ticket enters: the
+destination, or the state an `on_leave` callback redirected it to.
+
+The file is written under the plan lock, after every check of the transition has
+passed — the compare-and-swap, the edge and its condition, the `on_leave`
+callbacks, the source outputs, the target inputs and the terminal result — and
+before the budget charge and the state write. So an `on_enter` callback can read
+it, and an `on_leave` callback cannot. When the move is refused after the file is
+written — by the budget, a failed state write, or an `on_enter` callback whose
+failure rolls the state back — the file is removed before the lock is released,
+and a file it replaced (a ledger reset restarts the visit count) is put back, so
+a refused answer leaves no trace.
 
 ### 7.2. The Result Message
 
@@ -338,6 +352,35 @@ file. `{input.gate-answer.path}`, `{input.gate-answer.exists}` and
 ([§FS-rhei-states.3.1](rhei-states.spec.md#31-optional-inputs)), `{gate_answer}` is shorthand for the path, and the prompt's
 handoff section lists the file. The agent that continues reads the ruling from
 the plan, not from whoever relayed it.
+
+- **Latest** is the file under `runtime/gates/<task-id>/` with the latest
+  `answered_at`, then the latest modification time.
+- Before any answer, `{input.gate-answer.exists}` is `false`, and
+  `{input.gate-answer.path}` and `{gate_answer}` are left as written, as an
+  unknown variable is. A program gets `RHEI_INPUT_GATE_ANSWER_EXISTS` always,
+  and `RHEI_INPUT_GATE_ANSWER_PATH`, relative to the execution root, only when
+  there is a file.
+- A state that declares an input named `gate-answer` keeps its own:
+  the declared one wins, and `{gate_answer}` is its path.
+- `{if input.gate-answer.exists}` is valid in every state, declared or not
+  ([§FS-rhei-states.4.2](rhei-states.spec.md#42-resolution-rules)).
+
+#### 7.3.1. The Handoff Section
+
+When the latest answer moved the ticket into the state it is now in — its `to` is
+that state, and the ledger's latest move into that state came from the answer's
+gate — the agent's prompt carries a section beside the declared handoffs:
+
+```text
+## Gate Answer from <state>
+
+A person answered the `<state>` gate (visit <n>) and moved this task here.
+The answer is recorded in `<path>`. ...
+```
+
+It names the file and, fenced as data, the answers it records. A file that an
+exclusion keeps out of the prompt ([§FS-rhei-plan-language.3.13](rhei-plan-language.spec.md#313-task-read-exclusions)) is named
+without its answers.
 
 ## 8. Leaving a Gate by `rhei transition`
 

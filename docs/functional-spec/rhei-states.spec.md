@@ -506,6 +506,9 @@ Runtime semantics:
 - A gate's `display` and `request` files are required inputs of the gate state
   without being listed, checked at the same point and refused the same way;
   the request is also validated there ([§FS-rhei-gate-brief.2](rhei-gate-brief.spec.md#2-implicit-inputs)).
+- Every state also has the implicit optional input `gate-answer`, the ticket's
+  latest gate answer, exposed like a declared optional input unless the state
+  declares an input of that name ([§FS-rhei-gate-brief.7.3](rhei-gate-brief.spec.md#73-the-gate-answer-input)).
 - `outputs` are checked after `on_leave` callbacks complete and before the
   transition out of the state is committed. If any required output file is
   missing, the transition or successful-work completion is rejected according
@@ -876,6 +879,7 @@ The `instructions` and `personality` fields support template variable substituti
 | `{plan_path}` | filesystem | Path to the plan file | `./ci-pipeline.rhei.md` |
 | `{input.<name>.path}` | artifact contract | Resolved path of a declared input artifact | `runtime/results/auth.3.md` |
 | `{input.<name>.exists}` | artifact contract | Whether the input artifact file exists on disk at resolution time | `true`, `false` |
+| `{gate_answer}` | gate answer | Path of the ticket's latest gate answer, the implicit `gate-answer` input; unresolved before any answer ([§FS-rhei-gate-brief.7.3](rhei-gate-brief.spec.md#73-the-gate-answer-input)) | `runtime/gates/auth.3/review.1.answer.json` |
 | `{output.<name>.path}` | artifact contract | Resolved path of a declared output artifact | `runtime/findings/auth.3.md` |
 | `{mcp.<name>.available}` | tooling | Whether the MCP server with id `<name>` started successfully and is attached to the current agent | `true`, `false` |
 | `{skill.<id>.available}` | tooling | Whether the skill with id `<id>` is enabled for the current agent | `true`, `false` |
@@ -896,7 +900,7 @@ The `instructions` and `personality` fields support template variable substituti
   the relative form shown above.
 - **`{visit_count}` and `{visits}` are only meaningful for counted-loop states.** For states without a `visits` declaration, `{visits}` is left unresolved and `{visit_count}` resolves to `1`.
 - **`{target}` and `{target.slug}` are only available for target-based execution.** For states that use the legacy `model` / `all_models` fields, `{target}` is left unresolved.
-- **Conditional blocks suppress whole paragraphs.** Use `{if input.<name>.exists}`, `{if mcp.<name>.available}`, or `{if skill.<id>.available}` … `{endif}` to include a block of text only when the referenced artifact, server, or skill is present. Use `{else}` between the opening tag and `{endif}` for an alternative block. The entire block — including surrounding blank lines — is removed from the output when the condition is false. Conditional blocks may not be nested in v1.
+- **Conditional blocks suppress whole paragraphs.** Use `{if input.<name>.exists}`, `{if mcp.<name>.available}`, or `{if skill.<id>.available}` … `{endif}` to include a block of text only when the referenced artifact, server, or skill is present. Use `{else}` between the opening tag and `{endif}` for an alternative block. The entire block — including surrounding blank lines — is removed from the output when the condition is false. Conditional blocks may not be nested in v1. `{if input.gate-answer.exists}` names the implicit `gate-answer` input, so it needs no declaration ([§FS-rhei-gate-brief.7.3](rhei-gate-brief.spec.md#73-the-gate-answer-input)); `{gate_answer}` is that input's path.
 - **Escaped braces are literal.** Use `\{` and `\}` when prompt text needs to
   show identifier-shaped runtime syntax literally, for example
   `\{task_id\}` renders as `{task_id}` instead of the current task id. Brace

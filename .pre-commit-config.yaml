@@ -58,6 +58,15 @@ repos:
         pass_filenames: false
         always_run: true
         stages: [pre-commit]
+      # The dashboard page's scripts, which no Rust test reaches. The shell
+      # expands the glob, because Node 20 reads a directory and Node 22 a glob. §FS-rhei-distribution.6
+      - id: dashboard-script-tests
+        name: dashboard script tests
+        entry: bash -c 'node --test tests/browser/*.test.js'
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
       # One offline pass over the tree, one pass over the URLs a commit stages. §AR-ci-release.2.1
       - id: lychee
         name: lychee

@@ -84,9 +84,10 @@ subprocess use in that harness process runs the copy.
 `grund check .`, then the repository `.pre-commit-config.yaml` against all
 files with the cargo hooks skipped — `test` has just run them on three
 platforms, and running the suite a second time on one of them bought nothing —
-so the remaining hook contract (fissile, lychee, attribution boilerplate) is
-enforced remotely. It runs no changelog step, because no pull request is checked
-for a bullet ([§FS-rhei-distribution.5.1](../functional-spec/rhei-distribution.spec.md#51-what-a-releases-notes-list)), and so it checks out the
+so the remaining hook contract (fissile, lychee, the dashboard page's script
+tests, attribution boilerplate) is enforced remotely. It installs a Node beside
+its Python for the script tests, the one hook that needs it. It runs no
+changelog step, because no pull request is checked for a bullet ([§FS-rhei-distribution.5.1](../functional-spec/rhei-distribution.spec.md#51-what-a-releases-notes-list)), and so it checks out the
 single commit a checkout takes by default: nothing in the job needs the pull
 request's base. The job keeps its name,
 `repository gates (grund, fissile, lychee, changelog, attribution)`, because
@@ -113,9 +114,9 @@ look the green run up by workflow name.
 ## 2. Local Hooks
 
 The pre-commit hooks run `grund`, formatting, clippy, build, tests, the release
-scripts' tests, link checks, and attribution boilerplate checks before a
-commit. The pre-push hook reruns the Rust tests and nothing else
-([§FS-rhei-distribution.6](../functional-spec/rhei-distribution.spec.md#6-local-gates)): no hook, at either stage, checks
+scripts' tests, the dashboard page's script tests, link checks, and attribution
+boilerplate checks before a commit. The pre-push hook reruns the Rust tests and
+nothing else ([§FS-rhei-distribution.6](../functional-spec/rhei-distribution.spec.md#6-local-gates)): no hook, at either stage, checks
 `docs/changelog.md` for a bullet, because a change adds none.
 
 ### 2.1. Two link hooks

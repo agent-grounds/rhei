@@ -212,6 +212,10 @@ generated notes of [§FS-rhei-distribution.5.1](rhei-distribution.spec.md#51-wha
 proven on the contributor's own platform before a commit, and no hook checks a
 branch for a changelog bullet.
 
+It runs the dashboard page's script tests with `node --test tests/browser/`
+too. The page is one HTML asset whose scripts no Rust test reaches
+([§FS-rhei-viz.5.1](rhei-viz.spec.md#51-human-gate-transitions)), so without the hook nothing would run them.
+
 ## 7. Supported Platforms
 
 Which platforms Rhei supports, and what support means, is a project-wide

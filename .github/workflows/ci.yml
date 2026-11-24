@@ -94,6 +94,13 @@ jobs:
         with:
           python-version: "3.x"
 
+      # The `dashboard-script-tests` hook runs the dashboard page's scripts
+      # under Node's own test runner. §AR-ci-release.1
+      - name: Install Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+
       # The gate binaries are compiled from source on a cache miss only. They
       # live under their own root so the cache never touches rustup's proxies
       # in ~/.cargo/bin; the key is the pinned versions, so bumping one rebuilds.

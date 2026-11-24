@@ -67,6 +67,7 @@ impl StateMachine {
                 )));
             }
         }
+        self.validate_gate_configuration()?;
         // Last, so a machine that is invalid for a narrower reason is still
         // reported by that reason rather than by its dead ends. §FS-rhei-states.1.3
         self.validate_every_state_can_be_left()?;

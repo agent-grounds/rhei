@@ -17,6 +17,8 @@ pub mod callback;
 /// The language's one reading of a fenced code block.
 /// §FS-rhei-plan-language.2.1
 pub mod fence;
+/// What a gating state shows and asks a person. §FS-rhei-gate-brief
+pub mod gate;
 /// The language's one reading of a document's header.
 /// §FS-rhei-plan-language.2.3
 pub mod header;

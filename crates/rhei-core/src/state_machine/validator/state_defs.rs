@@ -25,6 +25,9 @@ pub struct StateDef {
     /// When `true`, autonomous commands must not transition out of this state.
     #[serde(default)]
     pub gating: bool,
+    /// What a `gating: true` state shows and asks a person. §FS-rhei-gate-brief.1
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gate: Option<crate::gate::GateDef>,
     /// When `true`, `rhei run` may work multiple ready tasks in this state
     /// simultaneously (bounded by `--parallel`). When `false`, at most one
     /// task per pass is scheduled for this state; remaining tasks are

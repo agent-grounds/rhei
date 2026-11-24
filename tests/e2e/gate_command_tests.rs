@@ -302,6 +302,9 @@ fn states_shows_what_each_gate_block_declares() {
         json!({ "to": "drafting", "when": { "approve": false } })
     );
     assert_eq!(state("vetting")["gate"]["questions"][0]["id"], "approve");
+    // Defaults written out, as `rhei gate show` writes them.
+    assert_eq!(state("vetting")["gate"]["questions"][0]["required"], true);
+    assert_eq!(state("vetting")["gate"]["routes"][1], json!({ "to": "drafting", "when": {} }));
     assert!(state("parked").get("gate").is_none(), "no block, no member");
 
     let text = fx.rhei(&["states"]);

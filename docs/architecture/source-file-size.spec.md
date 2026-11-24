@@ -138,6 +138,8 @@ under `crates/rhei-cli/src/cli/`:
   `file_locks`, `render_install_commands`, `install_skill_agents`, and
   `diagnostics` contain the remaining command families, the cross-platform
   file-lock helpers every locking command shares, and shared diagnostics.
+- `tests_index` lists the CLI unit tests the crate root's `tests` module
+  includes, so the root lists only the parts that ship.
 - `tests_cli_render`, `tests_complete_reset_tooling`, `tests_file_locks`,
   `tests_claim_writer_exclusion`,
   `tests_agent_resolution`, `tests_agent_execution_validation`,

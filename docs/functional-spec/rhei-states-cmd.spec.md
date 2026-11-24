@@ -159,7 +159,9 @@ the inspection shape of machines that do not opt in.
 A gating state that authors a `gate:` block includes a `"gate": { … }` member
 holding the block as authored, its path and prose templates unrendered: the
 `title`, `summary`, `display`, `request` and `questions` it declares, and
-`routes` when it declares any ([§FS-rhei-gate-brief.1](rhei-gate-brief.spec.md#1-declaring-a-gate)). A state without the block omits the
+`routes` when it declares any ([§FS-rhei-gate-brief.1](rhei-gate-brief.spec.md#1-declaring-a-gate)). Defaults are written out, as
+`rhei gate show` writes them: a question's `required`, and a fallback route's
+empty `when`. A state without the block omits the
 member, for the same reason as `effort`. What one ticket is asked at the gate is
 its brief, read with `rhei gate show` ([§FS-rhei-gate-cmd.2](rhei-gate-cmd.spec.md#2-rhei-gate-show)).
 

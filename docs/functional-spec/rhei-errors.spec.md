@@ -327,6 +327,41 @@ state, which is both the state being left and the state whose budget was spent,
 so the rule reads the same either way: the subject is whatever the check
 measured.
 
+#### 1.5.1. Successful workers blocked by counted entries
+
+When an agent or program exits successfully but cannot advance because an
+otherwise eligible forward transition would enter a destination whose `visits:`
+budget is exhausted, `rhei run` appends that destination's counted-entry refusal
+to its no-advance warning. The warning retains the worker kind, task and source
+state, and names the destination, budget kind and `used/limit` in visits, as a
+manual transition does. This applies in sequential and parallel scheduling and
+to the warning recorded in the run's logs. For example:
+
+```text
+warning: agent exited 0 but task plan.1 did not advance from 'audit': visit budget for state 'check-review' is exhausted (2/2 visits)
+```
+
+The explanation must follow the completion context: the candidate must satisfy
+its other guards, exit-code selection and required-output checks. A spent
+destination on an independently ineligible edge is not the cause, and an
+applicable alternative forward edge must still advance. Missing required
+outputs and spent invocation attempts retain their existing diagnostic priority
+([§FS-rhei-agents.3.2.1](rhei-agents.spec.md#321-runtime-semantics),
+[§FS-rhei-agents.3.2.3](rhei-agents.spec.md#323-attempt-budget)). These diagnostics do
+not change transition eligibility, counters, run exit status or poll semantics
+([§FS-rhei-transitions.4.3](rhei-transitions.spec.md#43-counted-loops)).
+
+**Attention.** The report's exact-reason requirement
+([§FS-rhei-run-report.2](rhei-run-report.spec.md#2-markdown-ui)) applies both in the run whose
+successful worker could not advance and in every subsequent run halted by the
+same condition. Attention names that destination's exhausted visit budget and
+`used/limit` in visits, using the same attribution rules above. Its next action
+says to raise `visits:` on the named destination or cancel the ticket. It must
+not instead recommend adding a transition that exists, inspecting successful
+worker logs, or `rhei retry`, which grants invocation attempts rather than
+destination entries. The task remains in its source state and the run still
+halts unsuccessfully.
+
 ### 1.6. Composed block context
 
 A composition error names the mount alias or public endpoint the user wrote and

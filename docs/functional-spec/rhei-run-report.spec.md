@@ -392,7 +392,8 @@ the summary prints five stacked groups:
    ([§FS-rhei-run.5.1.1](rhei-run.spec.md#511-a-blocker-no-clock-releases)); a worker interrupted mid-flight by an
    *operator's* shutdown ([§FS-rhei-run.3.2](rhei-run.spec.md#32-interruption-and-process-ownership)) — a run that tore its own workers down while
    failing describes their tickets by the failure instead, never by "re-run to
-   continue"; a spent current visit with unmet completion; a manual-only initial state
+   continue"; a spent current visit with unmet completion; a finished worker whose selected edge its destination refused,
+   for a spent `visits:` budget ([§FS-rhei-errors.1.5.1](rhei-errors.spec.md#151-successful-workers-blocked-by-counted-entries)) or a missing required input named by absolute path ([§FS-rhei-errors.1.5.2](rhei-errors.spec.md#152-successful-workers-blocked-by-a-destinations-missing-input)); a manual-only initial state
    for a ticket this run neither worked nor interrupted; a worker that ran and
    left a required artifact unwritten — agent or program alike, since both are
    workers and both stall the same way; a required `inputs:` artifact of the
@@ -432,9 +433,9 @@ the summary prints five stacked groups:
 
    A **spent current visit** belongs in Attention, never Waiting
    ([§FS-rhei-run.5.1.1](rhei-run.spec.md#511-a-blocker-no-clock-releases)). Its blocker names the attempts spent on this visit
-   and unmet completion artifacts, including an absent required result. Paths identify the
+   and unmet completion artifacts, including an absent required result, or else the edge its destination refused ([§FS-rhei-errors.1.5.2](rhei-errors.spec.md#152-successful-workers-blocked-by-a-destinations-missing-input)). Paths identify the
    checked execution root, including the member rhei's root in a Panta project.
-   Its next action is `rhei retry <id>`, then rerun ([§FS-rhei-retry.3](rhei-retry.spec.md#3-output-and-halt-advice));
+   Its next action is `rhei retry <id>`, then rerun ([§FS-rhei-retry.3](rhei-retry.spec.md#3-output-and-halt-advice)), after releasing that refused edge;
    never rerunning alone, claiming with `rhei next`, writing outputs by hand or cancelling.
    This applies to the run consuming the last attempt and later runs that cannot spawn,
    whether the worker exited nonzero or exited zero without completing its artifacts.

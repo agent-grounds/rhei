@@ -42,7 +42,9 @@ with attempts remaining receives no grant; it must not prevent recovery of an
 exhausted sibling. Invocations whose work the next run can reuse, removed
 targets and older visits receive no grant. Refuse without writes when none of
 the active invocations has an exhausted current record: report remaining
-attempts when any still has capacity, otherwise the missing current record.
+attempts when any still has capacity; otherwise reusable work when the current
+visit's record is on disk and its work is reusable (below); otherwise the
+missing current record.
 
 Write the record through a temporary file and rename under the same lock used
 by attempt charging. Re-read under that lock; an interleaved charge and grant
@@ -56,6 +58,18 @@ Refuse non-zero, without writing anything, when:
   A poll visit halted by its kills ([§FS-rhei-agents.3.2.3](rhei-agents.spec.md#323-attempt-budget)) is granted like any
   other: there each granted attempt allows one more kill.
 - There is no spawn record for this current visit (an older visit is not one).
+- The current visit's work is reusable: its record proves successful work, and
+  what that work owes is on disk, so the next run spawns nothing for it and a
+  grant would refill nothing. Say there is `nothing to refill`, and never that
+  the record is missing, because it is on disk. When the edge that work
+  selected is refused at its destination, name the refusal and what releases it
+  ([§FS-rhei-errors.1.5.1](rhei-errors.spec.md#151-successful-workers-blocked-by-counted-entries), [§FS-rhei-errors.1.5.2](rhei-errors.spec.md#152-successful-workers-blocked-by-a-destinations-missing-input)). Until that changes, a rerun
+  halts the same way:
+
+  ```text
+  × Task plan.1 'draft': nothing to refill: this visit's attempt finished and its work is reusable
+  help: its edge into 'read' is refused: required input note (/work/plan/runtime/plan.1.note.md) is missing. Write that file and rerun, or cancel the ticket.
+  ```
 - `RHEI_TASK_ID` is set: a spawned worker cannot refill its own bound.
 
 The grant takes effect on the next `rhei run`, because a live run already set

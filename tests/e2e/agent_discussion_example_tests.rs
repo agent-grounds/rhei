@@ -5,7 +5,6 @@ use super::*;
 /// The committed mock must satisfy both terminal entries and preserve the
 /// discussion loop and downstream gate. §FS-rhei-states.3.3.1
 #[test]
-#[ignore = "red until #767: committed mock writes both terminal results; implement removes this"]
 fn example_agent_discussion_runs_with_committed_mock_settings() {
     let dir = unique_temp_dir("rhei-767-agent-discussion");
     let workspace = dir.join("agent-discussion");
@@ -47,7 +46,8 @@ fn example_agent_discussion_runs_with_committed_mock_settings() {
         ("agent-discussion.discussion-seed", "converged"),
         ("agent-discussion.apply-decision", "completed"),
     ] {
-        let task = tasks.iter().find(|task| task["id"] == id).expect("expected example task");
+        let task =
+            tasks.iter().find(|task| task["id"]["path"] == id).expect("expected example task");
         assert_eq!(task["state"], state, "{id}: exact terminal state");
         let result = fs::read_to_string(workspace.join(format!("runtime/results/{id}.md")))
             .expect("each terminal task writes its own result");

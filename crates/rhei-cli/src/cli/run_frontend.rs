@@ -77,7 +77,7 @@ impl rhei_tui::GateTransitionSink for RunGateTransitionSink {
             result,
             self.no_callbacks,
         )
-        .map_err(|err| err.to_string())
+        .map_err(|err| gate_release_refusal(&err))
     }
 }
 
@@ -352,7 +352,7 @@ fn transition_dashboard_gate(
     // §FS-rhei-viz.5.1 §FS-rhei-run.3 §FS-rhei-states.3.3
     let result = result.map(str::trim).filter(|message| !message.is_empty());
     let route = loaded.task_route(task_id_str, input);
-    execute_transition(
+    execute_transition_with_origin(
         TransitionFiles {
             task_file: &route.task_file,
             role: loaded.document_role(&route.task_file),
@@ -366,9 +366,29 @@ fn transition_dashboard_gate(
         &route.local_id,
         from,
         to,
-        result,
         no_callbacks,
+        TransitionOrigin {
+            // A gate whose brief asks authored questions is answered, here as at
+            // `rhei transition`. §FS-rhei-viz.5.1 §FS-rhei-transition-cmd.3.5
+            gate_brief_guard: true,
+            result_message: result.map(str::to_string),
+            ..TransitionOrigin::default()
+        },
+        None,
+        None,
     )
+}
+
+/// A refusal as one line with its help, so the dashboard block and the TUI
+/// journal name the way forward and not only the refusal. §FS-rhei-viz.5.1
+fn gate_release_refusal(err: &miette::Report) -> String {
+    let help = err.help().map(|help| format!(" — {help}")).unwrap_or_default();
+    format!("{err}{help}")
+        .split(['\n', '\r'])
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 /// Re-read the plan from disk and build the dashboard's [`VizModel`] via

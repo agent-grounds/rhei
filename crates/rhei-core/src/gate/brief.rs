@@ -43,15 +43,22 @@ pub struct Destination {
 }
 
 /// One entry per distinct target of `state`'s declared outgoing edges, exact
-/// before wildcard, each described by the edge that governs the pair: the
-/// first exact one, else the first wildcard (§FS-rhei-transition-cmd.3).
+/// and wildcard alike, in the order the machine first declares each. An entry
+/// is described by the edge that governs the pair: the first exact edge to
+/// the target, else the first wildcard one (§FS-rhei-transition-cmd.3).
+/// §FS-rhei-gate-brief.4.1 §FS-rhei-gate-cmd.2.1
 pub fn destinations(machine: &StateMachine, state: &str) -> Vec<Destination> {
     let mut out: Vec<Destination> = Vec::new();
-    for rule in machine.transitions_from(state) {
-        let target = rule.to.0.as_str();
+    let leaving = || {
+        machine.transitions().iter().filter(|rule| machine.transition_matches_source(rule, state))
+    };
+    for declared in leaving() {
+        let target = declared.to.0.as_str();
         if out.iter().any(|known| known.state == target) {
             continue;
         }
+        let rule =
+            leaving().find(|rule| rule.to.0 == target && rule.from.0 != "*").unwrap_or(declared);
         let target_def = machine.states.get(target);
         let condition = rule.condition.clone().or_else(|| {
             rule.exit_code.as_ref().map(|code| format!("exit code {}", exit_code_text(code)))

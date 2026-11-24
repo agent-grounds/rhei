@@ -415,7 +415,7 @@ fn a_machine_with_a_valid_gate_block_loads() {
     assert_eq!(gate.routes.len(), 2);
     let targets = destinations(&loaded, "judge");
     let names: Vec<&str> = targets.iter().map(|d| d.state.as_str()).collect();
-    assert_eq!(names, ["shipping", "revising", "completed"], "exact before wildcard, deduplicated");
+    assert_eq!(names, ["shipping", "revising", "completed"], "declaration order, deduplicated");
     assert_eq!(targets[1].condition.as_deref(), Some("test -f runtime/notes.md"));
     assert_eq!(targets[0].description.as_deref(), Some("Ship the change"));
     assert!(targets[2].terminal);
@@ -460,4 +460,38 @@ fn every_state_may_branch_on_the_implicit_gate_answer() {
         machine("    gating: true\n    instructions: \"{if input.gate-answers.exists}x{endif}\"")
             .unwrap_err();
     assert!(typo.contains("'gate-answers' is not a declared input"), "{typo}");
+}
+
+// A wildcard declared first is listed first, and a pair both an exact and a
+// wildcard edge name is described by the exact one. §FS-rhei-gate-brief.4.1 §FS-rhei-gate-cmd.2.1
+#[test]
+fn destinations_follow_declaration_order_with_the_exact_edge_governing() {
+    let yaml = r#"
+name: ordered
+version: 1.0
+states:
+  todo: { initial: true }
+  gate: { gating: true }
+  apply: { description: "Apply it" }
+  done: { final: true }
+  cancelled: { final: true, description: "Dropped" }
+transitions:
+  - { from: "*", to: cancelled }
+  - { from: todo, to: gate }
+  - { from: gate, to: apply }
+  - { from: gate, to: cancelled, condition: "test -f runtime/drop" }
+  - { from: apply, to: done }
+"#;
+    let loaded = crate::state_machine::StateMachine::from_yaml_str(yaml).expect("machine loads");
+    let targets = destinations(&loaded, "gate");
+    let names: Vec<&str> = targets.iter().map(|d| d.state.as_str()).collect();
+    assert_eq!(names, ["cancelled", "apply"], "declaration order, deduplicated");
+    assert_eq!(
+        targets[0].condition.as_deref(),
+        Some("test -f runtime/drop"),
+        "the exact edge governs"
+    );
+    let asked = destination_question("plan.1", &targets);
+    let options: Vec<&str> = asked.option_values().collect();
+    assert_eq!(options, ["cancelled", "apply"]);
 }

@@ -259,6 +259,64 @@ fn list_names_every_gate_with_required_and_holds() {
     );
 }
 
+/// A gate holds its open descendants and whatever waits on them through
+/// `**Prior:**`; a finished child and an unrelated ticket are not held.
+/// §FS-rhei-gate-cmd.4
+#[test]
+fn holds_counts_open_descendants_and_the_tickets_their_priors_reach() {
+    let fx = gate_fixture("gate-list-holds");
+    fx.write(
+        "verdict.rhei.md",
+        "# Rhei: Verdict\n\n## Tasks\n\n### Task 1: Park me\n**State:** parked\n\n\
+         #### Task 1.1: Open child\n**State:** todo\n\n#### Task 1.2: Done child\n**State:** completed\n\n\
+         ### Task 2: After the child\n**State:** todo\n**Prior:** 1.1\n\n\
+         ### Task 3: After that\n**State:** todo\n**Prior:** 2\n\n### Task 4: Unrelated\n**State:** todo\n",
+    );
+    let listed = fx.gate_json(&["list"]);
+    let gates = listed["gates"].as_array().expect("gates");
+    assert_eq!(gates.len(), 1, "{listed:#}");
+    assert_eq!(gates[0]["ticket"], "verdict.1");
+    assert_eq!(gates[0]["holds"], 3, "verdict.1.1, then verdict.2 and verdict.3 behind it");
+}
+
+/// `rhei states` shows a gate block as authored, and nothing for a gate
+/// without one. §FS-rhei-states-cmd.4 §FS-rhei-states-cmd.5
+#[test]
+fn states_shows_what_each_gate_block_declares() {
+    let fx = gate_fixture("gate-states");
+    let result = fx.rhei(&["states", "--json"]);
+    assert_success(&result);
+    let machine: Value = serde_json::from_str(&result.stdout).expect("states JSON");
+    let state = |name: &str| {
+        machine["states"]
+            .as_array()
+            .expect("states")
+            .iter()
+            .find(|s| s["name"] == name)
+            .cloned()
+            .expect(name)
+    };
+    assert_eq!(state("review")["gate"]["request"], "runtime/gates/{task_id}.request.json");
+    assert_eq!(
+        state("review")["gate"]["routes"][1],
+        json!({ "to": "drafting", "when": { "approve": false } })
+    );
+    assert_eq!(state("vetting")["gate"]["questions"][0]["id"], "approve");
+    assert!(state("parked").get("gate").is_none(), "no block, no member");
+
+    let text = fx.rhei(&["states"]);
+    assert_success(&text);
+    assert!(
+        text.stdout.contains(
+            "      Gate: display=runtime/drafts/{task_id}.md, request=runtime/gates/{task_id}.request.json, routes=2\n"
+        ),
+        "{}",
+        text.stdout
+    );
+    assert!(text.stdout.contains("      Gate: questions=2, routes=2\n"), "{}", text.stdout);
+    assert_eq!(text.stdout.matches("Gate:").count(), 2, "{}", text.stdout);
+}
+
 /// No gate is an empty list, not an error. §FS-rhei-gate-cmd.4
 #[test]
 fn list_with_no_gate_is_empty_and_succeeds() {

@@ -16,6 +16,29 @@ fn executes_on_phrase(execute_on: rhei_validator::ExecuteOn) -> &'static str {
     }
 }
 
+/// A `gate:` block on one line: each of its parts the author declared, or
+/// `declared` when it declares none of them. §FS-rhei-states-cmd.4
+fn gate_block_phrase(gate: &rhei_core::gate::GateDef) -> String {
+    let mut parts = Vec::new();
+    if let Some(display) = gate.display.as_deref() {
+        parts.push(format!("display={display}"));
+    }
+    if let Some(request) = gate.request.as_deref() {
+        parts.push(format!("request={request}"));
+    }
+    if let Some(questions) = gate.questions.as_ref() {
+        parts.push(format!("questions={}", questions.len()));
+    }
+    if !gate.routes.is_empty() {
+        parts.push(format!("routes={}", gate.routes.len()));
+    }
+    if parts.is_empty() {
+        "declared".to_string()
+    } else {
+        parts.join(", ")
+    }
+}
+
 fn render_state_machine_text(machine: &rhei_validator::StateMachine) -> String {
     let mut out = String::new();
     // §FS-rhei-states-cmd.4: the machine's callback bound sits beside the version.
@@ -89,6 +112,10 @@ fn render_state_machine_text(machine: &rhei_validator::StateMachine) -> String {
             // nothing about which events reach it.
             if let Some(execute_on) = def.execute_on() {
                 out.push_str(&format!("      Executes on: {}\n", executes_on_phrase(execute_on)));
+            }
+            // What the gate block declares, only when authored. §FS-rhei-states-cmd.4
+            if let Some(gate) = def.gate.as_ref() {
+                out.push_str(&format!("      Gate: {}\n", gate_block_phrase(gate)));
             }
             if let Some(poll) = def.poll.as_ref() {
                 // §FS-rhei-states-cmd.4: appended only when authored, so a
@@ -254,6 +281,13 @@ fn render_state_machine_json(machine: &rhei_validator::StateMachine) -> Result<S
                     .as_object_mut()
                     .expect("state JSON is an object")
                     .insert("effort".to_string(), serde_json::json!(effort.as_str()));
+            }
+            // The block as authored, templates unrendered; absent when not. §FS-rhei-states-cmd.5
+            if let Some(gate) = def.gate.as_ref() {
+                rendered
+                    .as_object_mut()
+                    .expect("state JSON is an object")
+                    .insert("gate".to_string(), serde_json::json!(gate));
             }
             // As authored, `false` included; absent when not. §FS-rhei-states-cmd.5
             if let Some(withhold) = def.withhold_task_tooling {

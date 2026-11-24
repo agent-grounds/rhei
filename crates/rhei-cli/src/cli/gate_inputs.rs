@@ -199,11 +199,17 @@ fn ensure_gate_left_by_answer(
     }
     let questions = if asked == 1 { "question" } else { "questions" };
     Err(miette!(
-        help = format!(
-            "read the brief with: {}\nanswer it with: {}",
-            help_command_with("gate show", &format!("--task {task_id}")),
-            help_command_with("gate answer", &format!("--task {task_id} --from {from} --answers <file|->"))
-        ),
+        help = gate_answer_help(task_id, from),
         "Task {task_id} waits at gate '{from}', which asks {asked} required {questions}."
     ))
+}
+
+/// The two commands that leave a gate with authored required questions: the
+/// one that reads its brief and the one that answers it. §FS-rhei-gate-brief.8
+fn gate_answer_help(task_id: &str, from: &str) -> String {
+    format!(
+        "read the brief with: {}\nanswer it with: {}",
+        help_command_with("gate show", &format!("--task {task_id}")),
+        help_command_with("gate answer", &format!("--task {task_id} --from {from} --answers <file|->"))
+    )
 }

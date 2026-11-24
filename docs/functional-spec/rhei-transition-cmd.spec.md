@@ -416,7 +416,9 @@ synthesizes — including the degraded brief of a missing or invalid request
 is unchanged: a declared edge out of the gate still refuses it, and a missing
 edge still takes the operator recovery of [§FS-rhei-transition-cmd.6](rhei-transition-cmd.spec.md#6-operator-forced-missing-edge-recovery). The
 other verbs are unchanged too: `rhei next`, `rhei complete` and `rhei run` never
-leave a gating state.
+leave a gating state, and a `rhei complete` refused at such a gate names the
+same two commands ([§FS-rhei-complete.4](rhei-complete.spec.md#4-behavior)). The live dashboard's gate release is a
+human transition, so it takes this refusal as well ([§FS-rhei-viz.5.1](rhei-viz.spec.md#51-human-gate-transitions)).
 
 ## 4. Compare-and-Swap Conflicts
 

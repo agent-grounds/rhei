@@ -306,6 +306,14 @@ rejection reason naming `rhei transition <id> --from <state> --to <state>
 all. The rejection is rendered in the block, and the run is unaffected either
 way: it picks up an applied transition on its next pass.
 
+It inherits the refusal at a gate with a brief as well
+([§FS-rhei-transition-cmd.3.5](rhei-transition-cmd.spec.md#35-gates-with-a-brief)): where the gate's brief asks an authored required question,
+the server refuses the release whichever choice was made, and the rejection
+names `rhei gate show` and `rhei gate answer`, the commands that answer it. A
+rejection reason carries the refusal's help with it, folded onto one line, so
+the block and the run TUI's journal ([§FS-rhei-run-tui.1.5.5](rhei-run-tui.spec.md#155-live-actions-intervene-and-human-gate)) show the way
+forward and not only the refusal.
+
 This is the only plan-state mutation allowed from the dashboard. It is available
 only while the loopback dashboard is live and only for tasks currently in a
 gating state. The static and frozen surfaces render gate choices as inert

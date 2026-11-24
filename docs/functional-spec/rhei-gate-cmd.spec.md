@@ -43,7 +43,7 @@ One object, on stdout:
 {
   "version": 1,
   "ticket": "agora.1",
-  "ticket_title": "Discuss: gate routing in rhei or ephor",
+  "ticket_title": "Discuss: where a gate's answers are routed",
   "title": "Rule on 3 disputed entries",
   "state": "human-judgment",
   "visit": 1,
@@ -166,7 +166,9 @@ not predicted.
 `to` is where the ticket went, after any `on_leave` redirect. `result` is the
 rendered answers ([§FS-rhei-gate-brief.7.2](rhei-gate-brief.spec.md#72-the-result-message)). On refusal, stdout still
 carries the object, with `"ok": false`; `to`, `route`, `answer_path` and
-`result` are `null` where they are unknown, and `errors` lists each as
+`result` are `null` where they are unknown — `answer_path` is known once the
+brief is read, at step 3, and `result` once the answers hold, after step 4, so an
+`unrouted` refusal still carries it — and `errors` lists each as
 `{ "kind": <kind>, "question": <id> | null, "message": <text> }`, with the kinds
 of [§FS-rhei-gate-brief.6.2](rhei-gate-brief.spec.md#62-refusals). Without `--json` the same errors are printed to stderr, one
 per line.

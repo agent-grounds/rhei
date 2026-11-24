@@ -2,7 +2,7 @@
 //! single source of truth for the spec's derivation rules (flattening, plan
 //! state, classification), shared by the static and live paths. §AR-rhei-viz-flow.8
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -159,6 +159,7 @@ pub fn build_set_with_history_roots(
         about,
         tasks,
         machine: flatten_machine_union(machines),
+        gates: BTreeMap::new(),
     })
 }
 
@@ -254,6 +255,7 @@ fn build_inner(rhei: &Rhei, machine: &StateMachine, roots: Option<HistoryRoots<'
         about,
         tasks,
         machine: flatten_machine(machine),
+        gates: BTreeMap::new(),
     }
 }
 

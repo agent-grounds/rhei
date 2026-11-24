@@ -114,6 +114,22 @@ struct GateAnswerOutcome {
 }
 
 impl GateAnswerOutcome {
+    /// Nothing checked yet: not ok, and nowhere to go.
+    fn new(ticket: &str, from: &str, dry_run: bool) -> Self {
+        Self {
+            version: rhei_core::gate::GATE_DOCUMENT_VERSION,
+            ok: false,
+            dry_run,
+            ticket: ticket.to_string(),
+            from: from.to_string(),
+            to: None,
+            route: None,
+            answer_path: None,
+            result: None,
+            errors: Vec::new(),
+        }
+    }
+
     fn refuse(&mut self, kind: rhei_core::gate::GateErrorKind, message: impl Into<String>) {
         self.errors.push(rhei_core::gate::GateError::new(kind, None, message));
     }
@@ -131,19 +147,15 @@ fn gate_answer_command(request: &GateAnswerRequest<'_>) -> MietteResult<()> {
     let machines = ExecutionMachines::build(&resolved, input, &loaded)?;
     let task = find_task_by_id_str(&loaded.rhei.tasks, &task_id)
         .ok_or_else(|| miette!(help = task_id_help(), "task '{}' not found in the plan", task_id))?;
-    let mut outcome = GateAnswerOutcome {
-        version: rhei_core::gate::GATE_DOCUMENT_VERSION,
-        ok: false,
+    let mut outcome = GateAnswerOutcome::new(&task_id, request.from, request.dry_run);
+    let ask = GateAsk {
+        from: request.from,
+        answers: GateAnswerText::Source(request.answers),
         dry_run: request.dry_run,
-        ticket: task_id.clone(),
-        from: request.from.to_string(),
-        to: None,
-        route: None,
-        answer_path: None,
-        result: None,
-        errors: Vec::new(),
+        no_callbacks: false,
+        advise_live_run: true,
     };
-    let scene = GateAnswerScene { request, input, loaded: &loaded, machines: &machines, task, task_id: &task_id };
+    let scene = GateAnswerScene { ask, input, loaded: &loaded, machines: &machines, task, task_id: &task_id };
     answer_gate(&scene, &mut outcome)?;
     outcome.ok = outcome.errors.is_empty();
     if request.json {
@@ -168,9 +180,30 @@ fn gate_answer_command(request: &GateAnswerRequest<'_>) -> MietteResult<()> {
     Ok(())
 }
 
+/// What one answer asks, wherever it was posted from: the CLI names a file or
+/// stdin, a live surface carries the document itself. §FS-rhei-viz.5.1.2
+struct GateAsk<'a> {
+    from: &'a str,
+    answers: GateAnswerText<'a>,
+    dry_run: bool,
+    /// The run's `--no-callbacks`, which a surface inside that run honors as its
+    /// release does; a dry run runs no callback either way.
+    no_callbacks: bool,
+    /// Tell a live run its gate moved. A surface inside the run is that run.
+    advise_live_run: bool,
+}
+
+/// Where the answer document comes from.
+enum GateAnswerText<'a> {
+    /// `--answers`: a path, or `-` for stdin.
+    Source(&'a str),
+    /// The document itself, as a surface posts it.
+    Inline(&'a str),
+}
+
 /// What one answer is checked against.
 struct GateAnswerScene<'a> {
-    request: &'a GateAnswerRequest<'a>,
+    ask: GateAsk<'a>,
     input: &'a Path,
     loaded: &'a LoadedPlan,
     machines: &'a ExecutionMachines,
@@ -183,7 +216,7 @@ struct GateAnswerScene<'a> {
 /// refusal. §FS-rhei-gate-cmd.3
 fn answer_gate(scene: &GateAnswerScene<'_>, outcome: &mut GateAnswerOutcome) -> MietteResult<()> {
     use rhei_core::gate::GateErrorKind;
-    let (task_id, from) = (scene.task_id, scene.request.from);
+    let (task_id, from) = (scene.task_id, scene.ask.from);
     let machine = scene.machines.for_task_str(task_id);
     if !machine.states.get(from).is_some_and(|def| def.gating) {
         outcome.refuse(GateErrorKind::NotAGate, format!("'{from}' is not a gate (`gating: true`) of {task_id}'s machine"));
@@ -201,8 +234,11 @@ fn answer_gate(scene: &GateAnswerScene<'_>, outcome: &mut GateAnswerOutcome) -> 
     };
     let answer_path = view.answer_path();
     outcome.answer_path = Some(answer_path.clone());
-    let document = read_answer_text(scene.request.answers)
-        .and_then(|text| rhei_core::gate::parse_answer(&text));
+    let text = match scene.ask.answers {
+        GateAnswerText::Source(source) => read_answer_text(source),
+        GateAnswerText::Inline(text) => Ok(text.to_string()),
+    };
+    let document = text.and_then(|text| rhei_core::gate::parse_answer(&text));
     let document = match document {
         Ok(document) => document,
         Err(errors) => {
@@ -242,7 +278,7 @@ fn answer_gate(scene: &GateAnswerScene<'_>, outcome: &mut GateAnswerOutcome) -> 
     };
     let answered_at = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
     let record = GateAnswerRecord {
-        dry_run: scene.request.dry_run,
+        dry_run: scene.ask.dry_run,
         path: answer_path,
         document: rhei_core::gate::GateAnswer {
             ticket: Some(task_id.to_string()),
@@ -271,7 +307,7 @@ fn answer_gate(scene: &GateAnswerScene<'_>, outcome: &mut GateAnswerOutcome) -> 
         from,
         &to,
         // A dry run runs no callback. §FS-rhei-gate-cmd.3.1
-        scene.request.dry_run,
+        scene.ask.dry_run || scene.ask.no_callbacks,
         // An answer takes the declared edge as a person's release of the gate,
         // never a forced move. §FS-rhei-gate-brief.7
         TransitionOrigin {
@@ -285,7 +321,7 @@ fn answer_gate(scene: &GateAnswerScene<'_>, outcome: &mut GateAnswerOutcome) -> 
     );
     match moved {
         Ok(effective) => {
-            if !scene.request.dry_run {
+            if !scene.ask.dry_run && scene.ask.advise_live_run {
                 // §FS-rhei-transition-cmd.3.4
                 advise_live_gate_budget(scene.input, &route, machine, task_id, from, &effective);
             }

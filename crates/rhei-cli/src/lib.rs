@@ -35,6 +35,7 @@ include!("cli/gate_view.rs");
 include!("cli/gate_commands.rs");
 include!("cli/gate_answer.rs");
 include!("cli/gate_answer_input.rs");
+include!("cli/gate_surface.rs");
 include!("cli/error_guidance.rs");
 include!("cli/state_machine_shape_help.rs");
 include!("cli/diagnostic_causes.rs");

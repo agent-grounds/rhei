@@ -35,7 +35,9 @@ fn viz_command(
     // A member rhei renders its project's graph, filtered to its own tickets:
     // a cross-rhei prior is part of what governs this rhei, so the edge stays
     // and its far end is drawn as an out-of-scope neighbour. §FS-rhei-viz.7.3
-    let plans = rhei_viz::narrow_bundle(plans, rhei_scope);
+    let mut plans = rhei_viz::narrow_bundle(plans, rhei_scope);
+    // A static page renders each brief in full, with inert controls. §FS-rhei-viz.8
+    attach_static_gate_briefs(&mut plans, input, state_machine);
 
     let html = rhei_viz_model::render_static(&plans);
     let out = output.map(Path::to_path_buf).unwrap_or_else(|| default_viz_output(input));

@@ -1,3 +1,5 @@
+use super::files::{encode_url_path, resolve_within_workspace};
+use super::http::{percent_decode, query_param};
 use super::*;
 use crate::rhei_tui::event::{
     DimensionStatus, DimensionSummary, PricingStatus, RunSummary, TaskOutcome, UsageCoverage,
@@ -44,17 +46,18 @@ fn task_row(id: &str, title: &str, state: &str, parent: Option<&str>, depth: u8)
 /// Build a `VizModel` for a loader closure, as `rhei-viz` would. `plan_state`
 /// is the pure derivation; the dashboard promotes it to `active` when a root is
 /// running.
-fn model(plan_state: &str, tasks: Vec<TaskRow>) -> VizModel {
+pub(super) fn model(plan_state: &str, tasks: Vec<TaskRow>) -> VizModel {
     VizModel {
         plan_title: Some("Demo Plan".to_string()),
         plan_state: Some(plan_state.to_string()),
         about: None,
         tasks,
         machine: Machine { name: "rhei".to_string(), states: Vec::new() },
+        gates: Default::default(),
     }
 }
 
-fn fetch_snapshot_json(dashboard: &DashboardSink) -> serde_json::Value {
+pub(super) fn fetch_snapshot_json(dashboard: &DashboardSink) -> serde_json::Value {
     let addr = dashboard.url().strip_prefix("http://").expect("loopback url");
     let mut stream = TcpStream::connect(addr).expect("connect to dashboard");
     stream
@@ -99,7 +102,7 @@ fn fetch_body_split_headers(dashboard: &DashboardSink, target: &str) -> String {
     response.split("\r\n\r\n").nth(1).unwrap_or_default().to_string()
 }
 
-fn post_json(dashboard: &DashboardSink, target: &str, body: &str) -> serde_json::Value {
+pub(super) fn post_json(dashboard: &DashboardSink, target: &str, body: &str) -> serde_json::Value {
     let addr = dashboard.url().strip_prefix("http://").expect("loopback url");
     let mut stream = TcpStream::connect(addr).expect("connect to dashboard");
     let request = format!(

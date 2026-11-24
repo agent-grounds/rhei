@@ -79,6 +79,27 @@ impl rhei_tui::GateTransitionSink for RunGateTransitionSink {
         )
         .map_err(|err| gate_release_refusal(&err))
     }
+
+    fn answers_gates(&self) -> bool {
+        true
+    }
+
+    /// The core `rhei gate answer` runs, with this run's machines and its
+    /// `--no-callbacks`. §FS-rhei-viz.5.1.2
+    fn answer_gate(
+        &self,
+        task_id: &str,
+        from: &str,
+        answers: &str,
+        dry_run: bool,
+    ) -> Result<serde_json::Value, String> {
+        let surface =
+            SurfaceAnswer { input: &self.input, machines: &self.machines, no_callbacks: self.no_callbacks };
+        let outcome = surface
+            .answer(task_id, from, answers, dry_run)
+            .map_err(|err| gate_release_refusal(&err))?;
+        serde_json::to_value(&outcome).map_err(|err| err.to_string())
+    }
 }
 
 impl ActiveRunFrontend {
@@ -407,12 +428,15 @@ fn load_plan_for_dashboard(
     // root; per-task roots route each ticket's history to its owning rhei,
     // which is where a project run writes its ledgers. §AR-rhei-panta.5
     let default_root = execution_workspace_root(plan_path);
-    rhei_viz::build_set_with_history_roots(
+    let mut model = rhei_viz::build_set_with_history_roots(
         &loaded.rhei,
         machines,
         &default_root,
         &loaded.task_roots,
-    ).map_err(|err| eprintln!("{err}")).ok()
+    ).map_err(|err| eprintln!("{err}")).ok()?;
+    // Each waiting ticket's brief, as `rhei gate show` reads it. §FS-rhei-viz.5.1.1
+    model.gates = surface_gate_briefs(&loaded, plan_path, machines);
+    Some(model)
 }
 
 impl

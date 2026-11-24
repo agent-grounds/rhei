@@ -6,6 +6,13 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
+mod gate_brief;
+
+pub use gate_brief::{
+    GateAnswerError, GateAnswerReply, GateBrief, GateDestination, GateFile, GateOption,
+    GateQuestion, GateRoute, SYNTHESIZED_SOURCE,
+};
+
 /// The self-contained Flow asset. The static path replaces [`BOOT_PLACEHOLDER`]
 /// with the inlined plan bundle; the live path serves it verbatim (the
 /// placeholder evaluates to `null`, which the JS reads as "poll `/snapshot`").
@@ -35,6 +42,10 @@ pub struct VizModel {
     pub tasks: Vec<TaskRow>,
     /// The resolved state machine, flattened for the surface. §FS-rhei-viz.8
     pub machine: Machine,
+    /// The brief of each task at a gate, by task id: what `rhei gate show
+    /// --json` prints for it. Absent when no task waits at a gate. §FS-rhei-viz.8
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub gates: BTreeMap<String, GateBrief>,
 }
 
 /// One node in the flat task list: a top-level task or any descendant.
@@ -271,6 +282,7 @@ mod tests {
                 history: vec![],
             }],
             machine: Machine { name: "rhei".into(), states: vec![] },
+            gates: BTreeMap::new(),
         }
     }
 

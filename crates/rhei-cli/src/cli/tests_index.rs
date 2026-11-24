@@ -21,6 +21,7 @@ include!("tests_task_tooling_surfaces.rs");
 include!("tests_show_target.rs");
 include!("tests_gate_view.rs");
 include!("tests_gate_release.rs");
+include!("tests_gate_surface.rs");
 include!("tests_loose_rhei_pick.rs");
 include!("tests_cancellation_roles.rs");
 include!("tests_complete_result_input.rs");

@@ -12,6 +12,7 @@
 /// not advance the task. When required outputs are missing, the warning
 /// includes the missing names.
 // §FS-rhei-agents.3.2.1: Missing-output warning contents.
+// §FS-rhei-errors.1.5.1: share the successful-worker entry refusal.
 #[allow(clippy::too_many_arguments)]
 fn emit_exit_zero_warnings(
     workspace_root: &Path,
@@ -37,13 +38,13 @@ fn emit_exit_zero_warnings(
         selected_to,
     );
     if missing.is_empty() {
-        sink.emit(rhei_tui::RunEvent::Message {
-            level: rhei_tui::MessageLevel::Warn,
-            text: format!(
-                "  warning: agent exited 0 but task {} did not advance from '{}'",
-                task_id_str, state_name
-            ),
-        });
+        emit_no_advance_warning(
+            "agent", task_id_str, state_name,
+            Some(NoAdvanceContext {
+                workspace_root, artifact_root, machine, metadata, task, state: state_name,
+            }),
+            sink,
+        );
     } else {
         emit_missing_required_outputs_warning(
             "agent",

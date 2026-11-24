@@ -353,10 +353,19 @@ fn run_sequential_program_work_items(
                     );
                     *progress.advanced_any = true;
                 } else if program_outcome.status.success() {
-                    run_warn!(
-                        "  warning: program exited 0 but task {} did not advance from '{}'",
-                        task_id_str,
-                        current_state
+                    // Share the completion-context refusal with agents and the pool.
+                    // §FS-rhei-errors.1.5.1
+                    emit_no_advance_warning(
+                        "program", task_id_str, current_state,
+                        Some(NoAdvanceContext {
+                            workspace_root,
+                            artifact_root: &reloaded.task_root(task_id_str, workspace_root),
+                            machine,
+                            metadata: reloaded.rhei.metadata.as_ref(),
+                            task: task_after.unwrap_or(task),
+                            state: current_state,
+                        }),
+                        sink,
                     );
                     progress.stalled_tasks.insert(task_id_str.clone());
                 } else {

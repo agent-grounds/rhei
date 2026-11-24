@@ -177,6 +177,14 @@ fn classify_halt(
                 .unwrap_or_default(),
         };
     }
+    // Required outputs outrank a counted destination, in this run and later
+    // runs alike; the probe also checks candidate-specific artifacts.
+    // §FS-rhei-errors.1.5.1
+    if missing.as_ref().is_none_or(|unwritten| unwritten.entries.is_empty()) {
+        if let Some(budget) = spent_destination_halt(task, rhei, machine, &state, spawns) {
+            return HaltCause::SpentDestination { budget };
+        }
+    }
     if worked {
         // The run knows exactly what the worker did not write; say so instead
         // of pointing at logs. §FS-rhei-run-report.3.1

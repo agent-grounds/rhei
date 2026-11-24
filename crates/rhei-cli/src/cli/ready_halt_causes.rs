@@ -90,6 +90,9 @@ enum HaltCause {
     ManualOnly { to: String },
     /// Non-terminal with no declared outgoing transition to take.
     NoTransition,
+    /// An otherwise eligible forward entry refused the destination's visits.
+    /// §FS-rhei-errors.1.5.1
+    SpentDestination { budget: SpentLoopBudget },
     /// The run was interrupted while this ticket's worker was in flight.
     /// Nothing about the ticket failed and nothing about it is waiting on a
     /// human: the run was stopped, and re-running it is the whole recovery.
@@ -199,6 +202,7 @@ impl HaltCause {
             | HaltCause::BlockedByPrior { .. }
             | HaltCause::Interrupted
             | HaltCause::SpentVisit { .. }
+            | HaltCause::SpentDestination { .. }
             | HaltCause::MissingInputs { .. } => false,
         }
     }
@@ -323,6 +327,12 @@ impl HaltCause {
             HaltCause::NoTransition => (
                 format!("no forward transition available from '{state}'"),
                 "declare a transition out of this state, or cancel the ticket".to_string(),
+            ),
+            // The same measured refusal as the successful worker's warning.
+            // §FS-rhei-errors.1.5.1
+            HaltCause::SpentDestination { budget } => (
+                budget.to_string(),
+                format!("raise `visits:` on state '{}', or cancel the ticket", budget.state),
             ),
             // Not "stalled", and emphatically not "mark the task cancelled":
             // the operator stopped the run, so the run says so and asks for

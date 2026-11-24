@@ -102,10 +102,10 @@ fn transition_out_of_a_gate_with_authored_questions_is_refused() {
     // Each command names the plan as every suggested command does, spelled per platform. §FS-rhei-errors.1.2.1
     assert_stderr_contains(&result, "read the brief with: rhei gate show ");
     assert_stderr_contains(&result, "answer it with: rhei gate answer ");
-    assert_stderr_contains(
-        &result,
-        "verdict.rhei.md --task verdict.1 --from review --answers <file|->",
-    );
+    // The plan's spelling ends in a quote on Windows, so its name and the
+    // arguments after it are checked apart.
+    assert_stderr_contains(&result, "verdict.rhei.md");
+    assert_stderr_contains(&result, " --task verdict.1 --from review --answers <file|->");
     assert_eq!(fx.state_of("verdict.1"), "review");
 
     fx.enter("verdict.2", "vetting");

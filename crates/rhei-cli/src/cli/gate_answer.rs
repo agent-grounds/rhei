@@ -222,6 +222,9 @@ fn answer_gate(scene: &GateAnswerScene<'_>, outcome: &mut GateAnswerOutcome) -> 
     if !outcome.errors.is_empty() {
         return Ok(());
     }
+    // Known once the answers hold, so an `unrouted` refusal carries it too. §FS-rhei-gate-cmd.3.2
+    let rendered = rhei_core::gate::render_answers(&view.brief, &document.answers, &answer_path);
+    outcome.result = Some(rendered.clone());
     let (to, route) = match rhei_core::gate::pick_destination(&view.brief, &document.answers) {
         Ok(picked) => picked,
         Err(error) => {
@@ -229,8 +232,7 @@ fn answer_gate(scene: &GateAnswerScene<'_>, outcome: &mut GateAnswerOutcome) -> 
             return Ok(());
         }
     };
-    let rendered = rhei_core::gate::render_answers(&view.brief, &document.answers, &answer_path);
-    (outcome.to, outcome.route, outcome.result) = (Some(to.clone()), route.clone(), Some(rendered.clone()));
+    (outcome.to, outcome.route) = (Some(to.clone()), route.clone());
     let answered_by = match invoking_os_account() {
         Ok(account) => account,
         Err(message) => {

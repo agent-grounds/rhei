@@ -206,7 +206,22 @@ fn complete_command(
             current_state_raw
         ));
     }
-    if machine.states.get(&current_state).map(|def| def.gating).unwrap_or(false) {
+    if let Some(gate) = machine.states.get(&current_state).filter(|def| def.gating) {
+        // A gate with authored required questions is answered, and `rhei transition`
+        // would refuse it, so the help names the gate's own commands. §FS-rhei-complete.4
+        let root = loaded.task_route(task_id_str, input).execution_root;
+        let asked = gate_authored_required(&root, Some(task), task_id_str, &current_state, gate);
+        if asked > 0 {
+            return Err(miette!(
+                help = gate_answer_help(task_id_str, &current_state),
+                "Task {} cannot be completed from gating state '{}', whose brief asks {} required \
+                 {}; answer it instead",
+                task_id_str,
+                current_state,
+                asked,
+                if asked == 1 { "question" } else { "questions" }
+            ));
+        }
         return Err(miette!(
             help = format!(
                 "a human gate is released explicitly: {}",

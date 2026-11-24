@@ -163,3 +163,70 @@ fn a_machine_with_a_broken_gate_block_does_not_load() {
         "a machine that fails to load is refused before anything is read"
     );
 }
+
+/// `write` writes a request no gate accepts and counts its own attempts; with
+/// `declared`, the request is also the state's declared output.
+fn bad_request_writer(prefix: &str, declared: bool) -> GateFixture {
+    let fx = gate_fixture(prefix);
+    let root = fx.root().to_path_buf();
+    let agent = write_python_agent(
+        &root,
+        "writer.py",
+        "root = pathlib.Path(env('RHEI_ROOT'))\nappend(root / 'attempts.log', 'write\\n')\n\
+         write(root / 'runtime/gates' / (env('RHEI_TASK_ID') + '.request.json'), \
+         '{\"version\": 2, \"questions\": [{\"id\": \"approve\", \"kind\": \"nope\"}]}')\n\
+         result('## Result\\n\\nWrote the request.\\n')\n",
+    );
+    let output = if declared {
+        "\n    outputs: [{ name: request, path: \"runtime/gates/{task_id}.request.json\" }]"
+    } else {
+        ""
+    };
+    let machine = GATE_MACHINE
+        .replace(
+            "  drafting:\n    description: The agent drafts the verdict",
+            &format!("  write:\n    description: Write the request\n    agent: fake\n    instructions: Write it.{output}\n  drafting:\n    description: The agent drafts the verdict"),
+        )
+        .replace("  - {from: drafting, to: review}", "  - {from: drafting, to: review}\n  - {from: write, to: review}");
+    fx.write("states.yaml", &machine);
+    fx.write(
+        "verdict.rhei.md",
+        "# Rhei: Verdict\n\n## Tasks\n\n### Task 1: Write the request\n**State:** write\n",
+    );
+    let command: serde_json::Value =
+        serde_json::from_str(&fixture_command(&agent)).expect("command");
+    let settings = serde_json::json!({ "agents": { "fake": { "command": command, "stdin_prompt": true, "timeout": "30s" } } });
+    fx.write(".agent-grounds/rhei/settings.json", &settings.to_string());
+    fx
+}
+
+fn attempts(fx: &GateFixture) -> usize {
+    fs::read_to_string(fx.root().join("attempts.log")).unwrap_or_default().lines().count()
+}
+
+/// Under `rhei run` a request that does not hold stalls the ticket in the
+/// writer's state with every problem, and the run spends no further attempt
+/// on it; a later run tries again only while the visit's completion condition
+/// is unmet, which a declared request meets. §FS-rhei-gate-brief.2
+#[test]
+fn a_run_stalls_a_bad_request_in_the_writer_state() {
+    for (prefix, declared, again) in [("gate-run-bad", false, 2), ("gate-run-bad-output", true, 1)]
+    {
+        let fx = bad_request_writer(prefix, declared);
+        let first = fx.rhei(&["run", "verdict.rhei.md", "--no-tui"]);
+        assert_eq!(first.status.code(), Some(1), "{}", first.stderr);
+        let said = format!("{}{}", first.stdout, first.stderr);
+        assert!(said.contains("could not auto-advance from 'write'"), "{said}");
+        assert!(
+            said.contains("`version` is 2") && said.contains("'nope'"),
+            "every problem:\n{said}"
+        );
+        assert_eq!((attempts(&fx), fx.state_of("verdict.1")), (1, "write".to_string()));
+
+        let second = fx.rhei(&["run", "verdict.rhei.md", "--no-tui"]);
+        assert_eq!(second.status.code(), Some(1), "{}", second.stderr);
+        assert_eq!(attempts(&fx), again, "declared: {declared}");
+        assert_eq!(fx.state_of("verdict.1"), "write");
+        assert!(!fx.root().join("runtime/gates/verdict.1").exists(), "no gate was entered");
+    }
+}

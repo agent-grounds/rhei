@@ -247,14 +247,26 @@ pub fn render_answers(
                 items.iter().filter_map(Value::as_str).map(label).collect::<Vec<_>>().join(", ")
             }
             (QuestionKind::Choice, Value::String(chosen)) => label(chosen),
-            (_, Value::String(text)) => text.trim().to_string(),
+            (_, Value::String(text)) => text.to_string(),
             (_, other) => other.to_string(),
         };
+        let rendered = one_line(&rendered);
         if rendered.is_empty() {
             continue;
         }
-        lines.push(format!("{}: {rendered}", question.prompt.trim()));
+        lines.push(format!("{}: {rendered}", one_line(&question.prompt)));
     }
     lines.push(format!("Answer: {answer_path}"));
     lines.join("\n")
+}
+
+/// `text` with each line break, and the blank around it, folded into one
+/// space, so an answered question stays one line of the result.
+/// §FS-rhei-gate-brief.7.2
+fn one_line(text: &str) -> String {
+    text.split(['\n', '\r', '\u{0b}', '\u{0c}', '\u{85}', '\u{2028}', '\u{2029}'])
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ")
 }

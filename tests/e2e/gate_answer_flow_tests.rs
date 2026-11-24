@@ -139,6 +139,12 @@ fn an_answer_no_route_takes_is_unrouted() {
         json!([{ "kind": "unrouted", "question": null, "message": outcome["errors"][0]["message"] }])
     );
     assert_matches_schema(&gate_schema(&fx, "result"), &outcome, "an unrouted answer");
+    // The answers held, so they are rendered; only the destination is unknown. §FS-rhei-gate-cmd.3.2
+    assert_eq!((&outcome["to"], &outcome["route"]), (&Value::Null, &Value::Null));
+    assert_eq!(
+        outcome["result"],
+        "Which one?: c\nAnswer: runtime/gates/pick.1/choose.1.answer.json"
+    );
     assert!(!fx.root().join("runtime/gates").exists());
     assert_eq!(fx.state_of("pick.1"), "choose");
 }

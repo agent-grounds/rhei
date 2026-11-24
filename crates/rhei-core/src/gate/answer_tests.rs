@@ -178,3 +178,18 @@ fn the_result_names_each_answer_by_its_prompt_and_label_then_the_file() {
     let short = render_answers(&brief, &map(json!({ "approve": false, "note": "" })), "a.json");
     assert_eq!(short, "Ask approve?: no\nAnswer: a.json", "an empty answer is not a line");
 }
+
+// A multi-line text answer, or a prompt with a break in it, is still one line
+// of the result; the recorded answer keeps it as written. §FS-rhei-gate-brief.7.2
+#[test]
+fn line_breaks_fold_so_each_answered_question_is_one_line() {
+    let mut brief = routed_brief();
+    brief.questions[3].prompt = "Anything\n  else?".into();
+    let answers = map(json!({ "approve": true, "note": "line one\r\n\n  line two\u{2028}three " }));
+    let rendered = render_answers(&brief, &answers, "a.json");
+    assert_eq!(
+        rendered,
+        "Ask approve?: yes\nAnything else?: line one line two three\nAnswer: a.json"
+    );
+    assert_eq!(rendered.lines().count(), 3, "two answers and the file");
+}

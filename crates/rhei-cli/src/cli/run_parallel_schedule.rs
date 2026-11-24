@@ -1,11 +1,12 @@
 // How much of the pass runs at once and which items get the capacity: the
 // initial fill from the pass batch, the release of a finished worker's slot,
-// and the refill that re-reads the live ready set when capacity frees up.
+// and the refill that re-reads the live ready set when capacity frees up —
+// and the non-concurrent key all three, and the pass's first fill, admit by.
 //
 // Its own part because capacity is the one decision every parallel invocation
 // shares, while spawning next door concerns a single item.
 
-// §AR-source-file-size.3 §FS-rhei-run.3
+// §AR-source-file-size.3 §FS-rhei-run.3 §FS-rhei-run.5.2.1
 
 struct ParallelScheduleOutcome {
     spawned: usize,
@@ -40,7 +41,7 @@ fn schedule_agent_work_items(
     free_slots: &mut BTreeSet<rhei_tui::Slot>,
     next_extra_slot: &mut rhei_tui::Slot,
     active_invocation_counts: &mut HashMap<String, usize>,
-    active_state_counts: &mut HashMap<String, usize>,
+    nonconcurrent_in_flight: &mut NonConcurrentInFlight,
     handles: &mut Vec<std::thread::JoinHandle<()>>,
 ) -> MietteResult<ParallelScheduleOutcome> {
     let mut selected_task_ids = HashSet::new();
@@ -86,15 +87,7 @@ fn schedule_agent_work_items(
         )? {
             ParallelAgentSpawnOutcome::Spawned(spawned_agent) => {
                 *active_invocation_counts.entry(spawned_agent.task_id_str.clone()).or_insert(0) += 1;
-                if !machines
-                    .for_task_str(&spawned_agent.task_id_str)
-                    .states
-                    .get(&spawned_agent.state_name)
-                    .map(|state| state.concurrent)
-                    .unwrap_or(false)
-                {
-                    *active_state_counts.entry(spawned_agent.state_name.clone()).or_insert(0) += 1;
-                }
+                nonconcurrent_in_flight.hold(machines, &spawned_agent.task_id_str, &spawned_agent.state_name);
                 handles.push(spawned_agent.handle);
                 spawned += 1;
             }
@@ -130,7 +123,7 @@ fn schedule_program_work_items(
     free_slots: &mut BTreeSet<rhei_tui::Slot>,
     next_extra_slot: &mut rhei_tui::Slot,
     active_invocation_counts: &mut HashMap<String, usize>,
-    active_state_counts: &mut HashMap<String, usize>,
+    nonconcurrent_in_flight: &mut NonConcurrentInFlight,
     handles: &mut Vec<std::thread::JoinHandle<()>>,
 ) -> MietteResult<ParallelScheduleOutcome> {
     let mut selected_task_ids = HashSet::new();
@@ -167,15 +160,7 @@ fn schedule_program_work_items(
                 *active_invocation_counts
                     .entry(spawned_program.task_id_str.clone())
                     .or_insert(0) += 1;
-                if !machines
-                    .for_task_str(&spawned_program.task_id_str)
-                    .states
-                    .get(&spawned_program.state_name)
-                    .map(|state| state.concurrent)
-                    .unwrap_or(false)
-                {
-                    *active_state_counts.entry(spawned_program.state_name.clone()).or_insert(0) += 1;
-                }
+                nonconcurrent_in_flight.hold(machines, &spawned_program.task_id_str, &spawned_program.state_name);
                 handles.push(spawned_program.handle);
                 spawned += 1;
             }
@@ -195,7 +180,7 @@ fn release_parallel_worker(
     slot: rhei_tui::Slot,
     free_slots: &mut BTreeSet<rhei_tui::Slot>,
     active_invocation_counts: &mut HashMap<String, usize>,
-    active_state_counts: &mut HashMap<String, usize>,
+    nonconcurrent_in_flight: &mut NonConcurrentInFlight,
 ) {
     free_slots.insert(slot);
     if let Some(count) = active_invocation_counts.get_mut(task_id_str) {
@@ -204,12 +189,7 @@ fn release_parallel_worker(
             active_invocation_counts.remove(task_id_str);
         }
     }
-    if let Some(count) = active_state_counts.get_mut(state_name) {
-        *count = count.saturating_sub(1);
-        if *count == 0 {
-            active_state_counts.remove(state_name);
-        }
-    }
+    nonconcurrent_in_flight.release(task_id_str, state_name);
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -232,7 +212,7 @@ fn refill_parallel_worker_pool(
     free_slots: &mut BTreeSet<rhei_tui::Slot>,
     next_extra_slot: &mut rhei_tui::Slot,
     active_invocation_counts: &mut HashMap<String, usize>,
-    active_state_counts: &mut HashMap<String, usize>,
+    nonconcurrent_in_flight: &mut NonConcurrentInFlight,
     handles: &mut Vec<std::thread::JoinHandle<()>>,
     identity: &RunIdentity,
 ) -> MietteResult<ParallelScheduleOutcome> {
@@ -265,7 +245,6 @@ fn refill_parallel_worker_pool(
     let machines = &live.machines;
     let settings = &live.settings;
     let active_task_ids = active_invocation_counts.keys().cloned().collect::<HashSet<_>>();
-    let active_nonconcurrent_states = active_state_counts.keys().cloned().collect::<HashSet<_>>();
     let (mut program_items, program_deferred) = collect_ready_program_work_items(
         &reloaded,
         machines,
@@ -274,7 +253,7 @@ fn refill_parallel_worker_pool(
         workspace_root,
         runtime_dir,
         &active_task_ids,
-        &active_nonconcurrent_states,
+        nonconcurrent_in_flight,
     )?;
     // A ticket whose worker finished this pass without moving it is still
     // "ready", so refilling from the ready set alone re-spawns it forever.
@@ -306,7 +285,7 @@ fn refill_parallel_worker_pool(
         free_slots,
         next_extra_slot,
         active_invocation_counts,
-        active_state_counts,
+        nonconcurrent_in_flight,
         handles,
     )?;
 
@@ -321,7 +300,6 @@ fn refill_parallel_worker_pool(
 
     let reloaded = load_run_plan(input)?;
     let active_task_ids = active_invocation_counts.keys().cloned().collect::<HashSet<_>>();
-    let active_nonconcurrent_states = active_state_counts.keys().cloned().collect::<HashSet<_>>();
     let (mut agent_items, agent_deferred) = collect_ready_agent_work_items(
         &reloaded,
         machines,
@@ -330,7 +308,7 @@ fn refill_parallel_worker_pool(
         workspace_root,
         runtime_dir,
         &active_task_ids,
-        &active_nonconcurrent_states,
+        nonconcurrent_in_flight,
         sink,
     )?;
     agent_items.retain(|item| !stalled.contains(&item.task_id_str));
@@ -369,7 +347,7 @@ fn refill_parallel_worker_pool(
         free_slots,
         next_extra_slot,
         active_invocation_counts,
-        active_state_counts,
+        nonconcurrent_in_flight,
         handles,
     )?;
 
@@ -380,4 +358,106 @@ fn refill_parallel_worker_pool(
         advanced: program_outcome.advanced || agent_outcome.advanced,
         skipped,
     })
+}
+
+
+/// One non-concurrent state of one machine source. Two tickets share a limit
+/// only when both parts match: the state's name alone is not the state, since
+/// a same-named state of another source is another state. The source is the
+/// canonical path of the file the ticket's machine resolved from (`None` for
+/// the built-in default), so two spellings of one file are one source and two
+/// identical files are two. §FS-rhei-run.5.2.1
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+struct NonConcurrentState {
+    source: Option<PathBuf>,
+    state: String,
+}
+
+impl ExecutionMachines {
+    /// The non-concurrent state a ticket in `state` occupies, or `None` when
+    /// its own machine marks the state `concurrent`. The flag and the source
+    /// both come from the ticket's own machine. §FS-rhei-run.5.2.1 §FS-rhei-states.1.2
+    fn nonconcurrent_state(&self, task_id: &str, state: &str) -> Option<NonConcurrentState> {
+        let concurrent = self
+            .for_task_str(task_id)
+            .states
+            .get(state)
+            .map(|def| def.concurrent)
+            .unwrap_or(false);
+        (!concurrent).then(|| NonConcurrentState {
+            // The callback paths carry the canonical machine path each rhei
+            // resolved, kept for a drifted member like its machine.
+            source: self.callbacks_for_str(task_id).state_machine_path.clone(),
+            state: state.to_string(),
+        })
+    }
+}
+
+/// One admission round's claims: the first ticket into a non-concurrent state
+/// holds it for the round, and a state already in flight admits nobody.
+/// Fan-out invocations of the claimant stay together. §FS-rhei-run.5.2 §FS-rhei-run.5.2.1
+#[derive(Default)]
+struct NonConcurrentClaims {
+    in_flight: HashSet<NonConcurrentState>,
+    claimant: HashMap<NonConcurrentState, String>,
+}
+
+impl NonConcurrentClaims {
+    /// Claims for a refill, which also waits behind the work still running.
+    fn behind(in_flight: &NonConcurrentInFlight) -> Self {
+        Self { in_flight: in_flight.states(), claimant: HashMap::new() }
+    }
+
+    /// Whether `task_id` in `state` may start in this round; `false` defers it.
+    fn admit(&mut self, machines: &ExecutionMachines, task_id: &str, state: &str) -> bool {
+        let Some(key) = machines.nonconcurrent_state(task_id, state) else {
+            return true;
+        };
+        if self.in_flight.contains(&key) {
+            return false;
+        }
+        match self.claimant.get(&key) {
+            Some(claimant) => claimant == task_id,
+            None => {
+                self.claimant.insert(key, task_id.to_string());
+                true
+            }
+        }
+    }
+}
+
+/// The non-concurrent work in flight. Each spawn is recorded under the key it
+/// was admitted with, so its release frees exactly that state even if the
+/// machines are re-resolved meanwhile. §FS-rhei-run.5.2.1
+#[derive(Default)]
+struct NonConcurrentInFlight {
+    /// (ticket, state) → the key it holds and how many of its invocations run.
+    held: HashMap<(String, String), (NonConcurrentState, usize)>,
+}
+
+impl NonConcurrentInFlight {
+    /// Record one spawn of `task_id` in `state`, if that state is non-concurrent.
+    fn hold(&mut self, machines: &ExecutionMachines, task_id: &str, state: &str) {
+        if let Some(key) = machines.nonconcurrent_state(task_id, state) {
+            self.held
+                .entry((task_id.to_string(), state.to_string()))
+                .or_insert((key, 0))
+                .1 += 1;
+        }
+    }
+
+    /// Release one finished spawn of `task_id` in `state`.
+    fn release(&mut self, task_id: &str, state: &str) {
+        let at = (task_id.to_string(), state.to_string());
+        if let Some((_, count)) = self.held.get_mut(&at) {
+            *count = count.saturating_sub(1);
+            if *count == 0 {
+                self.held.remove(&at);
+            }
+        }
+    }
+
+    fn states(&self) -> HashSet<NonConcurrentState> {
+        self.held.values().map(|(key, _)| key.clone()).collect()
+    }
 }

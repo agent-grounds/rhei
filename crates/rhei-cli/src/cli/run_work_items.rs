@@ -336,11 +336,12 @@ fn collect_ready_agent_work_items(
     workspace_root: &Path,
     runtime_dir: &Path,
     active_task_ids: &HashSet<String>,
-    active_nonconcurrent_states: &HashSet<String>,
+    in_flight: &NonConcurrentInFlight,
     sink: &Arc<dyn rhei_tui::EventSink>,
 ) -> MietteResult<(Vec<AgentWorkItem>, Vec<String>)> {
     let mut agent_tasks = Vec::new();
-    let mut state_claimant: HashMap<String, String> = HashMap::new();
+    // Waits behind in-flight work per (machine source, state). §FS-rhei-run.5.2.1
+    let mut claims = NonConcurrentClaims::behind(in_flight);
     let mut deferred: BTreeSet<String> = BTreeSet::new();
 
     // §FS-rhei-panta.6.1: `--rhei` narrows candidates, not prior resolution.
@@ -432,22 +433,9 @@ fn collect_ready_agent_work_items(
             ensure_orchestrator_timeout(resolved, &current_state)?;
         }
 
-        let is_concurrent = state_def.concurrent;
-        if !is_concurrent && active_nonconcurrent_states.contains(&current_state) {
+        if !claims.admit(machines, &task_id_str, &current_state) {
             deferred.insert(task_id_str);
             continue;
-        }
-        if !is_concurrent {
-            match state_claimant.get(&current_state) {
-                Some(claimant) if claimant == &task_id_str => {}
-                Some(_) => {
-                    deferred.insert(task_id_str);
-                    continue;
-                }
-                None => {
-                    state_claimant.insert(current_state.clone(), task_id_str.clone());
-                }
-            }
         }
 
         for resolved in pending {
@@ -471,10 +459,11 @@ fn collect_ready_program_work_items(
     workspace_root: &Path,
     runtime_dir: &Path,
     active_task_ids: &HashSet<String>,
-    active_nonconcurrent_states: &HashSet<String>,
+    in_flight: &NonConcurrentInFlight,
 ) -> MietteResult<(Vec<ProgramWorkItem>, Vec<String>)> {
     let mut program_tasks = Vec::new();
-    let mut state_claimant: HashMap<String, String> = HashMap::new();
+    // Waits behind in-flight work per (machine source, state). §FS-rhei-run.5.2.1
+    let mut claims = NonConcurrentClaims::behind(in_flight);
     let mut deferred: BTreeSet<String> = BTreeSet::new();
 
     // §FS-rhei-panta.6.1: `--rhei` narrows candidates, not prior resolution.
@@ -508,22 +497,9 @@ fn collect_ready_program_work_items(
             continue;
         };
 
-        let is_concurrent = state_def.concurrent;
-        if !is_concurrent && active_nonconcurrent_states.contains(&current_state) {
+        if !claims.admit(machines, &task_id_str, &current_state) {
             deferred.insert(task_id_str);
             continue;
-        }
-        if !is_concurrent {
-            match state_claimant.get(&current_state) {
-                Some(claimant) if claimant == &task_id_str => {}
-                Some(_) => {
-                    deferred.insert(task_id_str);
-                    continue;
-                }
-                None => {
-                    state_claimant.insert(current_state.clone(), task_id_str.clone());
-                }
-            }
         }
 
         program_tasks.push(ProgramWorkItem {

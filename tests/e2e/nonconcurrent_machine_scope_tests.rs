@@ -198,7 +198,6 @@ fn write_settings(root: &Path, command: &str) {
 /// non-concurrent agent state `polish`: both start in the first fill and run
 /// side by side. §FS-rhei-run.5.2.1
 #[test]
-#[ignore = "red until #759: beta.deliver is deferred behind alpha.deliver's same-named polish; implement removes this"]
 fn same_named_agent_states_of_two_machines_start_together() {
     let ran = run_project(
         "nonconcurrent-agents",
@@ -223,7 +222,6 @@ fn same_named_agent_states_of_two_machines_start_together() {
 /// The same for a program state: `collect` in two machines is two states.
 /// §FS-rhei-run.5.2.1
 #[test]
-#[ignore = "red until #759: beta.collect is deferred behind alpha.collect's same-named program state; implement removes this"]
 fn same_named_program_states_of_two_machines_start_together() {
     let ran = run_project(
         "nonconcurrent-programs",
@@ -249,7 +247,6 @@ fn same_named_program_states_of_two_machines_start_together() {
 /// `alpha.deliver` is still in `alpha`'s `polish`, and starts at once rather
 /// than after it. §FS-rhei-run.5.2.1
 #[test]
-#[ignore = "red until #759: the refill defers beta.deliver's polish behind alpha.deliver's; implement removes this"]
 fn a_ticket_entering_a_same_named_state_of_its_own_machine_starts_in_the_refill() {
     let ran = run_project(
         "nonconcurrent-refill",

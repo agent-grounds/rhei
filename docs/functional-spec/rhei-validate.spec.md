@@ -108,7 +108,9 @@ error naming its line
    decidable property of the effective agent binding, so it is decided here
    rather than at the spawn that consumes it.
 4. Validate snapshot plan context and report orphaned snapshot diagnostics as
-   warnings when a snapshot cache exists. [§FS-rhei-snapshot-operations](rhei-snapshot-operations.spec.md#fs-rhei-snapshot-operations-rhei-snapshot-operations-specification)
+   warnings when a snapshot cache exists, presented as
+   [§FS-rhei-validate.4.7](rhei-validate.spec.md#47-orphaned-snapshots-when-a-project-member-is-named).
+   [§FS-rhei-snapshot-operations](rhei-snapshot-operations.spec.md#fs-rhei-snapshot-operations-rhei-snapshot-operations-specification)
 5. Report every ticket that reached a successful terminal state while one of
    its `**Prior:**` dependencies is still unsatisfied as a **warning** naming
    the ticket and each blocking prior with its state. Such a plan contradicts
@@ -435,6 +437,38 @@ before anything is charged. It checks the book the run selected, so a `--prices`
 book is the one named. `rhei run --no-agent` resolves no agent invocation and
 checks nothing. A run keeps its existing fatal refusals for a book it cannot
 read; it does not warn about one.
+
+### 4.7. Orphaned snapshots when a project member is named
+
+Naming a member of a Panta project still loads and validates the whole project
+as [§FS-rhei-validate.1.1](rhei-validate.spec.md#11-why-there-is-no---rhei) requires. Only the presentation of snapshot cache-hygiene
+warnings changes: emit one detail warning per orphaned snapshot owned by the
+named rhei, followed by one combined warning for all other rheis' orphaned
+snapshots, when any exist. The combined warning states the total record count
+and each owning rhei's count, ordered by rhei id. It emits no per-record detail
+for those other rheis. An empty other-rhei set produces no combined warning;
+an empty own set produces no own detail. Live snapshots produce neither.
+
+Ownership comes from the project-qualified snapshot task identity, including
+deleted tickets, rather than requiring a live ticket. A record whose owner
+cannot safely be attributed retains its individual warning. Orphan status
+continues to be judged under the owning ticket's resolved state machine.
+
+The combined warning includes a read-only `rhei snapshot list` command with
+`--orphaned --produced-by all`, using the existing options of
+[§FS-rhei-snapshot-operations.1.2](rhei-snapshot-operations.spec.md#12-rhei-snapshot-list). Executed from the validation caller's working directory,
+the command must reach the same project cache and list every counted record,
+including operator-produced records. It may also list the named rhei's orphans.
+Supply project context with the existing `--plan` option when needed; do not
+recommend garbage collection to inspect other rheis' records. Exact summary
+prose is not prescribed.
+
+Equivalent member directory and index paths, including an omitted target
+resolved inside that member, use the same presentation. Each watch pass follows
+the same rule. A whole-project target or a standalone rhei keeps one detail
+warning per orphan. This changes no validation scope, graph/load/resolution
+diagnostic, orphan classification, warning severity, exit status, cache contents
+or structured-output contract.
 
 ## 5. Watch Mode
 

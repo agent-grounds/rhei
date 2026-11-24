@@ -487,6 +487,8 @@ mod until_idle_record_tests;
 mod until_idle_support;
 mod validate_parallel_layout_tests;
 mod validate_retry_cache_tests;
+mod validate_snapshot_orphan_support;
+mod validate_snapshot_orphan_tests;
 mod validation_override_support;
 mod validation_override_tests;
 mod validation_source_tests;

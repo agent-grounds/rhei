@@ -393,7 +393,7 @@ surroundings model of [§FS-rhei-viz.4](rhei-viz.spec.md#4-surroundings-inspecto
 | `h` / `l`, `←` / `→` | previous / next view |
 | `Tab` | (Flow) toggle focus between outline and inspector |
 | `PgUp` / `PgDn` | scroll the focused pane |
-| `Enter` | (inspector header) open its items; (inspector item) activate it; (Flow outline on gating task) open gate choices; (Flow outline on a folded parent) expand its subtree in place |
+| `Enter` | (inspector header) open its items; (inspector item) activate it; (Flow outline on gating task) open the gate block; (Flow outline on a folded parent) expand its subtree in place |
 | `Esc` | close an open inspector section or clear the active modal/filter |
 | `/` | filter the active view (`Flow`/task-cost rows by id, title, or state; `Machine` by state/task text; `Journal` by line text); `Esc` clears |
 | `g` | (Cost) cycle grouping: task → agent → model → state |
@@ -466,17 +466,39 @@ browser, not separate mutation paths ([§FS-rhei-viz.5](rhei-viz.spec.md#5-runni
   whose agent is reachable through the intervention sink. `Enter` sends, `Esc`
   cancels, and delivery/failure is echoed in the journal. Intervene never edits
   or transitions the plan.
-- **Human gate** — `Enter` on a selected live task in a `gating` state opens the
-  state's explicit outgoing transitions as digit choices. Picking one opens the
-  same one-line composer intervene uses, this time for the transition's **result
-  message**: `Enter` submits the choice through the gate sink carrying whatever
-  was typed, an empty line submits with no message, and `Esc` cancels the move
-  entirely. The composer is labelled with the chosen `from → to` and says when
-  the target is terminal, because that is the case a blank line can be refused
-  on — only when the ticket has no result of its own, which is why the hint
-  reads as a condition and not a rule ([§FS-rhei-states.3.3](rhei-states.spec.md#33-terminal-result)). The TUI does not
-  pre-judge it either: it lets the server
-  answer and echoes the reason in the journal, the same as any other rejection.
+- **Human gate** — `Enter` on a selected live task in a `gating` state opens
+  its **gate block**. The block renders the brief the dashboard renders
+  ([§FS-rhei-viz.5.1.1](rhei-viz.spec.md#511-the-brief)), from the same model: the title with the ticket, gate state, visit
+  and since; the summary; the display file's path and whether it can be read,
+  followed by a bounded head excerpt of its content under the inspector's
+  artifact excerpt rule ([§FS-rhei-run-tui.1.5.3](rhei-run-tui.spec.md#153-flow-view-default)), read against the ticket's execution
+  root; the attachments; the questions with their kinds, required marks and
+  options; the destinations and the routes; and a degraded brief's problems.
+  What the block then takes follows the dashboard ([§FS-rhei-viz.5.1.2](rhei-viz.spec.md#512-answering-a-briefed-gate), [§FS-rhei-viz.5.1.3](rhei-viz.spec.md#513-releasing-a-plain-gate)), and
+  `Esc` closes it.
+  - At a **briefed gate** the block is a form. `↑`/`↓` or `Tab`/`Shift+Tab`
+    move between questions. A `boolean` takes `y`, `n` or `Space`; a `choice`
+    takes `←`/`→` or its option's digit; a `multi` moves among its options with
+    `←`/`→` and toggles one with `Space` or its digit; a `text` takes typed
+    characters and `Backspace`; `Delete` clears the focused answer. `Enter`
+    asks the gate sink for a dry run and shows `this moves <ticket> to
+    <state>`; `Enter` again answers, and `Esc` returns to the form. Both go
+    through the gate sink to the core `rhei gate answer` uses. A refusal stays
+    in the form, beside its question when it names one, with the answers kept,
+    and is echoed in the journal; an answer that lands closes the block and is
+    journalled with its move.
+  - At a **plain gate** the block numbers the state's explicit outgoing
+    transitions as digit choices. Picking one opens the same one-line composer
+    intervene uses, this time for the transition's **result message**: `Enter`
+    submits the choice through the gate sink carrying whatever was typed, an
+    empty line submits with no message, and `Esc` cancels the move entirely.
+    The composer is labelled with the chosen `from → to` and says when the
+    target is terminal, because that is the case a blank line can be refused
+    on — only when the ticket has no result of its own, which is why the hint
+    reads as a condition and not a rule ([§FS-rhei-states.3.3](rhei-states.spec.md#33-terminal-result)). The TUI does not
+    pre-judge it either: it lets the server answer and echoes the reason in the
+    journal, the same as any other rejection.
+
   Frozen/static surfaces offer no working controls. Interactive runs stay alive
   for non-terminal human gates when the remaining work is gate-blocked or
   poll-blocked; a pending gate remains responsive instead of being hidden behind

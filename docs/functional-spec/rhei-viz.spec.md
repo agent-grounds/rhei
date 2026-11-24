@@ -56,7 +56,7 @@ fixtures `examples/inflight-dashboard` and `examples/disjoint-tracks`.
 
 - No general plan editing, mutation, transitioning, or diff mode from the
   surface. It is read-only with respect to plan state except for the narrow live
-  human-gate transition action in [§FS-rhei-viz.5.1](rhei-viz.spec.md#51-human-gate-transitions): open-in-editor spawns the operator's
+  human-gate actions in [§FS-rhei-viz.5.1](rhei-viz.spec.md#51-human-gate-transitions), the answer and the release: open-in-editor spawns the operator's
   editor ([§FS-rhei-viz.11](rhei-viz.spec.md#11-open-in-editor-route)) and intervene messages a running agent ([§FS-rhei-viz.5](rhei-viz.spec.md#5-running-execution-view)), but neither writes or
   advances the plan.
 - No remote deployment. The live surface is loopback-only; the static surface is
@@ -280,14 +280,91 @@ illustrative and are not delivered.
 
 ### 5.1. Human Gate Transitions
 
-When the selected node's current machine state is `gating: true`, the live
-dashboard may offer a **Human gate** action block. The block lists the state's
-explicit outgoing transitions as human choices and submits the selected task,
-`from` state, and `to` state to the run's loopback server. The server must apply
-the same explicit human-transition semantics as `rhei transition`: compare the
-task's current state to `from`, validate that `to` is a legal outgoing
-transition, honor callbacks and callback redirects, write the plan through the
-normal atomic transition path, and report the effective target state.
+When the selected node's current machine state is `gating: true`, the dashboard
+shows a **Human gate** block. It renders the gate's brief for every gate
+([§FS-rhei-viz.5.1.1](rhei-viz.spec.md#511-the-brief)), then takes what that brief asks for: an answer at a briefed gate
+([§FS-rhei-viz.5.1.2](rhei-viz.spec.md#512-answering-a-briefed-gate)), or a release at a plain one ([§FS-rhei-viz.5.1.3](rhei-viz.spec.md#513-releasing-a-plain-gate)).
+
+The answer and the release are the only plan-state mutations allowed from the
+dashboard. Both are available only while the loopback dashboard is live and
+only for tasks currently in a gating state. The static and frozen surfaces
+render the brief in full and its controls as inert inspection affordances, not
+as working controls. Intervene remains separate: it messages a running agent
+and never transitions or edits the plan ([§FS-rhei-viz.5](rhei-viz.spec.md#5-running-execution-view)).
+
+#### 5.1.1. The Brief
+
+The block leads with the brief `rhei gate show` resolves ([§FS-rhei-gate-cmd.2.1](rhei-gate-cmd.spec.md#21-output---json)), built by
+the same code, so a plain gate shows its synthesized brief ([§FS-rhei-gate-brief.4.1](rhei-gate-brief.spec.md#41-synthesized-questions)) and
+every gate renders through one path. It shows:
+
+- the title, with the ticket, its gate state, the visit, and since when it
+  waits — an unknown `since` reads as unknown, never as zero;
+- the summary;
+- the display file: its path, whether it can be read and, when it cannot, the
+  problem. A live page opens it in the operator's editor through the open route
+  ([§FS-rhei-viz.11](rhei-viz.spec.md#11-open-in-editor-route)), as it opens an artifact; the page shows no file's content, here or
+  anywhere else;
+- the attachments, each the same way;
+- the questions in order, each with its kind, whether it is required, its
+  prompt and help, and a `choice` or `multi` question's options with their
+  labels and descriptions;
+- the destinations, each with its description, edge condition and final mark,
+  and the routes in the order they are tried, each with the answers it matches;
+- a degraded brief's problems ([§FS-rhei-gate-brief.4.2](rhei-gate-brief.spec.md#42-degraded-brief)), so the operator sees why a gate
+  with a `gate:` block asks only for a destination and a reason.
+
+The host builds the brief and carries it in the model ([§FS-rhei-viz.8](rhei-viz.spec.md#8-data-contract)); the page never
+reads a request file or a states file. A brief whose digest changes while the
+block is open — a new visit, a rewritten request — redraws the block.
+
+#### 5.1.2. Answering a Briefed Gate
+
+Where the brief's questions are authored — its `source` is `request` or
+`questions` — the block is a form and takes an answer, never a release. It
+draws one control per question: a yes/no pair for `boolean`, one pick among the
+options for `choice`, a checkbox per option for `multi`, and a text field for
+`text`. Nothing is preselected, so a required question the operator skipped is
+refused rather than answered on their behalf.
+
+Submitting posts the answers, the digest the block rendered, the task, and its
+gate state to the run's loopback server as a **dry run** first. The block shows
+the destination the dry run reports, `this moves <ticket> to <state>`, and
+answers only once the operator confirms, by posting the same answers again
+without the dry run. Both posts take the path `rhei gate answer` takes
+([§FS-rhei-gate-cmd.3](rhei-gate-cmd.spec.md#3-rhei-gate-answer)): one core checks the answers against the brief and its digest,
+picks the destination from the routes, and takes the edge through the
+transition path, recording the answer file under the plan lock
+([§FS-rhei-gate-brief.7.1](rhei-gate-brief.spec.md#71-the-answer-file)). The dry run writes nothing ([§FS-rhei-gate-cmd.3.1](rhei-gate-cmd.spec.md#31---dry-run)). Neither the page nor
+the server holds a second implementation of any of it.
+
+```
+POST /answer-gate { task_id, from, answers: <answer document>, dry_run }
+  → the document `rhei gate answer --json` prints
+```
+
+The reply is that document ([§FS-rhei-gate-cmd.3.2](rhei-gate-cmd.spec.md#32-output---json)), refusals included. A refusal leaves
+the ticket where it is and is rendered in the block, a refusal that names a
+question beside that question and the rest under the form, with the answers
+kept, so the operator corrects one field rather than starting over. A `stale`
+refusal means the brief changed after the block drew it, and the next snapshot
+redraws it. A server that cannot answer gates replies `{ "ok": false, "error":
+… }`, and the block says so. The run picks an answered move up on its next
+pass, as it does a release.
+
+#### 5.1.3. Releasing a Plain Gate
+
+Where the brief's questions are only the synthesized `destination` and
+`reason` — no `gate:` block, a block that asks nothing, or a degraded brief —
+the block keeps the release it has always offered, because a release is those
+two questions under other names: the target and the result message. The block
+lists the state's explicit outgoing transitions as human choices and submits
+the selected task, `from` state, and `to` state to the run's loopback server.
+The server must apply the same explicit human-transition semantics as `rhei
+transition`: compare the task's current state to `from`, validate that `to` is
+a legal outgoing transition, honor callbacks and callback redirects, write the
+plan through the normal atomic transition path, and report the effective target
+state.
 
 Because it applies the same semantics, it also inherits the terminal-result
 obligation ([§FS-rhei-transition-cmd.3.2](rhei-transition-cmd.spec.md#32-terminal-result-on-entry)). A human finishing a ticket by hand is
@@ -306,19 +383,13 @@ rejection reason naming `rhei transition <id> --from <state> --to <state>
 all. The rejection is rendered in the block, and the run is unaffected either
 way: it picks up an applied transition on its next pass.
 
-It inherits the refusal at a gate with a brief as well
-([§FS-rhei-transition-cmd.3.5](rhei-transition-cmd.spec.md#35-gates-with-a-brief)): where the gate's brief asks an authored required question,
-the server refuses the release whichever choice was made, and the rejection
-names `rhei gate show` and `rhei gate answer`, the commands that answer it. A
-rejection reason carries the refusal's help with it, folded onto one line, so
-the block and the run TUI's journal ([§FS-rhei-run-tui.1.5.5](rhei-run-tui.spec.md#155-live-actions-intervene-and-human-gate)) show the way
-forward and not only the refusal.
-
-This is the only plan-state mutation allowed from the dashboard. It is available
-only while the loopback dashboard is live and only for tasks currently in a
-gating state. The static and frozen surfaces render gate choices as inert
-inspection affordances, not as working controls. Intervene remains separate: it
-messages a running agent and never transitions or edits the plan ([§FS-rhei-viz.5](rhei-viz.spec.md#5-running-execution-view)).
+The release still inherits the refusal at a gate with a brief
+([§FS-rhei-transition-cmd.3.5](rhei-transition-cmd.spec.md#35-gates-with-a-brief)), for any client that posts one there, an older page included:
+where the gate's brief asks an authored required question, the server refuses
+the release whichever choice was made, and the rejection names `rhei gate show`
+and `rhei gate answer`, the commands that answer it. A rejection reason carries
+the refusal's help with it, folded onto one line, so the block and the run
+TUI's journal ([§FS-rhei-run-tui.1.5.5](rhei-run-tui.spec.md#155-live-actions-intervene-and-human-gate)) show the way forward and not only the refusal.
 
 ## 6. State-Machine Graphs
 
@@ -437,13 +508,17 @@ type Snapshot = {
   accounting?: AccountingRunSummary;
   tasks: TaskRow[];             // id, title, parent, depth, state, visit_count?, prior, history?
   machine: Machine;             // the resolved state machine, flattened (below)
+  gates?: Record<string, GateBrief>; // the brief of each task at a gate, by task id (§5.1.1)
   capabilities?: Capabilities;   // live-only mutation affordances
   // plus existing run, slot, journal, ready/deferred, and link fields
 };
 
 type Capabilities = {
   gate_transition?: boolean;     // true only when POST /transition-gate is wired
+  gate_answer?: boolean;         // true only when POST /answer-gate is wired
 };
+
+type GateBrief = RheiGateShow;   // the document `rhei gate show --json` prints, field for field
 
 type StateHistoryEntry = {
   from: string;                  // parsed from `<task-id> <from>@<to>`
@@ -517,6 +592,12 @@ Rules:
   agent's `intervene_stdin` opt-in). The surface gates the message composer on
   this flag ([§FS-rhei-viz.5](rhei-viz.spec.md#5-running-execution-view)); it is absent on a static render, so the composer is never
   offered as deliverable offline.
+- **Gate briefs are `rhei gate show`'s.** For each task in a gating state the
+  host adds its brief under `gates[id]`: the document `rhei gate show --json`
+  prints ([§FS-rhei-gate-cmd.2.1](rhei-gate-cmd.spec.md#21-output---json)), built by the same code, which the surfaces render
+  ([§FS-rhei-viz.5.1.1](rhei-viz.spec.md#511-the-brief)). A static render carries them too, so an offline or frozen page
+  shows the brief with inert controls. A task whose brief cannot be built is
+  absent from `gates`, and its block falls back to the machine's transitions.
 
 ## 9. Plan-State Derivation
 

@@ -29,6 +29,7 @@ The state-machine surface also permits these optional fields for richer workflow
 - Per-state `inputs:` / `outputs:` artifact contracts to require workspace files on entry/exit; individual inputs may be marked `optional: true` to skip the existence check while still exposing the path and an existence flag to agents and programs
 - Per-state `handoff:` inheritance to inject declared same-task handoff artifacts from the previous state into the successor prompt
 - Per-state `mcp_servers:` and `skills:` lists to attach MCP servers and agent skills to the agent subprocess for that state; individual entries may be marked `optional: true` to warn-and-continue rather than block when the tool is unavailable
+- Per-state `gate:` to give a gating state a brief: what to show a person, what to ask, and which answer leads where ([§FS-rhei-gate-brief](rhei-gate-brief.spec.md#fs-rhei-gate-brief-gate-briefs))
 - Per-state `execute_on: <scope>-<event>` to make a non-leaf task in that state a *supervisor* of its subtree, woken at every finished child, every child transition, every finished descendant, or every descendant transition, and holding the subtree in between ([§FS-rhei-supervision](rhei-supervision.spec.md#fs-rhei-supervision-subtree-supervision-specification))
 
 When `models` is omitted, the machine behaves as it does today and states are
@@ -119,6 +120,7 @@ syntax error.
 | `personality` | string | No | State-specific role framing printed by `rhei next` for that state |
 | `role` | string | No | `cancellation` classifies abandonment independently of spelling; requires `final: true`. Omitted roles preserve bare-name inference. [§FS-rhei-states.1.4](rhei-states.spec.md#14-reserved-state-names) |
 | `gating` | boolean | No | When `true`, autonomous commands (`rhei next`, `rhei complete`, engine-triggered transitions) must not transition out of this state. Only explicit human-initiated transitions are allowed. |
+| `gate` | object | No | The brief a `gating: true` state puts to a person: a title and summary, the file to show, the questions (static, or a request file the state before writes), and routes from answers to destinations. Its `display` and `request` files are implicit required inputs of the state. See [§FS-rhei-gate-brief.1](rhei-gate-brief.spec.md#1-declaring-a-gate). |
 | `concurrent` | boolean | No | When `true`, `rhei run` may work multiple ready tasks in this state simultaneously (up to `--parallel`). When `false` (the default), at most one ready task per pass is scheduled for this state and the rest are deferred to a later pass. This is a scheduling hint only — state entry, exit, and transition semantics are unchanged. Fanout invocations from a single task (`all_targets` / `all_models`) are not affected by this flag. |
 | `poll` | object | No | Marks this state as a time-triggered *polling* state. Contains `interval` (duration string, e.g. `5m`) and `max_attempts` (integer ≥ 1). On each attempt the state's `agent` or `program` runs once and the engine evaluates transitions normally; a self-loop (`from: X, to: X`) is interpreted as "not done yet, retry after `interval`". Between attempts the `--parallel` slot is released and the task is not ready again until the interval elapses, unless its reverted attempts have spent `max_attempts` ([§FS-rhei-states.2.2](rhei-states.spec.md#22-semantics)). After `max_attempts` attempts the engine will not take a self-loop and instead selects a matching exhaustion transition (typically `condition: pollAttempts >= pollMaxAttempts`); if none matches, the task fails. May also carry `waiting_on` (a short label naming the person or role the poll waits for), which declares the wait as a *person* wait rather than machine backoff. Mutually exclusive with `visits`. See [Polling States](#2-polling-states) below and [Run Specification — Polling States](rhei-run.spec.md#51-polling-states). |
 | `visits` | integer | No | Maximum number of visits permitted for this state before the workflow must take a non-loop exit |
@@ -152,7 +154,7 @@ implicit rather than declared: see [Terminal Result](#33-terminal-result).
 
 - `profiles` and `node_policy` must either both be present or both be absent;
   omission of both is permitted only by the compatibility boundary in
-  [§FS-rhei-states.1.1](#11-top-level-fields).
+  [§FS-rhei-states.1.1](rhei-states.spec.md#11-top-level-fields).
 - In a profiled machine, `profiles` must be non-empty. Each entry must declare `initial`
   (a state name) and `allowed` (a list of state names). See
   [Profiles](#8-profiles) for per-profile validation.
@@ -253,6 +255,10 @@ implicit rather than declared: see [Terminal Result](#33-terminal-result).
 - `state.poll.waiting_on`, when present, must be a string that is not empty after trimming. It is optional; a blank value is a validation error rather than an absent field, because a poll that says it waits on someone must say on whom.
 - `state.poll` on a `final: true` state is a validation error (terminal states have no work to execute).
 - `state.poll` on a `gating: true` state is a validation error (gating states require human action; polling executes autonomously).
+- `state.gate` on a state that is not `gating: true` is a validation error. The
+  block's own rules — exclusive `request` and `questions`, relative paths, known
+  template variables, well-formed questions, and routes that name declared
+  edges and static questions — are [§FS-rhei-gate-brief.1.2](rhei-gate-brief.spec.md#12-validation).
 - `state.poll` combined with `state.visits` is a validation error. `poll.max_attempts` replaces the `visits` cap for the poll state and populates the same `stateVisits` counter.
 - A state that declares `poll` must have at least one self-loop transition (`from: <state>, to: <state>`); without it the "retry" branch is unreachable.
 - A non-poll state the machine declares a self-loop from is warned about when
@@ -497,6 +503,9 @@ Runtime semantics:
   state. If any required (`optional: false`, the default) input file is missing,
   the transition is rejected. Optional inputs (`optional: true`) are not checked;
   entry proceeds regardless of whether the file exists.
+- A gate's `display` and `request` files are required inputs of the gate state
+  without being listed, checked at the same point and refused the same way;
+  the request is also validated there ([§FS-rhei-gate-brief.2](rhei-gate-brief.spec.md#2-implicit-inputs)).
 - `outputs` are checked after `on_leave` callbacks complete and before the
   transition out of the state is committed. If any required output file is
   missing, the transition or successful-work completion is rejected according
@@ -1356,7 +1365,7 @@ per-node state policy. Profiles are defined once at the top level of the
 state machine YAML and referenced from `node_policy`.
 
 This section describes profiled machines. Legacy machines may omit both
-blocks under [§FS-rhei-states.1.1](#11-top-level-fields); their initial state
+blocks under [§FS-rhei-states.1.1](rhei-states.spec.md#11-top-level-fields); their initial state
 is selected by the per-state flag instead.
 
 Separating policy from state definitions means:
@@ -1435,7 +1444,7 @@ explicitly.
 `rhei` (the rhei tier), `by_type`, and `overrides`.
 
 These rules apply when the block is present. A legacy machine omits it
-together with `profiles` under [§FS-rhei-states.1.1](#11-top-level-fields)
+together with `profiles` under [§FS-rhei-states.1.1](rhei-states.spec.md#11-top-level-fields)
 and has no node-to-profile mapping.
 
 ### 9.1. Shape

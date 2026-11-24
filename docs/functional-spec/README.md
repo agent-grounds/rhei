@@ -44,6 +44,8 @@ one `FS-<slug>` ID at its H1.
 | [§FS-rhei-archive](rhei-archive.spec.md#fs-rhei-archive-rhei-archive) | `rhei archive`: pack one run's evidence into a file verified away from its workspace |
 | [§FS-rhei-next](rhei-next.spec.md#fs-rhei-next-rhei-next) | `rhei next` command behavior |
 | [§FS-rhei-transition-cmd](rhei-transition-cmd.spec.md#fs-rhei-transition-cmd-rhei-transition) | `rhei transition` command behavior |
+| [§FS-rhei-gate-brief](rhei-gate-brief.spec.md#fs-rhei-gate-brief-gate-briefs) | Gate briefs: what a gating state shows and asks, the request and answer files, and routes |
+| [§FS-rhei-gate-cmd](rhei-gate-cmd.spec.md#fs-rhei-gate-cmd-rhei-gate) | `rhei gate` command behavior: show, answer, list, and schema |
 | [§FS-rhei-recover](rhei-recover.spec.md#fs-rhei-recover-rhei-recover) | Explicit recovery of an interrupted operator-forced transition |
 | [§FS-rhei-retry](rhei-retry.spec.md#fs-rhei-retry-rhei-retry) | Grant an exhausted current visit another attempt budget without moving it |
 | [§FS-rhei-complete](rhei-complete.spec.md#fs-rhei-complete-rhei-complete) | `rhei complete` command behavior |

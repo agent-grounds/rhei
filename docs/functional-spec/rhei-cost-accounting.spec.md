@@ -1169,8 +1169,10 @@ It publishes, through the same command, the ids of the other durable documents
 it writes: `rhei.summary.checkpoint.v1` ([§FS-rhei-summary.6](rhei-summary.spec.md#6-the-checkpoint-document)), the seal's
 `rhei.seal.v1` ([§FS-rhei-seal.3](rhei-seal.spec.md#3-the-record)), the evidence schemas
 `rhei.evidence.invocation.v1`, `rhei.evidence.manifest.v1` and
-`rhei.evidence.event.v1` ([§FS-rhei-evidence](rhei-evidence.spec.md#fs-rhei-evidence-per-invocation-evidence)), and the archive index `rhei.archive.v1`
-([§FS-rhei-archive.4.2](rhei-archive.spec.md#42-the-index)). Listing is sorted by id.
+`rhei.evidence.event.v1` ([§FS-rhei-evidence](rhei-evidence.spec.md#fs-rhei-evidence-per-invocation-evidence)), the archive index `rhei.archive.v1`
+([§FS-rhei-archive.4.2](rhei-archive.spec.md#42-the-index)), and the gate documents `rhei.gate.request.v1`,
+`rhei.gate.answer.v1`, `rhei.gate.show.v1`, `rhei.gate.result.v1` and
+`rhei.gate.list.v1` ([§FS-rhei-gate-brief.9](rhei-gate-brief.spec.md#9-schemas)). Listing is sorted by id.
 
 The versioned source files live in `crates/rhei-cli/schemas/` and are embedded
 in the binary. `rhei schema <schema-id>` writes the embedded file bytes to
@@ -1179,8 +1181,10 @@ line. An unknown id exits nonzero and names both the unknown id and the listing
 command.
 
 Published v1 schemas permit additive evolution: fields may be added within v1,
-and consumers must tolerate unknown fields at every object extension point. A
-removal, rename, type change, or semantic change to an existing field requires
+and consumers must tolerate unknown fields at every object extension point.
+The gate request and answer are the exception, because rhei is their reader and
+refuses a field it does not know ([§FS-rhei-gate-brief.3](rhei-gate-brief.spec.md#3-the-request-file)): their schemas close
+every object. A removal, rename, type change, or semantic change to an existing field requires
 a new schema id. Fields documented as optional, including `duration_ms`,
 `cli_session`, `run_id`, `agent_family`, and `token_convention`, remain optional
 so artifacts from older Rhei versions still validate.

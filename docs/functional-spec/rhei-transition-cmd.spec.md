@@ -440,8 +440,11 @@ environment variable, configuration, persistent grant, or `--yes`; agents are
 forbidden to invoke it. Stdin must be a terminal. After every stable preflight
 passes, the command prints the exact qualified task id and canonical base-state
 hop and requires the operator to type back
-`force <task-id> <from> -> <to>`. Mismatch, EOF, or a non-terminal caller
-refuses. The confirmation is valid for that invocation only; a refusal, race,
+`force <task-id> <from> -> <to>`. The prompt is one line,
+`Operator <account>: type <hop>`, and it reaches the terminal whole, in a single
+write ending in its newline: neither a person nor a driver reading the terminal
+can observe the prompt without its hop (agent-grounds/rhei#761). Mismatch, EOF,
+or a non-terminal caller refuses. The confirmation is valid for that invocation only; a refusal, race,
 or retry requires another invocation and confirmation.
 
 This ceremony is an explicitness and account-attribution boundary, not proof

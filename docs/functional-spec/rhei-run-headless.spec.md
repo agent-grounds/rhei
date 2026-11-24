@@ -361,8 +361,8 @@ ones, which is the order resolution tries them in.
 
 The loopback server that serves the dashboard ([§FS-rhei-viz.7.1](rhei-viz.spec.md#71-dynamic-live-during-rhei-run)) is the run's
 **control server**: it carries `/snapshot`, `/intervene`
-([§AR-rhei-viz-flow.7](../architecture/rhei-viz-flow.spec.md#7-intervene-the-single-mutation-boundary)), and `/transition-gate` ([§FS-rhei-viz.5.1](rhei-viz.spec.md#51-human-gate-transitions)). The browser
-page is one thing it serves, not the reason it exists.
+([§AR-rhei-viz-flow.7](../architecture/rhei-viz-flow.spec.md#7-intervene-the-single-mutation-boundary)), `/transition-gate` ([§FS-rhei-viz.5.1.3](rhei-viz.spec.md#513-releasing-a-plain-gate)), and `/answer-gate`
+([§FS-rhei-viz.5.1.2](rhei-viz.spec.md#512-answering-a-briefed-gate)). The browser page is one thing it serves, not the reason it exists.
 
 `--headless` therefore always starts the control server, so an attached surface
 can intervene and release gates. `--no-dashboard` continues to mean "do not
@@ -396,14 +396,15 @@ did not start. It is a **reader of files plus a client of the control server**:
   `slot_assigned.log_path`, tailed directly. That is where the complete
   transcript already is ([§FS-rhei-run-tui.1.2](rhei-run-tui.spec.md#12-live-agent-traffic)), so nothing is duplicated into
   the event log to make attachment work.
-- **Intervene** and **human gate release** post to the run's `control_url`,
-  through the identical boundaries the browser dashboard and `rhei intervene`
-  use. When the run serves no control URL, both actions report themselves
-  unavailable rather than failing after the operator has typed.
+- **Intervene**, **human gate release** and **gate answers** post to the
+  run's `control_url`, through the identical boundaries the browser dashboard
+  and `rhei intervene` use. When the run serves no control URL, every one of
+  them reports itself unavailable rather than failing after the operator has
+  typed.
 
 Several surfaces may attach to one run at once, and a browser dashboard may be
 open beside them. None of them is privileged: they are all readers of the same
-files and clients of the same two endpoints.
+files and clients of the same endpoints.
 
 ### 5.1. Attaching Does Not Drive
 

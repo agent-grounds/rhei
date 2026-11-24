@@ -399,7 +399,9 @@ At a gate whose brief asks at least one **authored** required question,
 `rhei transition --from <gate>` is refused, and the refusal names
 `rhei gate answer <ticket> --from <gate> --answers <file|->` and
 `rhei gate show <ticket>` ([§FS-rhei-transition-cmd.3.5](rhei-transition-cmd.spec.md#35-gates-with-a-brief)). The live dashboard's gate
-release applies the same refusal ([§FS-rhei-viz.5.1](rhei-viz.spec.md#51-human-gate-transitions)), and `rhei complete`, which never
+release applies the same refusal ([§FS-rhei-viz.5.1.3](rhei-viz.spec.md#513-releasing-a-plain-gate)); the dashboard and the run TUI
+offer an answer at such a gate in its place, through the core this command
+uses ([§FS-rhei-viz.5.1.2](rhei-viz.spec.md#512-answering-a-briefed-gate) [§FS-rhei-run-tui.1.5.5](rhei-run-tui.spec.md#155-live-actions-intervene-and-human-gate)). `rhei complete`, which never
 leaves a gate, names the same two commands when it refuses one
 ([§FS-rhei-complete.4](rhei-complete.spec.md#4-behavior)). A gate with no block, or whose brief asks only synthesized
 questions — a degraded brief included — transitions exactly as before.

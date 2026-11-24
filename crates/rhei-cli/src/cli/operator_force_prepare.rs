@@ -101,6 +101,9 @@ fn prepare_forced_transition(request: &ForcedRequest<'_>) -> MietteResult<Prepar
     }
     ensure_state_inputs_exist_for_transition(&route.execution_root, Some(task), &task_id, to, &machine.states[to], to_visit, machine, &settings,
         &format!("Task {task_id} cannot enter state {to}."))?;
+    // §FS-rhei-gate-brief.2
+    ensure_gate_inputs_on_entry(&route.execution_root, Some(task), &task_id, to, &machine.states[to],
+        &format!("Task {task_id} cannot enter state {to}."))?;
     if declared.is_some() {
         ensure_terminal_result_available(machine, &root, &task_id, from, to, request.result, &input)?;
         return Ok(None);

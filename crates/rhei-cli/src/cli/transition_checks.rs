@@ -288,6 +288,7 @@ fn transition_command_with_release(
         no_callbacks,
         TransitionOrigin {
             manual_release: Some(release_subtree),
+            gate_brief_guard: true,
             result_message: result_msg.map(str::to_string),
             supervisor,
             ..TransitionOrigin::default()

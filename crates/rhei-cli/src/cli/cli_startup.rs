@@ -426,6 +426,8 @@ fn command_wants_json(command: &Commands) -> bool {
         // `show --json` exists so a script reads three keys every time, so its
         // failures are the machine shape too. §FS-rhei-errors.5
         Commands::Show { json, .. } => *json,
+        // §FS-rhei-gate-cmd.1
+        Commands::Gate { command } => command.wants_json(),
         // A damaged account is a failure, and without this arm it renders as
         // prose where the contract promises an object. Narrowed to `show`:
         // nothing else under `budget` has a `--format`. §FS-rhei-budgets.10

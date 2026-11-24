@@ -11,6 +11,9 @@ struct TransitionOrigin {
     /// executor then treats state, ownership, and bookkeeping as one claim.
     /// No other transition caller opts into this behavior. §FS-rhei-next.3.1
     claim: bool,
+    /// Only `rhei transition` sets this: a gate whose brief asks authored
+    /// required questions is answered, not transitioned. §FS-rhei-transition-cmd.3.5
+    gate_brief_guard: bool,
     /// Override the default `triggered_by` slot. `None` falls back to
     /// `"user"` (or `"callback"` when an on_leave redirect rerouted).
     triggered_by: Option<&'static str>,
@@ -244,6 +247,7 @@ fn execute_system_timeout_transition(
         TransitionOrigin {
             manual_release: None,
             claim: false,
+            gate_brief_guard: false,
             triggered_by: Some("system"),
             seed_data: Some(serde_json::Value::Object(data)),
             skip_source_outputs: true,
@@ -297,6 +301,7 @@ fn execute_system_tooling_transition(
         TransitionOrigin {
             manual_release: None,
             claim: false,
+            gate_brief_guard: false,
             triggered_by: Some("system"),
             seed_data: Some(serde_json::Value::Object(data)),
             skip_source_outputs: true,
@@ -350,6 +355,7 @@ fn execute_system_program_exit_transition(
         TransitionOrigin {
             manual_release: None,
             claim: false,
+            gate_brief_guard: false,
             triggered_by: Some("system"),
             seed_data: Some(serde_json::Value::Object(data)),
             // Deliberately still the bare exit test: the source state's declared

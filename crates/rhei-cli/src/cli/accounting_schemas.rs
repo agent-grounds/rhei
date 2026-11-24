@@ -47,6 +47,12 @@ const PUBLISHED_ACCOUNTING_SCHEMAS: &[(&str, &str)] = &[
         include_str!("../../schemas/rhei.evidence.manifest.v1.schema.json"),
     ),
     // A seal generation, which an evidence start record names. §FS-rhei-seal.3
+    // The gate documents `rhei gate schema` prints by short name. §FS-rhei-gate-cmd.5
+    ("rhei.gate.answer.v1", include_str!("../../schemas/rhei.gate.answer.v1.schema.json")),
+    ("rhei.gate.list.v1", include_str!("../../schemas/rhei.gate.list.v1.schema.json")),
+    ("rhei.gate.request.v1", include_str!("../../schemas/rhei.gate.request.v1.schema.json")),
+    ("rhei.gate.result.v1", include_str!("../../schemas/rhei.gate.result.v1.schema.json")),
+    ("rhei.gate.show.v1", include_str!("../../schemas/rhei.gate.show.v1.schema.json")),
     (
         "rhei.seal.v1",
         include_str!("../../schemas/rhei.seal.v1.schema.json"),

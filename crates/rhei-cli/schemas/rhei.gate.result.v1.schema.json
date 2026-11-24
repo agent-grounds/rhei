@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "rhei.gate.result.v1",
+  "title": "Rhei gate answer result v1",
+  "description": "What `rhei gate answer --json` prints, on success and on refusal. See FS-rhei-gate-cmd.3.2.",
+  "type": "object",
+  "required": [
+    "version",
+    "ok",
+    "dry_run",
+    "ticket",
+    "from",
+    "to",
+    "route",
+    "answer_path",
+    "result",
+    "errors"
+  ],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "ok": {
+      "type": "boolean"
+    },
+    "dry_run": {
+      "type": "boolean"
+    },
+    "ticket": {
+      "type": "string"
+    },
+    "from": {
+      "type": "string"
+    },
+    "to": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "route": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/route_choice"
+        }
+      ]
+    },
+    "answer_path": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "result": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/error"
+      }
+    }
+  },
+  "$defs": {
+    "route_choice": {
+      "type": "object",
+      "required": [
+        "index",
+        "when"
+      ],
+      "properties": {
+        "index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "when": {
+          "type": "object"
+        }
+      }
+    },
+    "error": {
+      "type": "object",
+      "required": [
+        "kind",
+        "question",
+        "message"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "invalid",
+            "stale",
+            "conflict",
+            "unrouted",
+            "not_a_gate",
+            "refused"
+          ]
+        },
+        "question": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

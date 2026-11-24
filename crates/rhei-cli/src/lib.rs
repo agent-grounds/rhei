@@ -28,6 +28,11 @@ include!("cli/completion_candidates.rs");
 include!("cli/completion_context.rs");
 include!("cli/list_command.rs");
 include!("cli/show_command.rs");
+// §FS-rhei-gate-cmd: one part per concern, the brief's inputs to its printing.
+include!("cli/gate_cli.rs");
+include!("cli/gate_inputs.rs");
+include!("cli/gate_view.rs");
+include!("cli/gate_commands.rs");
 include!("cli/error_guidance.rs");
 include!("cli/state_machine_shape_help.rs");
 include!("cli/diagnostic_causes.rs");

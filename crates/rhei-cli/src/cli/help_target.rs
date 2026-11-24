@@ -81,6 +81,7 @@ impl HelpTarget {
                 (plan_of(input, task), state_machine.as_ref(), true)
             }
             Commands::Show { input, task, .. } => (plan_of(input, task), None, true),
+            Commands::Gate { command } => command.help_target(),
             Commands::Migrate { command: MigrateCommand::ExportPriors { input, .. } }
             | Commands::Roster { input, .. }
             | Commands::Cost { input, .. } => (input.clone(), None, true),
@@ -354,7 +355,11 @@ fn names_help_target(text: &str) -> bool {
 /// The verbs whose next word is a subcommand rather than a target, with those
 /// subcommands. §FS-rhei-errors.1.2.1
 const SUBCOMMANDS: &[(&str, &[&str])] =
-    &[("budget", &["init", "show", "adjust", "forget"]), ("snapshot", &["list", "show", "gc", "continue"])];
+    &[
+        ("budget", &["init", "show", "adjust", "forget"]),
+        ("gate", &["show", "answer", "list", "schema"]),
+        ("snapshot", &["list", "show", "gc", "continue"]),
+    ];
 
 fn is_path_word(word: &str, typed: Option<&str>) -> bool {
     let word = word.trim_end_matches([',', ';', ':', ')', '`', '.']);

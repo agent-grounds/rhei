@@ -144,7 +144,9 @@ compare-and-swap and every mutable guard before computing any effect.
    edge and condition evaluation, callbacks and redirects, artifact checks,
    transition-metadata preparation, and every state, result, ledger, or
    checkpoint effect. `--no-callbacks` does not bypass it.
-6. Validate that a declared transition exists from `--from` to `--to` in the
+6. Without `--force`, refuse when `--from` is a gate whose brief asks an
+   authored required question ([§FS-rhei-transition-cmd.3.5](rhei-transition-cmd.spec.md#35-gates-with-a-brief)).
+   Validate that a declared transition exists from `--from` to `--to` in the
    active state machine. Without `--force`, reject if the edge is unlisted.
    With `--force`, classify the edge and route only a genuinely missing edge to
    [§FS-rhei-transition-cmd.6](rhei-transition-cmd.spec.md#6-operator-forced-missing-edge-recovery); a declared edge never enters the exceptional path. Then evaluate the
@@ -389,6 +391,33 @@ The successful release must retain its ordinary stdout and exit status, and its
 advisory must give foreground interruption and fresh-run recovery. This does not
 extend the advisory to inactive runs or relax strict machine validation.
 
+### 3.5. Gates with a Brief
+
+A gate whose brief asks at least one **authored** required question — a static
+question, or one from a valid request file ([§FS-rhei-gate-brief.4](rhei-gate-brief.spec.md#4-the-brief)) — is
+answered, not transitioned. `rhei transition --from <gate>` without `--force` is
+refused under the lock, after compare-and-swap and before the edge is looked
+at, and changes nothing. The refusal names the brief and the command that
+answers it ([§FS-rhei-errors.2](rhei-errors.spec.md#2-copy-paste-safety)):
+
+```text
+Error: Task agora.1 waits at gate 'human-judgment', which asks 2 required questions.
+  help: read the brief with: rhei gate show agora.1
+        answer it with: rhei gate answer agora.1 --from human-judgment --answers <file|->
+```
+
+The answer takes the same edge through this same path, so nothing a transition
+checks is skipped; what the refusal prevents is leaving the gate without the
+questions answered and recorded ([§FS-rhei-gate-brief.7](rhei-gate-brief.spec.md#7-recording)).
+
+A gate with no `gate:` block, or whose brief asks only the questions rhei
+synthesizes — including the degraded brief of a missing or invalid request
+([§FS-rhei-gate-brief.4.2](rhei-gate-brief.spec.md#42-degraded-brief)) — transitions exactly as any other state. `--force`
+is unchanged: a declared edge out of the gate still refuses it, and a missing
+edge still takes the operator recovery of [§FS-rhei-transition-cmd.6](rhei-transition-cmd.spec.md#6-operator-forced-missing-edge-recovery). The
+other verbs are unchanged too: `rhei next`, `rhei complete` and `rhei run` never
+leave a gating state.
+
 ## 4. Compare-and-Swap Conflicts
 
 Two agents that race on the same task both specify the same `--from`. The first call to acquire the lock rewrites the state. The second call re-reads under the lock, sees the actual state no longer matches `--from`, and fails non-zero with:
@@ -506,7 +535,7 @@ remedy followed by the complete quoted retry in its invocation context
 ([§FS-rhei-errors.1.2](rhei-errors.spec.md#12-help)). Scope comes only from that
 run's verified complete startup journal prefix: whole project or the resolved
 union of repeated `--rhei` selections, using the same evidence and safe stop
-rules as [§FS-rhei-transition-cmd.3.4](#34-live-gate-release-into-a-visits-budget).
+rules as [§FS-rhei-transition-cmd.3.4](rhei-transition-cmd.spec.md#34-live-gate-release-into-a-visits-budget).
 Incomplete, torn, stale, absent or unreadable scope evidence stays unknown.
 Malformed, unsupported, stale or mismatched ownership supplies no invented run
 identity, scope, pid or stop action. Another operator holder is identified as

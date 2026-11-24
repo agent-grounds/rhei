@@ -1,14 +1,18 @@
 # Rhei: Human Review Content Refresh
 
 ## Context
-Refresh customer-facing content while preserving explicit human checkpoints in the plan.
+Refresh customer-facing content. Its human checkpoints, the reviewer questions
+of Task 2 and the final sign-off of Task 4, are ordinary tasks in the dependency
+chain, not gate states: no `states.yaml` sits beside this plan, so the built-in
+`rhei` machine judges it and every task is `pending` or `completed`. For a plan
+that stops at a human gate, see `hourly-human-intervention-example/`.
 
 ## Notes
 This example demonstrates:
-- escaped state values with spaces
-- numeric task dependencies
-- subtask body content captured by the parser
-- realistic states from the default states file
+- numeric task identifiers, with child tasks numbered under their parent
+- a `**Prior:**` dependency chain across tasks: 2 after 1, 3 after 2, 4 after 3
+- child task bodies the parser captures
+- the built-in `rhei` states, `pending` and `completed`, with no `states.yaml` beside the plan
 
 ## Tasks
 
@@ -22,7 +26,7 @@ Review the current landing page, pricing page, and help center copy.
 Capture current headlines and calls to action for comparison.
 
 ### Task 2: Prepare revised copy
-**State:** human-review
+**State:** pending
 **Prior:** Task 1
 
 Draft updated messaging and leave open questions for stakeholders.
@@ -36,13 +40,13 @@ Propose updated headline, supporting text, and primary call to action.
 List questions for product and legal review in a short bullet list.
 
 ### Task 3: Apply approved edits
-**State:** agent-review
+**State:** pending
 **Prior:** Task 2
 
 Update the content files after review feedback is resolved.
 
 #### Task 3.1: Patch markdown sources
-**State:** agent-review
+**State:** pending
 Apply approved copy updates to the documentation repository.
 
 ### Task 4: Final sign-off

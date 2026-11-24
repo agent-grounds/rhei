@@ -54,7 +54,6 @@ fn xtask_examples() -> Vec<Entry> {
 }
 
 #[test]
-#[ignore = "red until #766: human-review-loop example uses states the built-in machine dropped; implement removes this"]
 fn every_xtask_example_validates_against_the_machine_it_names() {
     let root = repo_root();
     let entries = xtask_examples();

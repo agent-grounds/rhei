@@ -411,8 +411,8 @@ These distinct messages allow a PM or orchestrator to tell apart a finished
 plan, a human gate, fully in-flight work, manual transition selection, and
 ordinary prerequisite blocking. See [States Specification — State
 Definition](rhei-states.spec.md#12-per-state-fields) for the `gating: true`
-field (e.g., `human-review` in the default machine; custom machines may define
-additional gating states such as `security-review` or `legal-review`).
+field (the built-in machine has no gating state; a project's own machine may
+declare one, such as `human-review`, `security-review` or `legal-review`).
 
 **Relationship to Other Commands**
 

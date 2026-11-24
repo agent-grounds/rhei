@@ -10,7 +10,7 @@ Use this table when you know the job you want to model:
 |------|------------|-----|
 | First local run with no external agent setup | `agent-discussion/` | Mock agents complete a multi-target discussion workflow in a temporary copy. |
 | Simple manual plan authoring | `release-automation.rhei.md` | A compact single-file plan with sections, dependencies, and named ids. |
-| Human approval gates | `human-review-loop.rhei.md` | Shows the default `human-review` and `agent-review` flow. |
+| Human approval gates | `hourly-human-intervention-example/` | Its `graalvm-human-review` state is `gating: true`, so a run stops there until a person moves the task on. |
 | Repeatable product or PM work | `product-management-example/` | Fan-out PM entries, aggregate them, and implement a bounded slice. |
 | Agent debate or deliberation | `agent-discussion/` | Two agent targets discuss, aggregate disagreement, and apply a decision. |
 | Multi-model analysis | `multi-model-analysis/` | Runs analysis across several targets before aggregation. |
@@ -49,9 +49,9 @@ Use this table when you know the job you want to model:
 - `human-review-loop.rhei.md`
   Valid example using:
   - numeric task identifiers
-  - default workflow states including `human-review` and `agent-review`
   - normal subtask content bodies
   - dependency chaining across multiple tasks
+  - the built-in `rhei` states (no `states.yaml` sits beside the plan)
 
 - `pm-onboarding-experiment.rhei.md`
   Valid example using:

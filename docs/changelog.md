@@ -3,20 +3,21 @@
 *Each release's section is generated from the pull requests merged since the
 previous release; nothing here is written by hand.*
 
-## 2. [0.6.6] - 2026-11-23
+## 2. [0.7.0] - 2026-11-25
 
-- [Check run locks before operator confirmation and give complete recovery guidance](https://github.com/agent-grounds/rhei/pull/758) (PR #758)
-- [Announce first-visit output reuse before skipping agents](https://github.com/agent-grounds/rhei/pull/756) (PR #756)
-- [Explain which automatic state machines project validation overrides replace](https://github.com/agent-grounds/rhei/pull/754) (PR #754)
-- [Say what a replacing rhei note replaced and state the fold rule beside the raw note store](https://github.com/agent-grounds/rhei/pull/752) (PR #752)
-- [Report spent visits with retry advice and rooted unmet artifacts](https://github.com/agent-grounds/rhei/pull/750) (PR #750)
-- [Recognize a Claude Code give-up on an unreachable provider as provider_unavailable](https://github.com/agent-grounds/rhei/pull/748) (PR #748)
-- [Resolve stop and attach member references to the Panta project run](https://github.com/agent-grounds/rhei/pull/747) (PR #747)
-- [Honor the state-machine override when creating tickets](https://github.com/agent-grounds/rhei/pull/743) (PR #743)
-- [Describe --state-machine as overriding the automatic states.yaml lookup](https://github.com/agent-grounds/rhei/pull/744) (PR #744)
+- [Show the gate brief in the dashboard and the run TUI, and answer a briefed gate there](https://github.com/agent-grounds/rhei/pull/773) (PR #773)
+- [Give gating states a brief and answer it with rhei gate](https://github.com/agent-grounds/rhei/pull/768) (PR #768)
+- [Summarize other rheis' orphan snapshots during member validation](https://github.com/agent-grounds/rhei/pull/775) (PR #775)
+- [Explain finished workers refused by a destination's missing input in Attention, halt lines and retry](https://github.com/agent-grounds/rhei/pull/772) (PR #772)
+- [Put the human-review-loop example on the built-in machine's states and stop presenting review states as built-in](https://github.com/agent-grounds/rhei/pull/771) (PR #771)
+- [Make the agent-discussion example complete with its committed mock](https://github.com/agent-grounds/rhei/pull/769) (PR #769)
+- [Explain spent destination visits in run warnings and Attention](https://github.com/agent-grounds/rhei/pull/765) (PR #765)
+- [Show the operator prompt in one write and make the attended driver wait for its whole line](https://github.com/agent-grounds/rhei/pull/763) (PR #763)
+- [Hold a non-concurrent state's limit per machine source, not per state name](https://github.com/agent-grounds/rhei/pull/762) (PR #762)
 
 ## 3. Older releases
 
+- [0.6.6](changelog/0.6.6.md) - 2026-11-23: 9 pull requests.
 - [0.6.5](changelog/0.6.5.md) - 2026-11-16: 41 pull requests.
 - [0.6.4](changelog/0.6.4.md) - 2026-11-09: 69 pull requests.
 - [0.6.3](changelog/0.6.3.md) - 2026-10-26: 6 pull requests.

@@ -7,7 +7,6 @@ use super::validate_snapshot_orphan_support::*;
 use super::*;
 
 #[test]
-#[ignore = "red until #774: combine other members' orphan warnings; implement removes this"]
 fn validate_snapshot_orphans_named_member_summarizes_other_owners() {
     let fixture = Fixture::new("rhei-774-orphan-summary");
     // Premises before the red assertion: readable manifests, genuine orphans,
@@ -82,7 +81,6 @@ fn validate_snapshot_orphans_named_member_summarizes_other_owners() {
 }
 
 #[test]
-#[ignore = "red until #774: preserve member orphan summaries on each watch pass; implement removes this"]
 fn validate_snapshot_orphans_watch_repeats_member_summary() {
     use super::provider_limit_support::{wait_for, RunningChild};
 
@@ -121,7 +119,6 @@ fn validate_snapshot_orphans_watch_repeats_member_summary() {
 
 #[test]
 #[cfg(unix)]
-#[ignore = "red until #774: offer an all-origin inspection command for the same project; implement removes this"]
 fn validate_snapshot_orphans_member_paths_offer_working_project_hint() {
     use super::help_target_tests::pasted;
 

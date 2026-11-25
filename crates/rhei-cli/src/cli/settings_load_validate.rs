@@ -637,52 +637,8 @@ fn validate_snapshot_plan_context(
     errors
 }
 
-fn snapshot_orphan_validation_warnings(
-    workspace_root: &Path,
-    loaded: &LoadedPlan,
-    machines: &ResolvedMachineSet,
-    settings: &RheiSettings,
-) -> MietteResult<Vec<String>> {
-    let cache_root = snapshot_cache_dir(settings, workspace_root);
-    if !cache_root.exists() {
-        return Ok(Vec::new());
-    }
-    let records = read_snapshot_records(&cache_root)?;
-    let mut warnings = Vec::new();
-    for record in records {
-        // A snapshot belongs to one ticket; judge it under that ticket's
-        // machine. §DA-per-rhei-state-machines
-        let machine = machines.machine_for_task_str(&record.task_id);
-        if snapshot_record_is_orphaned_for_loaded(&record, loaded, machine, settings) {
-            warnings.push(format!(
-                "snapshot {} is orphaned relative to the current plan/state machine",
-                record.display_ref()
-            ));
-        }
-    }
-    Ok(warnings)
-}
-
-fn snapshot_record_is_orphaned_for_loaded(
-    record: &SnapshotRecord,
-    loaded: &LoadedPlan,
-    machine: &rhei_validator::StateMachine,
-    settings: &RheiSettings,
-) -> bool {
-    let task_exists =
-        flatten_tasks(&loaded.rhei).into_iter().any(|task| task.id.to_string() == record.task_id);
-    if !task_exists {
-        return true;
-    }
-    if !machine.states.contains_key(&record.emitting_state) {
-        return true;
-    }
-    let Ok(slugs) = effective_target_slugs_for_state(machine, &record.emitting_state, settings)
-    else {
-        return true;
-    };
-    slugs.is_empty() || !slugs.contains(&record.target_slug)
-}
+// Snapshot cache validation and member-focused warning presentation. §FS-rhei-validate.4.7
+include!("snapshot_validation_warnings.rs");
 
 /// What to do about a `snapshot:` block the resolved agent cannot honour.
 ///

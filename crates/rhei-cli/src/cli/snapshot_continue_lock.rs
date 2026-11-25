@@ -634,23 +634,15 @@ fn days_from_civil(year: i64, month: u32, day: u32) -> Option<i64> {
     Some(era * 146_097 + doe - 719_468)
 }
 
+/// Inspection and validation agree on the records the summary counts.
+/// §FS-rhei-validate.4.7
 fn is_snapshot_orphaned(record: &SnapshotRecord, ctx: &SnapshotCommandContext) -> bool {
-    let task_exists = flatten_tasks(&ctx.loaded.rhei)
-        .into_iter()
-        .any(|task| task.id.to_string() == record.task_id);
-    if !task_exists {
-        return true;
-    }
-    let machine = ctx.machines.for_task_str(&record.task_id);
-    if !machine.states.contains_key(&record.emitting_state) {
-        return true;
-    }
-    let Ok(slugs) =
-        effective_target_slugs_for_state(machine, &record.emitting_state, &ctx.settings)
-    else {
-        return true;
-    };
-    slugs.is_empty() || !slugs.contains(&record.target_slug)
+    snapshot_record_is_orphaned_for_loaded(
+        record,
+        &ctx.loaded,
+        ctx.machines.for_task_str(&record.task_id),
+        &ctx.settings,
+    )
 }
 
 fn effective_target_slugs_for_state(

@@ -19,7 +19,8 @@ fn dispatch_target_command(
             let target = resolve_plan_target(input)?;
             report_validation_widened(&target);
             let state_machine = state_machine.or(before_subcommand);
-            validate_command(target.path(), state_machine.as_deref(), watch)
+            // Keep the member as a reporting preference, never a graph filter. §FS-rhei-validate.4.7
+            validate_command(&target, state_machine.as_deref(), watch)
         }
         Commands::Run { input, standalone, agent, program, snapshot, state_machine } => {
             let target = resolve_plan_target(input)?;

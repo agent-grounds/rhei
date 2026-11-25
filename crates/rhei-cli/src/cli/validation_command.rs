@@ -1,15 +1,29 @@
-/// Execute the `validate` subcommand once or in watch mode.
-fn validate_command(input: &Path, state_machine: Option<&Path>, watch: bool) -> MietteResult<()> {
+/// Retain the named member for presentation while validating the full target.
+/// §FS-rhei-validate.4.7
+fn validate_command(target: &PlanTarget, state_machine: Option<&Path>, watch: bool) -> MietteResult<()> {
+    let input = target.path();
+    let member = target.implied_scope.first().map(String::as_str);
     if watch {
-        watch_validation_command(input, state_machine)
+        watch_validation_command(input, state_machine, member)
     } else {
-        run_validation_once(input, state_machine)
+        run_validation_once_with_member(input, state_machine, member)
     }
 }
 
-/// Parse a plan, load the selected states, and print validation results.
+/// Parse a plan, load the selected states, and print full-detail validation
+/// results for commands that reuse validation. §FS-rhei-validate.4.7
 fn run_validation_once(input: &Path, state_machine: Option<&Path>) -> MietteResult<()> {
-    let warnings = validation_warnings_or_error(input, state_machine)?;
+    run_validation_once_with_member(input, state_machine, None)
+}
+
+/// Apply member-focused cache warnings only to validate, including watch passes.
+/// Other validation callers keep full detail. §FS-rhei-validate.4.7
+fn run_validation_once_with_member(
+    input: &Path,
+    state_machine: Option<&Path>,
+    member: Option<&str>,
+) -> MietteResult<()> {
+    let warnings = validation_warnings_or_error(input, state_machine, member)?;
     // All four, before any conditional warning: a bound nobody sees before
     // it is spent is not visible. Resolved and reported only — nothing here
     // locks, appends, or debits. §FS-rhei-validate.4 §FS-rhei-budgets.6.3
@@ -50,11 +64,14 @@ struct ValidationPass {
 /// pass `rhei validate` runs without its output — `rhei new` checks the project
 /// still loads before it reports success.
 // §FS-rhei-new.5.1
+// §FS-rhei-validate.4.7: the member affects warning presentation only.
 fn validation_warnings_or_error(
     input: &Path,
     state_machine: Option<&Path>,
+    member: Option<&str>,
 ) -> MietteResult<Vec<String>> {
-    let pass = validation_pass(input, state_machine)?;
+    let loaded = load_plan_for_validation(input)?;
+    let pass = validation_pass_for_loaded_with_member(input, state_machine, loaded, None, member)?;
     // Both ordinary and watch validation report once, including failed passes. §FS-rhei-validate.6.1
     if let Some(context) = &pass.override_context {
         println!("{context}");
@@ -78,14 +95,26 @@ fn validation_pass(input: &Path, state_machine: Option<&Path>) -> MietteResult<V
 }
 
 /// Validate a preloaded graph through the same machine, link, settings, and
-/// snapshot checks as `rhei validate`. §FS-rhei-templates.6.1.2
+/// snapshot checks as `rhei validate`, retaining full orphan detail for other
+/// commands. §FS-rhei-templates.6.1.2 §FS-rhei-validate.4.7
 fn validation_pass_for_loaded(
     input: &Path,
     state_machine: Option<&Path>,
     loaded: LoadedPlan,
     settings_root: Option<&Path>,
 ) -> MietteResult<ValidationPass> {
+    validation_pass_for_loaded_with_member(input, state_machine, loaded, settings_root, None)
+}
 
+/// The same whole-graph checks with an optional member reporting preference.
+/// §FS-rhei-validate.4.7
+fn validation_pass_for_loaded_with_member(
+    input: &Path,
+    state_machine: Option<&Path>,
+    loaded: LoadedPlan,
+    settings_root: Option<&Path>,
+    member: Option<&str>,
+) -> MietteResult<ValidationPass> {
     let resolved = resolve_state_machines_for_loaded_plan(input, &loaded, state_machine)?;
     let machines = resolved.validator_set();
     let normalized_input = normalize_workspace_input(input);
@@ -132,6 +161,8 @@ fn validation_pass_for_loaded(
         &loaded,
         &resolved,
         &settings,
+        member,
+        state_machine,
     )?);
     // §FS-rhei-panta.6: an empty project is valid, but say discovery found
     // nothing — a misnamed or misplaced plan is otherwise silently invisible

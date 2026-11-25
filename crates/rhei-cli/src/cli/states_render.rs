@@ -1207,8 +1207,13 @@ fn collect_workspace_task_sources(
 include!("validation_command.rs");
 include!("validation_override.rs");
 
-/// Watch the plan and states files and re-run validation on relevant changes.
-fn watch_validation_command(input: &Path, state_machine: Option<&Path>) -> MietteResult<()> {
+/// Watch the full project while retaining member warning presentation on every pass.
+/// §FS-rhei-validate.4.7
+fn watch_validation_command(
+    input: &Path,
+    state_machine: Option<&Path>,
+    member: Option<&str>,
+) -> MietteResult<()> {
     let mut watch_plan = validation_watch_plan(input, state_machine);
 
     println!(
@@ -1232,7 +1237,7 @@ fn watch_validation_command(input: &Path, state_machine: Option<&Path>) -> Miett
     let mut watched = Vec::new();
     register_watch_roots(&mut watcher, &watch_plan.roots, &mut watched)?;
 
-    run_validation_pass(input, state_machine);
+    run_validation_pass(input, state_machine, member);
 
     loop {
         let event = match rx.recv() {
@@ -1254,7 +1259,7 @@ fn watch_validation_command(input: &Path, state_machine: Option<&Path>) -> Miett
         while debounce_has_relevant_event(&rx, &watch_plan.targets) {}
 
         println!("--- change detected, revalidating ---");
-        run_validation_pass(input, state_machine);
+        run_validation_pass(input, state_machine, member);
 
         // `prompt_templates/` is optional, so the initial plan may have had no
         // directory to watch recursively. Re-plan after every pass: once the
@@ -1283,9 +1288,10 @@ fn register_watch_roots(
     Ok(())
 }
 
-/// Run one validation pass in watch mode, writing any failure to stderr.
-fn run_validation_pass(input: &Path, state_machine: Option<&Path>) {
-    if let Err(err) = run_validation_once(input, state_machine) {
+/// Run one watch pass with the same member presentation, writing failures to stderr.
+/// §FS-rhei-validate.4.7
+fn run_validation_pass(input: &Path, state_machine: Option<&Path>, member: Option<&str>) {
+    if let Err(err) = run_validation_once_with_member(input, state_machine, member) {
         eprintln!("{err:?}");
     }
 }
